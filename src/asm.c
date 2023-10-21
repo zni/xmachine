@@ -25,7 +25,9 @@ int main(int argc, char** argv)
 
     char line[8];
     uint16_t instruction;
+    uint16_t program_size = 0;
     size_t len = 8;
+    fwrite(&program_size, sizeof(program_size), 1, binary);
     while(!feof(source)) {
         for (int i = 0; i < len; i++) {
             line[i] = fgetc(source);
@@ -35,9 +37,14 @@ int main(int argc, char** argv)
             }
         }
 
-        if (strncmp(line, ".end", 4) == 0) { break; }
-        sscanf(line, "%i", &instruction);
+        if (strncmp(line, ".end", 4) == 0) { 
+            fseek(binary, 0, 0);
+            fwrite(&program_size, sizeof(program_size), 1, binary);
+            break; 
+        }
+        sscanf(line, "%ho", &instruction);
         fwrite(&instruction, sizeof(instruction), 1, binary);
+        program_size++;
     }
     fclose(source);
     fclose(binary);

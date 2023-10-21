@@ -1,13 +1,14 @@
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define MEMSIZE 4096
-#define PROGSIZE 7
 #define ZEROFLAG 0x0001
 
 uint16_t MEMORY[MEMSIZE];
-uint16_t PWR = 0;
+uint16_t PSR = 0;
 uint16_t IR = 0;
 uint16_t PC = 0;
 uint16_t MAR = 0;
@@ -15,42 +16,22 @@ uint16_t MBR = 0;
 uint16_t ALU = 0;
 uint16_t R[5] = { 0, 0, 0, 0, 0 };
 
-uint16_t PROGRAM[PROGSIZE] = {
-    0x1005,
-    0x2004,
-    0x3005,
-    0x6006,
-    0x4,
-    0x1,
-    0x0000
-};
-
-uint16_t PROGRAM2[PROGSIZE] = {
-    0010100,
-    0060101,
-    0020101,
-    0160000,
-    0000000,
-    0000000,
-    0000000
-};
-
 void zero_memory(void)
 {
     for (int i = 0; i < MEMSIZE; i++) { MEMORY[i] = 0; }
 }
 
-void load_program(void)
+void load_program(uint16_t *program, uint16_t len)
 {
-    for (int i = 0; i < PROGSIZE; i++) { MEMORY[i] = PROGRAM2[i]; }
+    for (int i = 0; i < len; i++) { MEMORY[i] = program[i]; }
 }
 
 void set_zero_flag(void)
 {
     if (ALU == 0) {
-        PWR |= ZEROFLAG;
+        PSR |= ZEROFLAG;
     } else {
-        PWR = 0;
+        PSR = 0;
     }
 }
 
@@ -137,9 +118,9 @@ void run_machine(void)
     }
 }
 
-void dump_state(void)
+void dump_state(uint16_t program_len)
 {
-    printf("PWR: 0o%06o\n", PWR);
+    printf("PSR: 0o%06o\n", PSR);
     printf("IR : 0o%06o\n", IR);
     printf("PC : 0o%06o\n", PC);
     printf("MAR: 0o%06o\n", MAR);
@@ -149,7 +130,7 @@ void dump_state(void)
         printf("R%d : 0o%06o\n", i, R[i]);
     }
 
-    for (int i = 0; i < PROGSIZE; i++) {
+    for (int i = 0; i < program_len; i++) {
         printf("0o%06o ", MEMORY[i]);
     }
     printf("\n");
@@ -161,10 +142,37 @@ int main(int argc, char** argv)
     R[0] = 2;
     R[1] = 5;
 
+    if (argc < 2) {
+        fprintf(stderr, "usage: machine <binary>\n");
+        return 1;
+    }
+
+    FILE *binary = fopen(argv[1], "r");
+    if (binary == NULL) {
+        fprintf(stderr, "Failed to open binary file.\n");
+        return 1;
+    }
+
+    uint16_t len = 0;
+    fread(&len, sizeof(uint16_t), 1, binary);
+
+    uint16_t *program = malloc(sizeof(uint16_t) * len);
+    if (program == NULL) {
+        fprintf(stderr, "Failed to allocate program.\n");
+        return 1;
+    }
+
+    for (int i = 0; i < len; i++) {
+        fread(&(program[i]), sizeof(uint16_t), 1, binary);
+    }
+    fclose(binary);
+
     zero_memory();
-    load_program();
+    load_program(program, len);
     run_machine();
-    dump_state();
+    dump_state(len);
+
+    free(program);
 
     return 0;
 }
