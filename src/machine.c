@@ -44,7 +44,7 @@ void run_machine(void)
         MAR = MEMORY[MBR];
         IR = (MAR & 0170000) >> 12;
         if (IR == 0) {
-            IR = (MAR & 0007000) >> 9;
+            IR = (MAR & 0077000) >> 9;
             if (IR == 0) {
                 IR = (MAR & 0000700) >> 6;
             }
@@ -55,18 +55,15 @@ void run_machine(void)
                 halted = true;
                 break;
             case 050: // CLR
-                MBR = MAR & 077;
-                R[MBR] = 0;
+                R[MAR & 077] = 0;
                 PC++;
                 break;
             case 053: // DEC
-                MBR = MAR & 077;
-                R[MBR]--;
+                R[MAR & 077]--;
                 PC++;
                 break;
             case 052: // INC
-                MBR = MAR & 077;
-                R[MBR]++;
+                R[MAR & 077]++;
                 PC++;
                 break;
             case 054: // NEG
@@ -90,7 +87,14 @@ void run_machine(void)
                 PC++;
                 break;
             case 01: // MOV
-                R[MAR & 077] = R[(MAR & 07700) >> 6];
+                if ((MAR & 07700) == 02700) { // Immediate addressing.
+                    PC++;
+                    MBR = PC;
+                    R[MAR & 077] = MEMORY[MBR];
+                    PC++;
+                } else { // Register to register.
+                    R[MAR & 077] = R[(MAR & 07700) >> 6];
+                }
                 PC++;
                 break;
             case 02: // CMP
@@ -138,10 +142,6 @@ void dump_state(uint16_t program_len)
 
 int main(int argc, char** argv)
 {
-    // Put some initial values in the registers until we sort out loading them.
-    R[0] = 2;
-    R[1] = 5;
-
     if (argc < 2) {
         fprintf(stderr, "usage: machine <binary>\n");
         return 1;
