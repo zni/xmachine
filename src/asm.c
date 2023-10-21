@@ -23,13 +23,24 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    char peek;
     char line[8];
-    uint16_t instruction;
+    uint16_t instruction = 0;
     uint16_t program_size = 0;
     size_t len = 8;
     fwrite(&program_size, sizeof(program_size), 1, binary);
     while(!feof(source)) {
-        for (int i = 0; i < len; i++) {
+        peek = fgetc(source);
+        if (peek == ';') {
+            while (fgetc(source) != '\n');
+            continue;
+        } else if (peek == EOF) {
+            break;
+        } else {
+            line[0] = peek;
+        }
+
+        for (int i = 1; i < len; i++) {
             line[i] = fgetc(source);
             if (line[i] == '\n' || line[i] == EOF) {
                 line[i] = '\0';
@@ -41,10 +52,12 @@ int main(int argc, char** argv)
             fseek(binary, 0, 0);
             fwrite(&program_size, sizeof(program_size), 1, binary);
             break; 
+        } else {
+            sscanf(line, "%ho", &instruction);
+            printf("%07o - %hu\n", instruction, program_size);
+            fwrite(&instruction, sizeof(instruction), 1, binary);
+            program_size++;
         }
-        sscanf(line, "%ho", &instruction);
-        fwrite(&instruction, sizeof(instruction), 1, binary);
-        program_size++;
     }
     fclose(source);
     fclose(binary);
