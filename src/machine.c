@@ -46,7 +46,7 @@ void run_machine(void)
         if (IR == 0) {
             IR = (MAR & 0077000) >> 9;
             if (IR == 0) {
-                IR = (MAR & 0000700) >> 6;
+                IR = (MAR & 0007700) >> 6;
             }
         }
 
