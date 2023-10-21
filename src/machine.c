@@ -5,10 +5,10 @@
 #include <stdlib.h>
 
 #define MEMSIZE 4096
-#define ZEROFLAG 0x0001
+#define ZEROFLAG 0004
 
 uint16_t MEMORY[MEMSIZE];
-uint16_t PSR = 0;
+uint16_t PSW = 0;
 uint16_t IR = 0;
 uint16_t PC = 0;
 uint16_t MAR = 0;
@@ -29,9 +29,9 @@ void load_program(uint16_t *program, uint16_t len)
 void set_zero_flag(void)
 {
     if (ALU == 0) {
-        PSR |= ZEROFLAG;
+        PSW |= ZEROFLAG;
     } else {
-        PSR = 0;
+        PSW = (PSW & ZEROFLAG) ? (PSW ^ ZEROFLAG) : PSW;
     }
 }
 
@@ -127,7 +127,7 @@ void run_machine(void)
 
 void dump_state(uint16_t program_len)
 {
-    printf("PSR: 0o%06o\n", PSR);
+    printf("PSW: 0o%06o\n", PSW);
     printf("IR : 0o%06o\n", IR);
     printf("PC : 0o%06o\n", PC);
     printf("MAR: 0o%06o\n", MAR);
