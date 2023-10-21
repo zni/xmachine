@@ -5,7 +5,7 @@
 int main(int argc, char** argv)
 {
     if (argc > 3) {
-        fprintf(stderr, "usage: asm <file.asm> <binary>");
+        fprintf(stderr, "usage: asm <source.mcode> <binary>");
         return 1;
     }
 
@@ -23,15 +23,20 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    char *line;
+    char line[8];
     uint16_t instruction;
     size_t len = 8;
     while(!feof(source)) {
-        line = fgetln(source, &len);
-        line[7] = '\0';
+        for (int i = 0; i < len; i++) {
+            line[i] = fgetc(source);
+            if (line[i] == '\n' || line[i] == EOF) {
+                line[i] = '\0';
+                break;
+            }
+        }
 
         if (strncmp(line, ".end", 4) == 0) { break; }
-        instruction = sscanf("%i", line);
+        sscanf(line, "%i", &instruction);
         fwrite(&instruction, sizeof(instruction), 1, binary);
     }
     fclose(source);
