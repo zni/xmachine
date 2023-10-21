@@ -4,26 +4,16 @@
 
 #define MEMSIZE 4096
 #define PROGSIZE 7
+#define ZEROFLAG 0x0001
 
 uint16_t MEMORY[MEMSIZE];
+uint16_t PWR = 0;
 uint16_t IR = 0;
 uint16_t PC = 0;
 uint16_t MAR = 0;
 uint16_t MBR = 0;
 uint16_t ALU = 0;
-uint16_t R[5] { 0, 0, 0, 0, 0 };
-
-/*
-    0000 0000 0000 0000
-*/
-
-// 0x0 HALT
-// 0x1 LOAD
-// 0x2 ADD
-// 0x3 STORE
-// 0x4 BEQ
-// 0x5 BNE
-// 0x6 JMP
+uint16_t R[5] = { 0, 0, 0, 0, 0 };
 
 uint16_t PROGRAM[PROGSIZE] = {
     0x1005,
@@ -36,12 +26,23 @@ uint16_t PROGRAM[PROGSIZE] = {
 };
 
 uint16_t PROGRAM2[PROGSIZE] = {
-    0
+    0010100,
+    0060101,
+    0020101,
+    0000000,
+    0000000,
+    0000000,
+    0000000
+};
+
+void zero_memory(void)
+{
+    for (int i = 0; i < MEMSIZE; i++) { MEMORY[i] = 0; }
 }
 
 void load_program(void)
 {
-    for (int i = 0; i < PROGSIZE; i++) { MEMORY[i] = PROGRAM[i]; }
+    for (int i = 0; i < PROGSIZE; i++) { MEMORY[i] = PROGRAM2[i]; }
 }
 
 void run_machine(void)
@@ -51,10 +52,16 @@ void run_machine(void)
     while (!halted) {
         MBR = PC;
         MAR = MEMORY[MBR];
-        IR = (MAR & 0177700) >> 6;
+        IR = (MAR & 0170000) >> 12;
+        if (IR == 0) {
+            IR = (MAR & 0007000) >> 9;
+            if (IR == 0) {
+                IR = (MAR & 0000700) >> 6;
+            }
+        }
 
         switch (IR) {
-            case 0x0: // HALT
+            case 00: // HALT
                 halted = true;
                 break;
             case 050: // CLR
@@ -74,7 +81,7 @@ void run_machine(void)
                 break;
             case 054: // NEG
                 MBR = MAR & 077;
-                R[MBR] = ~R[MBR] + 1;
+                R[MBR] = ~(R[MBR]) + 1;
                 PC++;
                 break;
             case 051: // COM
@@ -94,6 +101,22 @@ void run_machine(void)
                 break;
             case 01: // MOV p75
                 R[MAR & 077] = R[(MAR & 07700) >> 6];
+                PC++;
+                break;
+            case 02: // CMP
+                ALU = R[MAR & 077];
+                ALU -= R[(MAR & 07700) >> 6];
+                if (ALU == 0) {
+                    PWR |= ZEROFLAG;
+                } else {
+                    PWR = 0;
+                }
+                PC++;
+                break;
+            case 06: // ADD
+                ALU = R[MAR & 077];
+                ALU += R[(MAR & 07700) >> 6];
+                R[MAR & 077] = ALU;
                 PC++;
                 break;
 /*
@@ -145,27 +168,31 @@ void run_machine(void)
 
 void dump_state(void)
 {
-    printf("IR : 0x%04x\n", IR);
-    printf("PC : 0x%04x\n", PC);
-    printf("AC : 0x%04x\n", AC);
-    printf("MAR: 0x%04x\n", MAR);
-    printf("MBR: 0x%04x\n", MBR);
-    printf("ALU: 0x%04x\n", ALU);
+    printf("PWR: 0o%06o\n", PWR);
+    printf("IR : 0o%06o\n", IR);
+    printf("PC : 0o%06o\n", PC);
+    printf("MAR: 0o%06o\n", MAR);
+    printf("MBR: 0o%06o\n", MBR);
+    printf("ALU: 0o%06o\n", ALU);
+    for (int i = 0; i < 5; i++) {
+        printf("R%d : 0o%06o\n", i, R[i]);
+    }
 
     for (int i = 0; i < PROGSIZE; i++) {
-        printf("0x%04x ", MEMORY[i]);
+        printf("0o%06o ", MEMORY[i]);
     }
     printf("\n");
 }
 
 int main(int argc, char** argv)
 {
-    for (int i = 0; i < MEMSIZE; i++) { MEMORY[i] = 0; }
+    // Put some initial values in the registers until we sort out loading them.
+    R[0] = 2;
+    R[1] = 5;
 
+    zero_memory();
     load_program();
-
     run_machine();
-
     dump_state();
 
     return 0;
