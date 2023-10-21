@@ -29,7 +29,7 @@ uint16_t PROGRAM2[PROGSIZE] = {
     0010100,
     0060101,
     0020101,
-    0000000,
+    0160000,
     0000000,
     0000000,
     0000000
@@ -43,6 +43,15 @@ void zero_memory(void)
 void load_program(void)
 {
     for (int i = 0; i < PROGSIZE; i++) { MEMORY[i] = PROGRAM2[i]; }
+}
+
+void set_zero_flag(void)
+{
+    if (ALU == 0) {
+        PWR |= ZEROFLAG;
+    } else {
+        PWR = 0;
+    }
 }
 
 void run_machine(void)
@@ -99,19 +108,15 @@ void run_machine(void)
                 R[MBR] <<= 1;
                 PC++;
                 break;
-            case 01: // MOV p75
+            case 01: // MOV
                 R[MAR & 077] = R[(MAR & 07700) >> 6];
                 PC++;
                 break;
             case 02: // CMP
                 ALU = R[MAR & 077];
                 ALU -= R[(MAR & 07700) >> 6];
-                if (ALU == 0) {
-                    PWR |= ZEROFLAG;
-                } else {
-                    PWR = 0;
-                }
                 PC++;
+                set_zero_flag();
                 break;
             case 06: // ADD
                 ALU = R[MAR & 077];
@@ -119,47 +124,13 @@ void run_machine(void)
                 R[MAR & 077] = ALU;
                 PC++;
                 break;
-/*
-            case 0x1: // LOAD
-                MBR = MAR & 0x0FFF;
-                MAR = MEMORY[MBR];
-                AC = MAR;
+            case 016: // SUB
+                ALU = R[MAR & 077];
+                ALU -= R[(MAR & 07700) >> 6];
+                R[MAR & 077] = ALU;
                 PC++;
+                set_zero_flag();
                 break;
-            case 0x2: // ADD
-                MBR = MAR & 0x0FFF;
-                MAR = MEMORY[MBR];
-                ALU = AC;
-                ALU += MAR;
-                AC = ALU;
-                PC++;
-                break;
-            case 0x3: // STORE
-                MBR = MAR & 0x0FFF;
-                MEMORY[MBR] = AC;
-                PC++;
-                break;
-            case 0x4: // BEQ
-                if (AC == 0) {
-                    MBR = MAR & 0x0FFF;
-                    PC = MBR;
-                } else {
-                    PC++;
-                }
-                break;
-            case 0x5: // BNE
-                if (AC != 0) {
-                    MBR = MAR & 0x0FFF;
-                    PC = MBR;
-                } else {
-                    PC++;
-                }
-                break;
-            case 0x6: // JMP
-                MBR = MAR & 0x0FFF;
-                PC = MBR;
-                break;
-*/
         }
 
 
