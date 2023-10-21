@@ -1,6 +1,8 @@
-; Testing out immediate addressing.
+; Testing out immediate addressing, plus increment.
 ; First word contains move op code plus mode / program counter (R7) for SRC.
 ; Second word is the value to load.
+; Third word is increment the loaded value.
 0012700
 0000077
+0005200
 .end
