@@ -45,8 +45,8 @@ void run_machine(void)
         IR = (MAR & 0170000) >> 12;
         if (IR == 0) {
             IR = (MAR & 0077000) >> 9;
-            if (IR == 0) {
-                IR = (MAR & 0007700) >> 6;
+            if (IR == 0 || !(IR >= 070 && IR <= 074)) {
+                IR = (MAR & 0777700) >> 6;
             }
         }
 
@@ -94,8 +94,8 @@ void run_machine(void)
                     PC++;
                 } else { // Register to register.
                     R[MAR & 077] = R[(MAR & 07700) >> 6];
+                    PC++;
                 }
-                PC++;
                 break;
             case 02: // CMP
                 ALU = R[MAR & 077];
@@ -115,6 +115,9 @@ void run_machine(void)
                 R[MAR & 077] = ALU;
                 PC++;
                 set_zero_flag();
+                break;
+            default: // Catch undefined opcodes.
+                PC++;
                 break;
         }
 
