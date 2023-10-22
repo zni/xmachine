@@ -1,0 +1,5 @@
+; Load immediate value 012 into address 10.
+0012737
+0000012
+0000010
+.end
