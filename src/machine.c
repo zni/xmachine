@@ -17,6 +17,7 @@ uint16_t MAR = 0;
 uint16_t MBR = 0;
 uint16_t ALU = 0;
 uint16_t R[5] = { 0, 0, 0, 0, 0 };
+bool HALTED = false;
 
 void zero_memory(void)
 {
@@ -56,15 +57,46 @@ void exec_double_operand(void)
             break;
 
         case CMP:
+            ALU = R[MAR & 077];
+            ALU -= R[(MAR & 07700) >> 6];
+            PC++;
+            set_zero_flag();
+            break;
+
         case CMPB:
+            break;
+
         case BIT:
+            break;
         case BITB:
+            break;
         case BIC:
+            break;
         case BICB:
+            break;
         case BIS:
+            break;
         case BISB:
+            break;
+
         case ADD:
+            ALU = R[MAR & 077];
+            ALU += R[(MAR & 07700) >> 6];
+            R[MAR & 077] = ALU;
+            PC++;
+            break;
+
         case SUB:
+            ALU = R[MAR & 077];
+            ALU -= R[(MAR & 07700) >> 6];
+            R[MAR & 077] = ALU;
+            PC++;
+            set_zero_flag();
+            break;
+
+        default: // Catch undefined opcodes.
+            PC++;
+            break;
     }
 }
 
@@ -72,128 +104,161 @@ void exec_single_operand(void)
 {
     switch (IR) {
         case JMP:
+            // Register
+            if ((MAR & 070) == 000) {
+                PC = R[MAR & 07];
+
+            // Immediate
+            } else if ((MAR & 077) == 027) {
+                PC++;
+                MBR = PC;
+                PC = MEMORY[MBR];
+            }
         case SWAB:
+            break;
+
         case CLR:
+            R[MAR & 077] = 0;
+            PC++;
+            break;
+
         case CLRB:
+            break;
+
         case COM:
+            break;
+
         case COMB:
+            break;
+
         case INC:
+            R[MAR & 077]++;
+            PC++;
+            break;
+
         case INCB:
+            break;
+
         case DEC:
+            R[MAR & 077]--;
+            PC++;
+            break;
+
         case DECB:
+            break;
+
         case NEG:
+            MBR = MAR & 077;
+            R[MBR] = ~(R[MBR]) + 1;
+            PC++;
+            break;
+
         case NEGB:
+            break;
+
         case ADC:
+            break;
+
         case ADCB:
+            break;
+
         case SBC:
+            break;
+
         case SBCB:
+            break;
+
         case TST:
+            break;
+
         case TSTB:
+            break;
+
         case ROR:
+            break;
+
         case RORB:
+            break;
+
         case ROL:
+            break;
+
         case ROLB:
+            break;
+
         case ASR:
+            MBR = MAR & 077;
+            R[MBR] >>= 1;
+            PC++;
+            break;
+
         case ASRB:
+            break;
+
         case ASL:
+            MBR = MAR & 077;
+            R[MBR] <<= 1;
+            PC++;
+            break;
+
         case ASLB:
+            break;
+
         case MTPS:
+            break;
+
         case MFPI:
+            break;
+
         case MFPD:
+            break;
+
         case MTPI:
+            break;
+
         case MTPD:
+            break;
+
         case SXT:
+            break;
+
         case MFPS:
+            break;
+
+        default: // Catch undefined opcodes.
+            PC++;
+            break;
     }
+}
+
+void exec_halt(void)
+{
+    HALTED = true;
 }
 
 void run_machine(void)
 {
-    bool halted = false;
 
-    while (!halted) {
+
+    while (!HALTED) {
         MBR = PC;
         MAR = MEMORY[MBR];
         IR = (MAR & 0170000) >> 12;
-        if (IR == 0) {
-            IR = (MAR & 0077000) >> 9;
-            if (IR == 0 || !(IR >= 070 && IR <= 074)) {
-                IR = (MAR & 0777700) >> 6;
+        if (IR != 0) {
+            exec_double_operand();
+        } else {
+            IR = (MAR & 0177000) >> 9;
+            if (IR != 0 && (IR >= 070 && IR <= 074)) {
+                printf("NOT IMPLEMENTED: %03o\n", IR);
+            } else {
+                IR = (MAR & 0177700) >> 6;
+                if (IR == 0) {
+                    exec_halt();
+                } else {
+                    exec_single_operand();
+                }
             }
         }
-
-        switch (IR) {
-            case 00: // HALT
-                halted = true;
-                break;
-            case 050: // CLR
-                R[MAR & 077] = 0;
-                PC++;
-                break;
-            case 053: // DEC
-                R[MAR & 077]--;
-                PC++;
-                break;
-            case 052: // INC
-                R[MAR & 077]++;
-                PC++;
-                break;
-            case 054: // NEG
-                MBR = MAR & 077;
-                R[MBR] = ~(R[MBR]) + 1;
-                PC++;
-                break;
-            case 051: // COM
-                MBR = MAR & 077;
-                R[MBR] = ~R[MBR];
-                PC++;
-                break;
-            case 062: // ASR
-                MBR = MAR & 077;
-                R[MBR] >>= 1;
-                PC++;
-                break;
-            case 063: // ASL
-                MBR = MAR & 077;
-                R[MBR] <<= 1;
-                PC++;
-                break;
-            case 01: // MOV
-                if ((MAR & 07700) == 02700) { // Immediate addressing.
-                    PC++;
-                    MBR = PC;
-                    R[MAR & 077] = MEMORY[MBR];
-                    PC++;
-                } else { // Register to register.
-                    R[MAR & 077] = R[(MAR & 07700) >> 6];
-                    PC++;
-                }
-                break;
-            case 02: // CMP
-                ALU = R[MAR & 077];
-                ALU -= R[(MAR & 07700) >> 6];
-                PC++;
-                set_zero_flag();
-                break;
-            case 06: // ADD
-                ALU = R[MAR & 077];
-                ALU += R[(MAR & 07700) >> 6];
-                R[MAR & 077] = ALU;
-                PC++;
-                break;
-            case 016: // SUB
-                ALU = R[MAR & 077];
-                ALU -= R[(MAR & 07700) >> 6];
-                R[MAR & 077] = ALU;
-                PC++;
-                set_zero_flag();
-                break;
-            default: // Catch undefined opcodes.
-                PC++;
-                break;
-        }
-
-
     }
 }
 
