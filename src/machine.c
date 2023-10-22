@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "include/machine.h"
+
 #define MEMSIZE 4096
 #define ZEROFLAG 0004
 
@@ -32,6 +34,76 @@ void set_zero_flag(void)
         PSW |= ZEROFLAG;
     } else {
         PSW = (PSW & ZEROFLAG) ? (PSW ^ ZEROFLAG) : PSW;
+    }
+}
+
+void exec_double_operand(void)
+{
+    switch (IR) {
+        case MOV:
+            if ((MAR & 07700) == 02700) { // Immediate addressing.
+                PC++;
+                MBR = PC;
+                R[MAR & 077] = MEMORY[MBR];
+                PC++;
+            } else { // Register to register.
+                R[MAR & 077] = R[(MAR & 07700) >> 6];
+                PC++;
+            }
+            break;
+
+        case MOVB:
+            break;
+
+        case CMP:
+        case CMPB:
+        case BIT:
+        case BITB:
+        case BIC:
+        case BICB:
+        case BIS:
+        case BISB:
+        case ADD:
+        case SUB:
+    }
+}
+
+void exec_single_operand(void)
+{
+    switch (IR) {
+        case JMP:
+        case SWAB:
+        case CLR:
+        case CLRB:
+        case COM:
+        case COMB:
+        case INC:
+        case INCB:
+        case DEC:
+        case DECB:
+        case NEG:
+        case NEGB:
+        case ADC:
+        case ADCB:
+        case SBC:
+        case SBCB:
+        case TST:
+        case TSTB:
+        case ROR:
+        case RORB:
+        case ROL:
+        case ROLB:
+        case ASR:
+        case ASRB:
+        case ASL:
+        case ASLB:
+        case MTPS:
+        case MFPI:
+        case MFPD:
+        case MTPI:
+        case MTPD:
+        case SXT:
+        case MFPS:
     }
 }
 
