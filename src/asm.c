@@ -4,7 +4,7 @@
 
 int main(int argc, char** argv)
 {
-    if (argc > 3) {
+    if (argc < 3) {
         fprintf(stderr, "usage: asm <source.mcode> <binary>");
         return 1;
     }
