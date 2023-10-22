@@ -7,7 +7,13 @@
 #include "include/machine.h"
 
 #define MEMSIZE 4096
-#define ZEROFLAG 0004
+
+#define IPLBITS         0340
+#define TRAPFLAG        0020
+#define NEGATIVEFLAG    0010
+#define ZEROFLAG        0004
+#define OVERFLOWFLAG    0002
+#define CARRYFLAG       0001
 
 uint16_t MEMORY[MEMSIZE];
 uint16_t PSW = 0;
@@ -115,6 +121,9 @@ void exec_single_operand(void)
                 PC = MEMORY[MBR];
             }
         case SWAB:
+            MBR = MAR & 077;
+            R[MBR] = ((R[MBR] & 0177400) >> 8) | ((R[MBR] & 000377) << 8);
+            PC++;
             break;
 
         case CLR:
@@ -123,12 +132,21 @@ void exec_single_operand(void)
             break;
 
         case CLRB:
+            MBR = MAR & 077;
+            R[MBR] = (R[MBR] & 0177400);
+            PC++;
             break;
 
         case COM:
+            MBR = MAR & 077;
+            R[MBR] = ~R[MBR];
+            PC++;
             break;
 
         case COMB:
+            MBR = MAR & 077;
+            R[MBR] = ~(R[MBR] | 000377) | (R[MBR] & 0177400);
+            PC++;
             break;
 
         case INC:
@@ -137,6 +155,9 @@ void exec_single_operand(void)
             break;
 
         case INCB:
+            MBR = MAR & 077;
+            R[MBR] = ((R[MBR] | 000377) + 1) | (R[MBR] & 0177400);
+            PC++;
             break;
 
         case DEC:
@@ -145,6 +166,9 @@ void exec_single_operand(void)
             break;
 
         case DECB:
+            MBR = MAR & 077;
+            R[MBR] = ((R[MBR] | 000377) - 1) | (R[MBR] & 0177400);
+            PC++;
             break;
 
         case NEG:
@@ -154,15 +178,24 @@ void exec_single_operand(void)
             break;
 
         case NEGB:
+            MBR = MAR & 077;
+            R[MBR] = ((~(R[MBR] | 000377) + 1) & 000377) | (R[MBR] & 0177400);
+            PC++;
             break;
 
         case ADC:
+            MBR = MAR & 077;
+            R[MBR] = R[MBR] + (PSW & CARRYFLAG);
+            PC++;
             break;
 
         case ADCB:
             break;
 
         case SBC:
+            MBR = MAR & 077;
+            R[MBR] = R[MBR] - (PSW & CARRYFLAG);
+            PC++;
             break;
 
         case SBCB:
@@ -205,6 +238,9 @@ void exec_single_operand(void)
             break;
 
         case MTPS:
+            MBR = MAR & 077;
+            PSW = R[MBR];
+            PC++;
             break;
 
         case MFPI:
@@ -220,9 +256,18 @@ void exec_single_operand(void)
             break;
 
         case SXT:
+            if (PSW & NEGATIVEFLAG) {
+                R[MAR & 077] = -1;
+            } else {
+                R[MAR & 077] = 0;
+            }
+            PC++;
             break;
 
         case MFPS:
+            MBR = MAR & 077;
+            R[MBR] = PSW;
+            PC++;
             break;
 
         default: // Catch undefined opcodes.
