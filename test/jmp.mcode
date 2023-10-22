@@ -1,0 +1,6 @@
+; Load 0o7 into R0
+; Jump to 0o7 and halt.
+0012700
+0000007
+0000100
+.end
