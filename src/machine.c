@@ -72,7 +72,11 @@ void exec_double_operand(void)
             break;
         case BICB:
             break;
-        case BIS:
+        case BIS: // XXX pretend this is XOR until I read the manual.
+            ALU = R[MAR & 077];
+            ALU ^= R[(MAR & 07700) >> 6];
+            R[MAR & 077] = ALU;
+            PC++;
             break;
         case BISB:
             break;
@@ -231,7 +235,9 @@ void exec_single_operand(void)
 
         case ASR:
             MBR = MAR & 077;
-            R[MBR] >>= 1;
+            ALU = R[MBR];
+            ALU >>= 1;
+            R[MBR] = ALU;
             PC++;
             break;
 
@@ -243,7 +249,9 @@ void exec_single_operand(void)
 
         case ASL:
             MBR = MAR & 077;
-            R[MBR] <<= 1;
+            ALU = R[MBR];
+            ALU <<= 1;
+            R[MBR] = ALU;
             PC++;
             break;
 
@@ -297,6 +305,32 @@ void exec_halt(void)
     HALTED = true;
 }
 
+void dump_state(bool dump_memory)
+{
+    printf("PSW: 0o%06o\n", PSW);
+    printf("IR : 0o%06o\n", IR);
+    printf("PC : 0o%06o\n", PC);
+    printf("MAR: 0o%06o\n", MAR);
+    printf("MBR: 0o%06o\n", MBR);
+    printf("ALU: 0o%06o\n", ALU);
+    printf("SP : 0o%06o\n", SP);
+    for (int i = 0; i < 5; i++) {
+        printf("R%d : 0o%06o\n", i, R[i]);
+    }
+
+    if (dump_memory) {
+        int rows = MEMSIZE / 16;
+        for (int r = 0; r < MEMSIZE; r += 16) {
+            printf("0o%06o: ", r);
+            for (int c = 0; c < 16; c++) {
+                printf("0o%06o ", MEMORY[r + c]);
+            }
+            printf("\n");
+        }
+    }
+    printf("\n");
+}
+
 void run_machine(void)
 {
     while (!HALTED) {
@@ -322,27 +356,10 @@ void run_machine(void)
                 }
             }
         }
+        dump_state(false);
     }
 }
 
-void dump_state(uint16_t program_len)
-{
-    printf("PSW: 0o%06o\n", PSW);
-    printf("IR : 0o%06o\n", IR);
-    printf("PC : 0o%06o\n", PC);
-    printf("MAR: 0o%06o\n", MAR);
-    printf("MBR: 0o%06o\n", MBR);
-    printf("ALU: 0o%06o\n", ALU);
-    printf("SP : 0o%06o\n", SP);
-    for (int i = 0; i < 5; i++) {
-        printf("R%d : 0o%06o\n", i, R[i]);
-    }
-
-    for (int i = 0; i < program_len; i++) {
-        printf("0o%06o ", MEMORY[i]);
-    }
-    printf("\n");
-}
 
 int main(int argc, char** argv)
 {
@@ -374,7 +391,7 @@ int main(int argc, char** argv)
     zero_memory();
     load_program(program, len);
     run_machine();
-    dump_state(len);
+    dump_state(true);
 
     free(program);
 
