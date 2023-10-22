@@ -121,6 +121,7 @@ void exec_single_operand(void)
                 MBR = PC;
                 PC = MEMORY[MBR];
             }
+            break;
         case SWAB:
             MBR = MAR & 077;
             R[MBR] = ((R[MBR] & 0177400) >> 8) | ((R[MBR] & 000377) << 8);
