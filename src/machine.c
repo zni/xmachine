@@ -22,6 +22,7 @@ uint16_t PC = 0;
 uint16_t MAR = 0;
 uint16_t MBR = 0;
 uint16_t ALU = 0;
+uint16_t SP = 0;
 uint16_t R[5] = { 0, 0, 0, 0, 0 };
 bool HALTED = false;
 
@@ -340,6 +341,7 @@ void dump_state(uint16_t program_len)
     printf("MAR: 0o%06o\n", MAR);
     printf("MBR: 0o%06o\n", MBR);
     printf("ALU: 0o%06o\n", ALU);
+    printf("SP : 0o%06o\n", SP);
     for (int i = 0; i < 5; i++) {
         printf("R%d : 0o%06o\n", i, R[i]);
     }
