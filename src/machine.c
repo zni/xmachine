@@ -191,7 +191,7 @@ void exec_single_operand(void)
 
         case ADCB:
             MBR = MAR & 077;
-            R[MBR] = (R[MBR] & 000377) + (PSW & CARRYFLAG) | (R[MBR] & 0177400);
+            R[MBR] = ((R[MBR] & 000377) + (PSW & CARRYFLAG)) | (R[MBR] & 0177400);
             PC++;
             break;
 
@@ -202,6 +202,9 @@ void exec_single_operand(void)
             break;
 
         case SBCB:
+            MBR = MAR & 077;
+            R[MBR] = ((R[MBR] & 000377) - (PSW & CARRYFLAG)) | (R[MBR] & 0177400);
+            PC++;
             break;
 
         case TST:
@@ -211,15 +214,26 @@ void exec_single_operand(void)
             break;
 
         case ROR:
+            MBR = MAR & 077;
+            R[MBR] = (R[MBR] << 1) | (R[MBR] >> 15);
+            PC++;
             break;
 
         case RORB:
+            MBR = MAR & 077;
+            R[MBR] = (((R[MBR] & 000377) << 1) | ((R[MBR] & 000377) >> 7)) | (R[MBR] & 0177400);
+            PC++;
             break;
 
         case ROL:
+            MBR = MAR & 077;
+            R[MBR] = (R[MBR] << 15) | (R[MBR] >> 1);
+            PC++;
             break;
 
         case ROLB:
+            MBR = MAR & 077;
+            R[MBR] = (((R[MBR] & 000377) << 7) | ((R[MBR] & 000377) >> 1)) | (R[MBR] & 0177400);
             break;
 
         case ASR:
@@ -229,6 +243,9 @@ void exec_single_operand(void)
             break;
 
         case ASRB:
+            MBR = MAR & 077;
+            R[MBR] = ((R[MBR] & 000377) >> 1) | (R[MBR] & 0177400);
+            PC++;
             break;
 
         case ASL:
@@ -238,6 +255,9 @@ void exec_single_operand(void)
             break;
 
         case ASLB:
+            MBR = MAR & 077;
+            R[MBR] = ((R[MBR] & 000377) << 1) | (R[MBR] & 0177400);
+            PC++;
             break;
 
         case MTPS:
