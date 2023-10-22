@@ -6,15 +6,6 @@
 
 #include "include/machine.h"
 
-#define MEMSIZE 4096
-
-#define IPLBITS         0340
-#define TRAPFLAG        0020
-#define NEGATIVEFLAG    0010
-#define ZEROFLAG        0004
-#define OVERFLOWFLAG    0002
-#define CARRYFLAG       0001
-
 uint16_t MEMORY[MEMSIZE];
 uint16_t PSW = 0;
 uint16_t IR = 0;

@@ -1,6 +1,15 @@
 #ifndef MACHINE_H
 #define MACHINE_H
 
+#define MEMSIZE 4096
+
+#define IPLBITS         0340
+#define TRAPFLAG        0020
+#define NEGATIVEFLAG    0010
+#define ZEROFLAG        0004
+#define OVERFLOWFLAG    0002
+#define CARRYFLAG       0001
+
 enum double_op {
     MOV  = 01,
     MOVB = 011,
