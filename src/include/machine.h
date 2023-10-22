@@ -10,6 +10,15 @@
 #define OVERFLOWFLAG    0002
 #define CARRYFLAG       0001
 
+enum spec_double_op {
+    MUL  = 070,
+    DIV  = 071,
+    ASH  = 072,
+    ASHC = 073,
+    XOR  = 074
+};
+typedef enum spec_double_op spec_double_op_t;
+
 enum double_op {
     MOV  = 01,
     MOVB = 011,

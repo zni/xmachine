@@ -19,6 +19,11 @@ uint16_t *SRC  = NULL;
 uint16_t R[5] = { 0, 0, 0, 0, 0 };
 bool HALTED = false;
 
+void exec_halt(void)
+{
+    HALTED = true;
+}
+
 void zero_memory(void)
 {
     for (int i = 0; i < MEMSIZE; i++) { MEMORY[i] = 0; }
@@ -38,12 +43,29 @@ void set_zero_flag(void)
     }
 }
 
-void exec_double_operand(void)
+void setup_dest_addressing(void)
 {
-    /*
-     * SRC Addressing
-     */
+    // From immediate.
+    if ((IR & 077) == 027) {
+        PC++;
+        MBR = PC;
+        DEST = &(MEMORY[MBR]);
 
+    // From absolute.
+    } else if ((IR & 077) == 037) {
+        PC++;
+        MBR = PC;
+        MAR = MEMORY[MBR];
+        DEST = &(MEMORY[MAR]);
+
+    // From register.
+    } else if ((IR & 070) == 00) {
+        DEST = &(R[(IR & 007)]);
+    }
+}
+
+void setup_src_addressing(void)
+{
     // From immediate address.
     if ((IR & 07700) == 02700) {
         PC++;
@@ -61,28 +83,43 @@ void exec_double_operand(void)
     } else if ((IR & 07000) == 0) {
         SRC = &(R[(IR & 00700) >> 6]);
     }
+}
 
-    /*
-     * DEST Addressing
-     */
+void exec_special_double_operand(void)
+{
+    SRC = &(R[(IR & 0700) >> 6]);
+    setup_dest_addressing();
 
-    // From immediate: ILLEGAL BEEP BOOP HALT HALT HALT
-    if ((IR & 077) == 027) {
-        fprintf(stderr, "HALTING: DEST IS IMMEDIATE\n");
-        HALTED = true;
-        return;
+    switch ((IR & 0177000) >> 9) {
+        case MUL:
+            break;
 
-    // From absolute.
-    } else if ((IR & 077) == 037) {
-        PC++;
-        MBR = PC;
-        MAR = MEMORY[MBR];
-        DEST = &(MEMORY[MAR]);
+        case DIV:
+            break;
 
-    // From register.
-    } else if ((IR & 070) == 00) {
-        DEST = &(R[(IR & 007)]);
+        case ASH:
+            break;
+
+        case ASHC:
+            break;
+
+        case XOR:
+            ALU = *SRC;
+            ALU ^= *DEST;
+            *DEST = ALU;
+            PC++;
+            break;
+
+        default:
+            PC++;
+            break;
     }
+}
+
+void exec_double_operand(void)
+{
+    setup_src_addressing();
+    setup_dest_addressing();
 
     switch ((IR & 0170000) >> 12) {
         case MOV:
@@ -91,6 +128,8 @@ void exec_double_operand(void)
             break;
 
         case MOVB:
+            *DEST = (*SRC & 0377);
+            PC++;
             break;
 
         case CMP:
@@ -104,19 +143,33 @@ void exec_double_operand(void)
             break;
 
         case BIT:
+            ALU = *DEST;
+            ALU &= *SRC;
+            *DEST = ALU;
+            set_zero_flag();
+            PC++;
             break;
+
         case BITB:
             break;
+
         case BIC:
-            break;
-        case BICB:
-            break;
-        case BIS: // XXX pretend this is XOR until I read the manual.
             ALU = *DEST;
-            ALU ^= *SRC;
+            ALU &= ~(*SRC);
             *DEST = ALU;
             PC++;
             break;
+
+        case BICB:
+            break;
+
+        case BIS:
+            ALU = *DEST;
+            ALU |= *SRC;
+            *DEST = ALU;
+            PC++;
+            break;
+
         case BISB:
             break;
 
@@ -143,27 +196,7 @@ void exec_double_operand(void)
 
 void exec_single_operand(void)
 {
-   /*
-     * DEST Addressing
-     */
-
-    // From immediate.
-    if ((IR & 077) == 027) {
-        PC++;
-        MBR = PC;
-        DEST = &(MEMORY[MBR]);
-
-    // From absolute.
-    } else if ((IR & 077) == 037) {
-        PC++;
-        MBR = PC;
-        MAR = MEMORY[MBR];
-        DEST = &(MEMORY[MAR]);
-
-    // From register.
-    } else if ((IR & 070) == 00) {
-        DEST = &(R[(IR & 007)]);
-    }
+    setup_dest_addressing();
 
     switch ((IR & 0177700) >> 6) {
         case JMP:
@@ -353,11 +386,6 @@ void exec_single_operand(void)
     }
 }
 
-void exec_halt(void)
-{
-    HALTED = true;
-}
-
 void dump_state(bool dump_memory)
 {
     printf("PSW: 0o%06o\n", PSW);
@@ -402,18 +430,15 @@ void run_machine(void)
         IR = MAR;
 
         // Is this a double operand op?
-        //IR = (MAR & 0170000) >> 12;
         if (((IR & 0170000) >> 12) != 0) {
             exec_double_operand();
         } else {
             // Is this a special double operand op?
-            // IR = (MAR & 0177000) >> 9;
             if (((IR & 0177000) >> 9) != 0 &&
                 (((IR & 0177000) >> 9) >= 070 && ((IR & 0177000) >> 9) <= 074)) {
-                printf("NOT IMPLEMENTED: %03o\n", IR);
+                exec_special_double_operand();
             } else {
                 // Is this a single operand op?
-                // IR = (MAR & 0177700) >> 6;
                 if (((IR & 0177700) >> 6) == 0) {
                     exec_halt();
                 } else {
