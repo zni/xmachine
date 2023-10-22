@@ -145,7 +145,7 @@ void exec_single_operand(void)
 
         case COMB:
             MBR = MAR & 077;
-            R[MBR] = ~(R[MBR] | 000377) | (R[MBR] & 0177400);
+            R[MBR] = ~(R[MBR] & 000377) | (R[MBR] & 0177400);
             PC++;
             break;
 
@@ -156,7 +156,7 @@ void exec_single_operand(void)
 
         case INCB:
             MBR = MAR & 077;
-            R[MBR] = ((R[MBR] | 000377) + 1) | (R[MBR] & 0177400);
+            R[MBR] = ((R[MBR] & 000377) + 1) | (R[MBR] & 0177400);
             PC++;
             break;
 
@@ -167,7 +167,7 @@ void exec_single_operand(void)
 
         case DECB:
             MBR = MAR & 077;
-            R[MBR] = ((R[MBR] | 000377) - 1) | (R[MBR] & 0177400);
+            R[MBR] = ((R[MBR] & 000377) - 1) | (R[MBR] & 0177400);
             PC++;
             break;
 
@@ -179,7 +179,7 @@ void exec_single_operand(void)
 
         case NEGB:
             MBR = MAR & 077;
-            R[MBR] = ((~(R[MBR] | 000377) + 1) & 000377) | (R[MBR] & 0177400);
+            R[MBR] = ((~(R[MBR] & 000377) + 1) & 000377) | (R[MBR] & 0177400);
             PC++;
             break;
 
@@ -190,6 +190,9 @@ void exec_single_operand(void)
             break;
 
         case ADCB:
+            MBR = MAR & 077;
+            R[MBR] = (R[MBR] & 000377) + (PSW & CARRYFLAG) | (R[MBR] & 0177400);
+            PC++;
             break;
 
         case SBC:
