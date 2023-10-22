@@ -94,8 +94,8 @@ void exec_double_operand(void)
             break;
 
         case CMP:
-            ALU = R[MAR & 077];
-            ALU -= R[(MAR & 07700) >> 6];
+            ALU = *DEST;
+            ALU -= *SRC;
             PC++;
             set_zero_flag();
             break;
@@ -112,25 +112,25 @@ void exec_double_operand(void)
         case BICB:
             break;
         case BIS: // XXX pretend this is XOR until I read the manual.
-            ALU = R[MAR & 077];
-            ALU ^= R[(MAR & 07700) >> 6];
-            R[MAR & 077] = ALU;
+            ALU = *DEST;
+            ALU ^= *SRC;
+            *DEST = ALU;
             PC++;
             break;
         case BISB:
             break;
 
         case ADD:
-            ALU = R[MAR & 077];
-            ALU += R[(MAR & 07700) >> 6];
-            R[MAR & 077] = ALU;
+            ALU = *DEST;
+            ALU += *SRC;
+            *DEST = ALU;
             PC++;
             break;
 
         case SUB:
-            ALU = R[MAR & 077];
-            ALU -= R[(MAR & 07700) >> 6];
-            R[MAR & 077] = ALU;
+            ALU = *DEST;
+            ALU -= *SRC;
+            *DEST = ALU;
             PC++;
             set_zero_flag();
             break;
@@ -143,103 +143,117 @@ void exec_double_operand(void)
 
 void exec_single_operand(void)
 {
+   /*
+     * DEST Addressing
+     */
+
+    // From immediate.
+    if ((IR & 077) == 027) {
+        PC++;
+        MBR = PC;
+        DEST = &(MEMORY[MBR]);
+
+    // From absolute.
+    } else if ((IR & 077) == 037) {
+        PC++;
+        MBR = PC;
+        MAR = MEMORY[MBR];
+        DEST = &(MEMORY[MAR]);
+
+    // From register.
+    } else if ((IR & 070) == 00) {
+        DEST = &(R[(IR & 007)]);
+    }
+
     switch ((IR & 0177700) >> 6) {
         case JMP:
-            // Register
-            if ((MAR & 070) == 000) {
-                PC = R[MAR & 07];
-
-            // Immediate
-            } else if ((MAR & 077) == 027) {
-                PC++;
-                MBR = PC;
-                PC = MEMORY[MBR];
-            }
+            PC = *DEST;
             break;
+
         case SWAB:
             MBR = MAR & 077;
-            R[MBR] = ((R[MBR] & 0177400) >> 8) | ((R[MBR] & 000377) << 8);
+            *DEST = ((*DEST & 0177400) >> 8) | ((*DEST & 000377) << 8);
             PC++;
             break;
 
         case CLR:
-            R[MAR & 077] = 0;
+            *DEST = 0;
             PC++;
             break;
 
         case CLRB:
             MBR = MAR & 077;
-            R[MBR] = (R[MBR] & 0177400);
+            *DEST = (*DEST & 0177400);
             PC++;
             break;
 
         case COM:
             MBR = MAR & 077;
-            R[MBR] = ~R[MBR];
+            *DEST = ~(*DEST);
             PC++;
             break;
 
         case COMB:
             MBR = MAR & 077;
-            R[MBR] = ~(R[MBR] & 000377) | (R[MBR] & 0177400);
+            *DEST = ~(*DEST & 000377) | (*DEST & 0177400);
             PC++;
             break;
 
         case INC:
-            R[MAR & 077]++;
+            (*DEST)++;
             PC++;
             break;
 
         case INCB:
             MBR = MAR & 077;
-            R[MBR] = ((R[MBR] & 000377) + 1) | (R[MBR] & 0177400);
+            *DEST = ((*DEST & 000377) + 1) | (*DEST & 0177400);
             PC++;
             break;
 
         case DEC:
-            R[MAR & 077]--;
+            (*DEST)--;
             PC++;
             break;
 
         case DECB:
             MBR = MAR & 077;
-            R[MBR] = ((R[MBR] & 000377) - 1) | (R[MBR] & 0177400);
+            *DEST = ((*DEST & 000377) - 1) | (*DEST & 0177400);
             PC++;
             break;
 
         case NEG:
             MBR = MAR & 077;
-            R[MBR] = ~(R[MBR]) + 1;
+            *DEST = ~(*DEST) + 1;
             PC++;
             break;
 
         case NEGB:
             MBR = MAR & 077;
-            R[MBR] = ((~(R[MBR] & 000377) + 1) & 000377) | (R[MBR] & 0177400);
+            *DEST = ((~(*DEST & 000377) + 1) & 000377) | (*DEST & 0177400);
             PC++;
             break;
 
         case ADC:
             MBR = MAR & 077;
-            R[MBR] = R[MBR] + (PSW & CARRYFLAG);
+            *DEST = *DEST + (PSW & CARRYFLAG);
             PC++;
             break;
 
         case ADCB:
             MBR = MAR & 077;
-            R[MBR] = ((R[MBR] & 000377) + (PSW & CARRYFLAG)) | (R[MBR] & 0177400);
+            *DEST = ((*DEST & 000377) + (PSW & CARRYFLAG)) | (*DEST & 0177400);
             PC++;
             break;
 
         case SBC:
             MBR = MAR & 077;
-            R[MBR] = R[MBR] - (PSW & CARRYFLAG);
+            *DEST = *DEST - (PSW & CARRYFLAG);
             PC++;
             break;
 
         case SBCB:
             MBR = MAR & 077;
-            R[MBR] = ((R[MBR] & 000377) - (PSW & CARRYFLAG)) | (R[MBR] & 0177400);
+            *DEST = ((*DEST & 000377) - (PSW & CARRYFLAG)) | (*DEST & 0177400);
             PC++;
             break;
 
@@ -251,58 +265,58 @@ void exec_single_operand(void)
 
         case ROR:
             MBR = MAR & 077;
-            R[MBR] = (R[MBR] << 1) | (R[MBR] >> 15);
+            *DEST = (*DEST << 1) | (*DEST >> 15);
             PC++;
             break;
 
         case RORB:
             MBR = MAR & 077;
-            R[MBR] = (((R[MBR] & 000377) << 1) | ((R[MBR] & 000377) >> 7)) | (R[MBR] & 0177400);
+            *DEST = (((*DEST & 000377) << 1) | ((*DEST & 000377) >> 7)) | (*DEST & 0177400);
             PC++;
             break;
 
         case ROL:
             MBR = MAR & 077;
-            R[MBR] = (R[MBR] << 15) | (R[MBR] >> 1);
+            *DEST = (*DEST << 15) | (*DEST >> 1);
             PC++;
             break;
 
         case ROLB:
             MBR = MAR & 077;
-            R[MBR] = (((R[MBR] & 000377) << 7) | ((R[MBR] & 000377) >> 1)) | (R[MBR] & 0177400);
+            *DEST = (((*DEST & 000377) << 7) | ((*DEST & 000377) >> 1)) | (*DEST & 0177400);
             break;
 
         case ASR:
             MBR = MAR & 077;
-            ALU = R[MBR];
+            ALU = *DEST;
             ALU >>= 1;
-            R[MBR] = ALU;
+            *DEST = ALU;
             PC++;
             break;
 
         case ASRB:
             MBR = MAR & 077;
-            R[MBR] = ((R[MBR] & 000377) >> 1) | (R[MBR] & 0177400);
+            *DEST = ((*DEST & 000377) >> 1) | (*DEST & 0177400);
             PC++;
             break;
 
         case ASL:
             MBR = MAR & 077;
-            ALU = R[MBR];
+            ALU = *DEST;
             ALU <<= 1;
-            R[MBR] = ALU;
+            *DEST = ALU;
             PC++;
             break;
 
         case ASLB:
             MBR = MAR & 077;
-            R[MBR] = ((R[MBR] & 000377) << 1) | (R[MBR] & 0177400);
+            *DEST = ((*DEST & 000377) << 1) | (*DEST & 0177400);
             PC++;
             break;
 
         case MTPS:
             MBR = MAR & 077;
-            PSW = R[MBR];
+            PSW = *DEST;
             PC++;
             break;
 
@@ -320,16 +334,16 @@ void exec_single_operand(void)
 
         case SXT:
             if (PSW & NEGATIVEFLAG) {
-                R[MAR & 077] = -1;
+                *DEST = -1;
             } else {
-                R[MAR & 077] = 0;
+                *DEST = 0;
             }
             PC++;
             break;
 
         case MFPS:
             MBR = MAR & 077;
-            R[MBR] = PSW;
+            *DEST = PSW;
             PC++;
             break;
 
