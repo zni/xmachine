@@ -306,19 +306,21 @@ void exec_halt(void)
 
 void run_machine(void)
 {
-
-
     while (!HALTED) {
         MBR = PC;
         MAR = MEMORY[MBR];
+
+        // Is this a double operand op?
         IR = (MAR & 0170000) >> 12;
         if (IR != 0) {
             exec_double_operand();
         } else {
+            // Is this a special double operand op?
             IR = (MAR & 0177000) >> 9;
             if (IR != 0 && (IR >= 070 && IR <= 074)) {
                 printf("NOT IMPLEMENTED: %03o\n", IR);
             } else {
+                // Is this a single operand op?
                 IR = (MAR & 0177700) >> 6;
                 if (IR == 0) {
                     exec_halt();
