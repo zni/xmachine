@@ -8,12 +8,14 @@
 
 uint16_t MEMORY[MEMSIZE];
 uint16_t PSW = 0;
-uint16_t IR = 0;
-uint16_t PC = 0;
+uint16_t IR  = 0;
+uint16_t PC  = 0;
 uint16_t MAR = 0;
 uint16_t MBR = 0;
 uint16_t ALU = 0;
-uint16_t SP = 0;
+uint16_t SP  = 0;
+uint16_t *DEST = NULL;
+uint16_t *SRC  = NULL;
 uint16_t R[5] = { 0, 0, 0, 0, 0 };
 bool HALTED = false;
 
@@ -38,17 +40,54 @@ void set_zero_flag(void)
 
 void exec_double_operand(void)
 {
-    switch (IR) {
+    /*
+     * SRC Addressing
+     */
+
+    // From immediate address.
+    if ((IR & 07700) == 02700) {
+        PC++;
+        MBR = PC;
+        SRC = &(MEMORY[MBR]);
+
+    // From absolute address.
+    } else if ((IR & 03700) == 03700) {
+        PC++;
+        MBR = PC;
+        MAR = MEMORY[MBR];
+        SRC = &(MEMORY[MAR]);
+
+    // From register.
+    } else if ((IR & 07000) == 0) {
+        SRC = &(R[(IR & 00700) >> 6]);
+    }
+
+    /*
+     * DEST Addressing
+     */
+
+    // From immediate: ILLEGAL BEEP BOOP HALT HALT HALT
+    if ((IR & 077) == 027) {
+        fprintf(stderr, "HALTING: DEST IS IMMEDIATE\n");
+        HALTED = true;
+        return;
+
+    // From absolute.
+    } else if ((IR & 077) == 037) {
+        PC++;
+        MBR = PC;
+        MAR = MEMORY[MBR];
+        DEST = &(MEMORY[MAR]);
+
+    // From register.
+    } else if ((IR & 070) == 00) {
+        DEST = &(R[(IR & 007)]);
+    }
+
+    switch ((IR & 0170000) >> 12) {
         case MOV:
-            if ((MAR & 07700) == 02700) { // Immediate addressing.
-                PC++;
-                MBR = PC;
-                R[MAR & 077] = MEMORY[MBR];
-                PC++;
-            } else { // Register to register.
-                R[MAR & 077] = R[(MAR & 07700) >> 6];
-                PC++;
-            }
+            *DEST = *SRC;
+            PC++;
             break;
 
         case MOVB:
@@ -104,7 +143,7 @@ void exec_double_operand(void)
 
 void exec_single_operand(void)
 {
-    switch (IR) {
+    switch ((IR & 0177700) >> 6) {
         case JMP:
             // Register
             if ((MAR & 070) == 000) {
@@ -336,27 +375,28 @@ void run_machine(void)
     while (!HALTED) {
         MBR = PC;
         MAR = MEMORY[MBR];
+        IR = MAR;
 
         // Is this a double operand op?
-        IR = (MAR & 0170000) >> 12;
-        if (IR != 0) {
+        //IR = (MAR & 0170000) >> 12;
+        if (((IR & 0170000) >> 12) != 0) {
             exec_double_operand();
         } else {
             // Is this a special double operand op?
-            IR = (MAR & 0177000) >> 9;
-            if (IR != 0 && (IR >= 070 && IR <= 074)) {
+            // IR = (MAR & 0177000) >> 9;
+            if (((IR & 0177000) >> 9) != 0 &&
+                (((IR & 0177000) >> 9) >= 070 && ((IR & 0177000) >> 9) <= 074)) {
                 printf("NOT IMPLEMENTED: %03o\n", IR);
             } else {
                 // Is this a single operand op?
-                IR = (MAR & 0177700) >> 6;
-                if (IR == 0) {
+                // IR = (MAR & 0177700) >> 6;
+                if (((IR & 0177700) >> 6) == 0) {
                     exec_halt();
                 } else {
                     exec_single_operand();
                 }
             }
         }
-        dump_state(false);
     }
 }
 
@@ -391,7 +431,7 @@ int main(int argc, char** argv)
     zero_memory();
     load_program(program, len);
     run_machine();
-    dump_state(true);
+    dump_state(false);
 
     free(program);
 
