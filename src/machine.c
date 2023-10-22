@@ -358,13 +358,23 @@ void dump_state(bool dump_memory)
     }
 
     if (dump_memory) {
-        int rows = MEMSIZE / 16;
+        uint16_t row[16];
+        bool all_zero = true;
         for (int r = 0; r < MEMSIZE; r += 16) {
-            printf("0o%06o: ", r);
             for (int c = 0; c < 16; c++) {
-                printf("0o%06o ", MEMORY[r + c]);
+                if (MEMORY[r+c] != 0) { all_zero = false; }
+                row[c] = MEMORY[r+c];
+            }
+            if (all_zero && ((r + 16) < MEMSIZE)) {
+                continue;
+            }
+
+            printf("0o%06o: ", r);
+            for (int i = 0; i < 16; i++) {
+                printf("0o%06o ", row[i]);
             }
             printf("\n");
+            all_zero = true;
         }
     }
     printf("\n");
@@ -431,7 +441,7 @@ int main(int argc, char** argv)
     zero_memory();
     load_program(program, len);
     run_machine();
-    dump_state(false);
+    dump_state(true);
 
     free(program);
 
