@@ -3,7 +3,6 @@
 #include <stdlib.h>
 
 #include "include/handlers.h"
-#include "include/machine.h"
 #include "include/machine_state.h"
 
 
@@ -124,7 +123,7 @@ void run_machine(machine_state_t *machine)
             }
         } else {
             if (index_tier_1 != 0) {
-                index_tier_2 = (index_tier_1 - 1) + index_tier_2;
+                index_tier_2 = index_tier_1 - 1;
                 index_tier_1 = 8;
                 low_opcodes[index_tier_1][index_tier_2](machine);
             } else if (index_tier_2 != 0) {
@@ -145,8 +144,6 @@ void run_machine(machine_state_t *machine)
                 exec_halt(machine);
             }
         }
-        machine->PC++;
-        //dump_state(false);
     }
 }
 
