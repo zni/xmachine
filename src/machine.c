@@ -1,402 +1,50 @@
 #include <inttypes.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "include/handlers.h"
 #include "include/machine.h"
+#include "include/machine_state.h"
 
-uint16_t MEMORY[MEMSIZE];
-uint16_t PSW = 0;
-uint16_t IR  = 0;
-uint16_t PC  = 0;
-uint16_t MAR = 0;
-uint16_t MBR = 0;
-uint16_t ALU = 0;
-uint16_t SP  = 0;
-uint16_t *DEST = NULL;
-uint16_t *SRC  = NULL;
-uint16_t R[5] = { 0, 0, 0, 0, 0 };
-bool HALTED = false;
 
-void exec_halt(void)
+void exec_halt(machine_state_t *machine)
 {
-    HALTED = true;
+    machine->HALTED = true;
 }
 
-void zero_memory(void)
+void init_machine(machine_state_t *machine)
 {
-    for (int i = 0; i < MEMSIZE; i++) { MEMORY[i] = 0; }
+    machine->ALU = 0;
+    machine->MAR = 0;
+    machine->MBR = 0;
+    machine->PC = 0;
+    machine->PSW = 0;
+    machine->SP = 0;
+    machine->IR = 0;
+    machine->HALTED = false;
+    machine->SRC = NULL;
+    machine->DEST = NULL;
+
+    for (int i = 0; i < REGISTERS; i++) { machine->R[i] = 0;}
+    for (int i = 0; i < MEMSIZE; i++) { machine->MEMORY[i] = 0; }
 }
 
-void load_program(uint16_t *program, uint16_t len)
+void load_program(machine_state_t *machine, uint16_t *program, uint16_t len)
 {
-    for (int i = 0; i < len; i++) { MEMORY[i] = program[i]; }
+    for (int i = 0; i < len; i++) { machine->MEMORY[i] = program[i]; }
 }
 
-void set_zero_flag(void)
+void dump_state(machine_state_t *machine, bool dump_memory)
 {
-    if (ALU == 0) {
-        PSW |= ZEROFLAG;
-    } else {
-        PSW = (PSW & ZEROFLAG) ? (PSW ^ ZEROFLAG) : PSW;
-    }
-}
-
-void setup_dest_addressing(void)
-{
-    // From immediate.
-    if ((IR & 077) == 027) {
-        PC++;
-        MBR = PC;
-        DEST = &(MEMORY[MBR]);
-
-    // From absolute.
-    } else if ((IR & 077) == 037) {
-        PC++;
-        MBR = PC;
-        MAR = MEMORY[MBR];
-        DEST = &(MEMORY[MAR]);
-
-    // From register.
-    } else if ((IR & 070) == 00) {
-        DEST = &(R[(IR & 007)]);
-    }
-}
-
-void setup_src_addressing(void)
-{
-    // From immediate address.
-    if ((IR & 07700) == 02700) {
-        PC++;
-        MBR = PC;
-        SRC = &(MEMORY[MBR]);
-
-    // From absolute address.
-    } else if ((IR & 03700) == 03700) {
-        PC++;
-        MBR = PC;
-        MAR = MEMORY[MBR];
-        SRC = &(MEMORY[MAR]);
-
-    // From register.
-    } else if ((IR & 07000) == 0) {
-        SRC = &(R[(IR & 00700) >> 6]);
-    }
-}
-
-void exec_special_double_operand(void)
-{
-    SRC = &(R[(IR & 0700) >> 6]);
-    setup_dest_addressing();
-
-    switch ((IR & 0177000) >> 9) {
-        case MUL:
-            break;
-
-        case DIV:
-            break;
-
-        case ASH:
-            break;
-
-        case ASHC:
-            break;
-
-        case XOR:
-            ALU = *SRC;
-            ALU ^= *DEST;
-            *DEST = ALU;
-            PC++;
-            break;
-
-        default:
-            PC++;
-            break;
-    }
-}
-
-void exec_double_operand(void)
-{
-    setup_src_addressing();
-    setup_dest_addressing();
-
-    switch ((IR & 0170000) >> 12) {
-        case MOV:
-            *DEST = *SRC;
-            PC++;
-            break;
-
-        case MOVB:
-            *DEST = (*SRC & 0377);
-            PC++;
-            break;
-
-        case CMP:
-            ALU = *DEST;
-            ALU -= *SRC;
-            PC++;
-            set_zero_flag();
-            break;
-
-        case CMPB:
-            break;
-
-        case BIT:
-            ALU = *DEST;
-            ALU &= *SRC;
-            *DEST = ALU;
-            set_zero_flag();
-            PC++;
-            break;
-
-        case BITB:
-            break;
-
-        case BIC:
-            ALU = *DEST;
-            ALU &= ~(*SRC);
-            *DEST = ALU;
-            PC++;
-            break;
-
-        case BICB:
-            break;
-
-        case BIS:
-            ALU = *DEST;
-            ALU |= *SRC;
-            *DEST = ALU;
-            PC++;
-            break;
-
-        case BISB:
-            break;
-
-        case ADD:
-            ALU = *DEST;
-            ALU += *SRC;
-            *DEST = ALU;
-            PC++;
-            break;
-
-        case SUB:
-            ALU = *DEST;
-            ALU -= *SRC;
-            *DEST = ALU;
-            PC++;
-            set_zero_flag();
-            break;
-
-        default: // Catch undefined opcodes.
-            PC++;
-            break;
-    }
-}
-
-void exec_single_operand(void)
-{
-    setup_dest_addressing();
-
-    switch ((IR & 0177700) >> 6) {
-        case JMP:
-            PC = *DEST;
-            break;
-
-        case SWAB:
-            MBR = MAR & 077;
-            *DEST = ((*DEST & 0177400) >> 8) | ((*DEST & 000377) << 8);
-            PC++;
-            break;
-
-        case CLR:
-            *DEST = 0;
-            PC++;
-            break;
-
-        case CLRB:
-            MBR = MAR & 077;
-            *DEST = (*DEST & 0177400);
-            PC++;
-            break;
-
-        case COM:
-            MBR = MAR & 077;
-            *DEST = ~(*DEST);
-            PC++;
-            break;
-
-        case COMB:
-            MBR = MAR & 077;
-            *DEST = ~(*DEST & 000377) | (*DEST & 0177400);
-            PC++;
-            break;
-
-        case INC:
-            (*DEST)++;
-            PC++;
-            break;
-
-        case INCB:
-            MBR = MAR & 077;
-            *DEST = ((*DEST & 000377) + 1) | (*DEST & 0177400);
-            PC++;
-            break;
-
-        case DEC:
-            (*DEST)--;
-            PC++;
-            break;
-
-        case DECB:
-            MBR = MAR & 077;
-            *DEST = ((*DEST & 000377) - 1) | (*DEST & 0177400);
-            PC++;
-            break;
-
-        case NEG:
-            MBR = MAR & 077;
-            *DEST = ~(*DEST) + 1;
-            PC++;
-            break;
-
-        case NEGB:
-            MBR = MAR & 077;
-            *DEST = ((~(*DEST & 000377) + 1) & 000377) | (*DEST & 0177400);
-            PC++;
-            break;
-
-        case ADC:
-            MBR = MAR & 077;
-            *DEST = *DEST + (PSW & CARRYFLAG);
-            PC++;
-            break;
-
-        case ADCB:
-            MBR = MAR & 077;
-            *DEST = ((*DEST & 000377) + (PSW & CARRYFLAG)) | (*DEST & 0177400);
-            PC++;
-            break;
-
-        case SBC:
-            MBR = MAR & 077;
-            *DEST = *DEST - (PSW & CARRYFLAG);
-            PC++;
-            break;
-
-        case SBCB:
-            MBR = MAR & 077;
-            *DEST = ((*DEST & 000377) - (PSW & CARRYFLAG)) | (*DEST & 0177400);
-            PC++;
-            break;
-
-        case TST:
-            break;
-
-        case TSTB:
-            break;
-
-        case ROR:
-            MBR = MAR & 077;
-            *DEST = (*DEST << 1) | (*DEST >> 15);
-            PC++;
-            break;
-
-        case RORB:
-            MBR = MAR & 077;
-            *DEST = (((*DEST & 000377) << 1) | ((*DEST & 000377) >> 7)) | (*DEST & 0177400);
-            PC++;
-            break;
-
-        case ROL:
-            MBR = MAR & 077;
-            *DEST = (*DEST << 15) | (*DEST >> 1);
-            PC++;
-            break;
-
-        case ROLB:
-            MBR = MAR & 077;
-            *DEST = (((*DEST & 000377) << 7) | ((*DEST & 000377) >> 1)) | (*DEST & 0177400);
-            break;
-
-        case ASR:
-            MBR = MAR & 077;
-            ALU = *DEST;
-            ALU >>= 1;
-            *DEST = ALU;
-            PC++;
-            break;
-
-        case ASRB:
-            MBR = MAR & 077;
-            *DEST = ((*DEST & 000377) >> 1) | (*DEST & 0177400);
-            PC++;
-            break;
-
-        case ASL:
-            MBR = MAR & 077;
-            ALU = *DEST;
-            ALU <<= 1;
-            *DEST = ALU;
-            PC++;
-            break;
-
-        case ASLB:
-            MBR = MAR & 077;
-            *DEST = ((*DEST & 000377) << 1) | (*DEST & 0177400);
-            PC++;
-            break;
-
-        case MTPS:
-            MBR = MAR & 077;
-            PSW = *DEST;
-            PC++;
-            break;
-
-        case MFPI:
-            break;
-
-        case MFPD:
-            break;
-
-        case MTPI:
-            break;
-
-        case MTPD:
-            break;
-
-        case SXT:
-            if (PSW & NEGATIVEFLAG) {
-                *DEST = -1;
-            } else {
-                *DEST = 0;
-            }
-            PC++;
-            break;
-
-        case MFPS:
-            MBR = MAR & 077;
-            *DEST = PSW;
-            PC++;
-            break;
-
-        default: // Catch undefined opcodes.
-            PC++;
-            break;
-    }
-}
-
-void dump_state(bool dump_memory)
-{
-    printf("PSW: 0o%06o\n", PSW);
-    printf("IR : 0o%06o\n", IR);
-    printf("PC : 0o%06o\n", PC);
-    printf("MAR: 0o%06o\n", MAR);
-    printf("MBR: 0o%06o\n", MBR);
-    printf("ALU: 0o%06o\n", ALU);
-    printf("SP : 0o%06o\n", SP);
+    printf("PSW: 0o%06o\n", machine->PSW);
+    printf("IR : 0o%06o\n", machine->IR);
+    printf("PC : 0o%06o\n", machine->PC);
+    printf("MAR: 0o%06o\n", machine->MAR);
+    printf("MBR: 0o%06o\n", machine->MBR);
+    printf("ALU: 0o%06o\n", machine->ALU);
+    printf("SP : 0o%06o\n", machine->SP);
     for (int i = 0; i < 5; i++) {
-        printf("R%d : 0o%06o\n", i, R[i]);
+        printf("R%d : 0o%06o\n", i, machine->R[i]);
     }
 
     if (dump_memory) {
@@ -404,8 +52,8 @@ void dump_state(bool dump_memory)
         bool all_zero = true;
         for (int r = 0; r < MEMSIZE; r += 16) {
             for (int c = 0; c < 16; c++) {
-                if (MEMORY[r+c] != 0) { all_zero = false; }
-                row[c] = MEMORY[r+c];
+                if (machine->MEMORY[r+c] != 0) { all_zero = false; }
+                row[c] = machine->MEMORY[r+c];
             }
             if (all_zero && ((r + 16) < MEMSIZE)) {
                 continue;
@@ -422,30 +70,83 @@ void dump_state(bool dump_memory)
     printf("\n");
 }
 
-void run_machine(void)
+void run_machine(machine_state_t *machine)
 {
-    while (!HALTED) {
-        MBR = PC;
-        MAR = MEMORY[MBR];
-        IR = MAR;
+    uint16_t high_bit;
+    uint16_t index_tier_1;
+    uint16_t index_tier_2;
+    uint16_t index_tier_3;
+    uint16_t branch_bit;
+    while (!machine->HALTED) {
+        machine->MBR = machine->PC;
+        machine->MAR = machine->MEMORY[machine->MBR];
+        machine->IR = machine->MAR;
 
-        // Is this a double operand op?
-        if (((IR & 0170000) >> 12) != 0) {
-            exec_double_operand();
-        } else {
-            // Is this a special double operand op?
-            if (((IR & 0177000) >> 9) != 0 &&
-                (((IR & 0177000) >> 9) >= 070 && ((IR & 0177000) >> 9) <= 074)) {
-                exec_special_double_operand();
+        /*
+         * I've spent so long on this, I'm not sure what I was trying to gain anymore.
+         * 
+         * Basically, grab the high bit, if it's set we're in the high op codes.
+         * From there, look at each position of the op code. They become our indexes
+         * into the jump tables. Once they're established, do some slight of hand,
+         * and voila we are calling our op code of choice.
+         * 
+         * Benefits of this:
+         * Can swap out handlers as needed, if needed, probably YAGNI.
+         * 
+         * Downsides:
+         * Brain slowly turned to mush.
+         */
+
+        high_bit     = (machine->IR & 0100000) >> 15;
+        index_tier_1 = (machine->IR & 0070000) >> 12;
+        index_tier_2 = (machine->IR & 0007000) >> 9;
+        index_tier_3 = (machine->IR & 0000700) >> 6;
+        branch_bit   = (machine->IR & 0000400) >> 8;
+
+        if (high_bit != 0) {
+            if (index_tier_1 != 0) {
+                // The high index is only set for a specific group of opcodes.
+                index_tier_2 = index_tier_1;
+                index_tier_1 = 7;
+
+                high_opcodes[index_tier_1][index_tier_2](machine);
             } else {
-                // Is this a single operand op?
-                if (((IR & 0177700) >> 6) == 0) {
-                    exec_halt();
-                } else {
-                    exec_single_operand();
+                index_tier_1 = index_tier_2;
+                index_tier_2 = index_tier_3;
+
+                // If we are between index 0 and 3, we have a branch instruction.
+                // So look at the branch bit for our index.
+                if ((index_tier_1 >= 0) && (index_tier_1 <= 3)) {
+                    index_tier_2 = branch_bit ? 4 : 0;
                 }
+
+                high_opcodes[index_tier_1][index_tier_2](machine);
+            }
+        } else {
+            if (index_tier_1 != 0) {
+                index_tier_2 = (index_tier_1 - 1) + index_tier_2;
+                index_tier_1 = 8;
+                low_opcodes[index_tier_1][index_tier_2](machine);
+            } else if (index_tier_2 != 0) {
+                index_tier_1 = index_tier_2;
+                index_tier_2 = index_tier_3;
+
+                // If we are between index 1 and 3, we have a branch instruction.
+                // Look at the branch bit to determine our second index.
+                if ((index_tier_1) >= 1 && (index_tier_1 <= 3)) {
+                    index_tier_2 = branch_bit ? 4 : 0;
+                }
+                low_opcodes[index_tier_1][index_tier_2](machine);
+            } else if (index_tier_3 != 0) {
+                index_tier_1 = 0;
+                index_tier_2 = index_tier_3;
+                low_opcodes[index_tier_1][index_tier_2](machine);
+            } else {
+                exec_halt(machine);
             }
         }
+        machine->PC++;
+        //dump_state(false);
     }
 }
 
@@ -477,10 +178,12 @@ int main(int argc, char** argv)
     }
     fclose(binary);
 
-    zero_memory();
-    load_program(program, len);
-    run_machine();
-    dump_state(true);
+    machine_state_t machine;
+
+    init_machine(&machine);
+    load_program(&machine, program, len);
+    run_machine(&machine);
+    dump_state(&machine, true);
 
     free(program);
 
