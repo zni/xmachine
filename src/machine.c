@@ -45,7 +45,7 @@ void load_program(machine_state_t *machine, char *program)
     uint16_t load_offset = 0;
     fread(&load_offset, sizeof(uint16_t), 1, binary);
 
-    uint16_t program_length = load_offset + len;
+    uint16_t program_length = load_offset + (len * 2);
     for (int i = load_offset; i < program_length; i++) {
         fread(&(machine->MEMORY[i]), sizeof(uint8_t), 1, binary);
     }
@@ -99,8 +99,9 @@ void run_machine(machine_state_t *machine)
     uint16_t branch_bit;
     while (!machine->HALTED) {
         machine->MBR = machine->PC;
-        machine->MAR = machine->MEMORY[machine->MBR] << 8;
-        machine->MAR |= machine->MEMORY[machine->MBR + 1];
+        // Words are stored little endian.
+        machine->MAR = machine->MEMORY[machine->MBR + 1] << 8;
+        machine->MAR |= machine->MEMORY[machine->MBR];
         machine->IR = machine->MAR;
 
         /*
@@ -206,7 +207,7 @@ int main(int argc, char** argv)
 
     init_machine(&machine);
     load_program(&machine, argv[1]);
-    //run_machine(&machine);
+    run_machine(&machine);
     dump_state(&machine, true);
 
     return 0;

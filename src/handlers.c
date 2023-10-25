@@ -5,13 +5,13 @@ void setup_dest_addressing(machine_state_t *machine)
 {
     // From immediate.
     if ((machine->IR & 077) == 027) {
-        machine->PC++;
+        machine->PC += 2;
         machine->MBR = machine->PC;
         machine->DEST = &(machine->MEMORY[machine->MBR]);
 
     // From absolute.
     } else if ((machine->IR & 077) == 037) {
-        machine->PC++;
+        machine->PC += 2;
         machine->MBR = machine->PC;
         machine->MAR = machine->MEMORY[machine->MBR];
         machine->DEST = &(machine->MEMORY[machine->MAR]);
@@ -26,13 +26,13 @@ void setup_src_addressing(machine_state_t *machine)
 {
     // From immediate address.
     if ((machine->IR & 07700) == 02700) {
-        machine->PC++;
+        machine->PC += 2;
         machine->MBR = machine->PC;
         machine->SRC = &(machine->MEMORY[machine->MBR]);
 
     // From absolute address.
     } else if ((machine->IR & 03700) == 03700) {
-        machine->PC++;
+        machine->PC += 2;
         machine->MBR = machine->PC;
         machine->MAR = machine->MEMORY[machine->MBR];
         machine->SRC = &(machine->MEMORY[machine->MAR]);
@@ -59,7 +59,7 @@ int8_t get_branch_offset(machine_state_t *machine)
 
 void NOP(machine_state_t *machine)
 {
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void BR(machine_state_t *machine)
@@ -200,7 +200,7 @@ void MOV(machine_state_t *machine)
     setup_dest_addressing(machine);
 
     *machine->DEST = *machine->SRC;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void MOVB(machine_state_t *machine)
@@ -209,7 +209,7 @@ void MOVB(machine_state_t *machine)
     setup_dest_addressing(machine);
 
     *machine->DEST = (*machine->SRC & 0377);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void CMP(machine_state_t *machine)
@@ -219,7 +219,7 @@ void CMP(machine_state_t *machine)
 
     machine->ALU = *machine->DEST;
     machine->ALU -= *machine->SRC;
-    machine->PC++;
+    machine->PC += 2;
     set_zero_flag(machine);
 }
 
@@ -237,7 +237,7 @@ void BIT(machine_state_t *machine)
     machine->ALU &= *machine->SRC;
     *machine->DEST = machine->ALU;
     set_zero_flag(machine);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void BITB(machine_state_t *machine)
@@ -253,7 +253,7 @@ void BIC(machine_state_t *machine)
     machine->ALU = *machine->DEST;
     machine->ALU &= ~(*machine->SRC);
     *machine->DEST = machine->ALU;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void BICB(machine_state_t *machine)
@@ -269,7 +269,7 @@ void BIS(machine_state_t *machine)
     machine->ALU = *machine->DEST;
     machine->ALU |= *machine->SRC;
     *machine->DEST = machine->ALU;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void BISB(machine_state_t *machine)
@@ -285,7 +285,7 @@ void ADD(machine_state_t *machine)
     machine->ALU = *machine->DEST;
     machine->ALU += *machine->SRC;
     *machine->DEST = machine->ALU;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void SUB(machine_state_t *machine)
@@ -296,7 +296,7 @@ void SUB(machine_state_t *machine)
     machine->ALU = *machine->DEST;
     machine->ALU -= *machine->SRC;
     *machine->DEST = machine->ALU;
-    machine->PC++;
+    machine->PC += 2;
     set_zero_flag(machine);
 }
 
@@ -311,14 +311,14 @@ void SWAB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = ((*machine->DEST & 0177400) >> 8) | ((*machine->DEST & 000377) << 8);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void CLR(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
     *machine->DEST = 0;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void CLRB(machine_state_t *machine)
@@ -326,7 +326,7 @@ void CLRB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = (*machine->DEST & 0177400);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void COM(machine_state_t *machine)
@@ -334,7 +334,7 @@ void COM(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = ~(*machine->DEST);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void COMB(machine_state_t *machine)
@@ -342,14 +342,14 @@ void COMB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = ~(*machine->DEST & 000377) | (*machine->DEST & 0177400);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void INC(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
     (*machine->DEST)++;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void INCB(machine_state_t *machine)
@@ -357,14 +357,14 @@ void INCB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = ((*machine->DEST & 000377) + 1) | (*machine->DEST & 0177400);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void DEC(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
     (*machine->DEST)--;
-    machine->PC++;
+    machine->PC += 2;
     set_zero_flag(machine);
 }
 
@@ -373,7 +373,7 @@ void DECB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = ((*machine->DEST & 000377) - 1) | (*machine->DEST & 0177400);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void NEG(machine_state_t *machine)
@@ -381,7 +381,7 @@ void NEG(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = ~(*machine->DEST) + 1;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void NEGB(machine_state_t *machine)
@@ -389,7 +389,7 @@ void NEGB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = ((~(*machine->DEST & 000377) + 1) & 000377) | (*machine->DEST & 0177400);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void ADC(machine_state_t *machine)
@@ -397,7 +397,7 @@ void ADC(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = *machine->DEST + (machine->PSW & CARRYFLAG);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void ADCB(machine_state_t *machine)
@@ -405,7 +405,7 @@ void ADCB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = ((*machine->DEST & 000377) + (machine->PSW & CARRYFLAG)) | (*machine->DEST & 0177400);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void SBC(machine_state_t *machine)
@@ -413,7 +413,7 @@ void SBC(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = *machine->DEST - (machine->PSW & CARRYFLAG);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void SBCB(machine_state_t *machine)
@@ -421,7 +421,7 @@ void SBCB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = ((*machine->DEST & 000377) - (machine->PSW & CARRYFLAG)) | (*machine->DEST & 0177400);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void TST(machine_state_t *machine)
@@ -439,7 +439,7 @@ void ROR(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = (*machine->DEST << 1) | (*machine->DEST >> 15);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void RORB(machine_state_t *machine)
@@ -447,7 +447,7 @@ void RORB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = (((*machine->DEST & 000377) << 1) | ((*machine->DEST & 000377) >> 7)) | (*machine->DEST & 0177400);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void ROL(machine_state_t *machine)
@@ -455,7 +455,7 @@ void ROL(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = (*machine->DEST << 15) | (*machine->DEST >> 1);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void ROLB(machine_state_t *machine)
@@ -463,7 +463,7 @@ void ROLB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = (((*machine->DEST & 000377) << 7) | ((*machine->DEST & 000377) >> 1)) | (*machine->DEST & 0177400);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void ASR(machine_state_t *machine)
@@ -473,7 +473,7 @@ void ASR(machine_state_t *machine)
     machine->ALU = *machine->DEST;
     machine->ALU >>= 1;
     *machine->DEST = machine->ALU;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void ASRB(machine_state_t *machine)
@@ -481,7 +481,7 @@ void ASRB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = ((*machine->DEST & 000377) >> 1) | (*machine->DEST & 0177400);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void ASL(machine_state_t *machine)
@@ -491,7 +491,7 @@ void ASL(machine_state_t *machine)
     machine->ALU = *machine->DEST;
     machine->ALU <<= 1;
     *machine->DEST = machine->ALU;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void ASLB(machine_state_t *machine)
@@ -499,7 +499,7 @@ void ASLB(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = ((*machine->DEST & 000377) << 1) | (*machine->DEST & 0177400);
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void MTPS(machine_state_t *machine)
@@ -507,7 +507,7 @@ void MTPS(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     machine->PSW = *machine->DEST;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void MFPI(machine_state_t *machine)
@@ -538,7 +538,7 @@ void SXT(machine_state_t *machine)
     } else {
         *machine->DEST = 0;
     }
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void MFPS(machine_state_t *machine)
@@ -546,7 +546,7 @@ void MFPS(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->MBR = machine->MAR & 077;
     *machine->DEST = machine->PSW;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void MUL(machine_state_t *machine)
@@ -557,7 +557,7 @@ void MUL(machine_state_t *machine)
     machine->ALU = *machine->DEST;
     machine->ALU *= *REG;
     *REG = machine->ALU;
-    machine->PC++;
+    machine->PC += 2;
 }
 
 void DIV(machine_state_t *machine)
@@ -583,5 +583,5 @@ void XOR(machine_state_t *machine)
     machine->ALU = *REG;
     machine->ALU ^= *machine->DEST;
     *REG = machine->ALU;
-    machine->PC++;
+    machine->PC += 2;
 }

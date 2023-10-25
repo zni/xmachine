@@ -2,8 +2,8 @@
 
 all:
 	if [ ! -d "bin" ]; then mkdir bin; fi
-	clang src/machine.c src/handlers.c -g -o bin/machine
-	clang src/asm.c -g -o bin/asm
+	clang src/machine.c src/handlers.c -Wall -Wno-incompatible-pointer-types -g -o bin/machine
+	clang src/asm.c -Wall -g -o bin/asm
 
 clean:
 	rm -rf bin/*
