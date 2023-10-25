@@ -79,7 +79,7 @@ void dump_state(machine_state_t *machine, bool dump_memory)
                 continue;
             }
 
-            printf("0o%04o: ", r);
+            printf("0o%05o: ", r);
             for (int i = 0; i < 16; i++) {
                 printf("0o%03o ", row[i]);
             }
