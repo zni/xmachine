@@ -4,18 +4,25 @@
 
 int main(int argc, char** argv)
 {
-    if (argc < 3) {
-        fprintf(stderr, "usage: asm <source.mcode> <binary>");
+    if (argc < 4) {
+        fprintf(stderr, "usage: asm <source.mcode> <load offset> <binary>");
+        return 1;
+    }
+
+    uint16_t load_offset = 0;
+    if (sscanf(argv[2], "%hu", &load_offset) <= 0) {
+        fprintf(stderr, "Failed to read load offset.");
         return 1;
     }
 
     char *source_filename = argv[1];
-    char *binary_filename = argv[2];
+    char *binary_filename = argv[3];
     FILE *source = fopen(source_filename, "r");
     if (source == NULL) {
         fprintf(stderr, "Failed to open: %s\n", source_filename);
         return 1;
     }
+
 
     FILE *binary = fopen(binary_filename, "w");
     if (binary == NULL) {
@@ -29,6 +36,7 @@ int main(int argc, char** argv)
     uint16_t program_size = 0;
     size_t len = 8;
     fwrite(&program_size, sizeof(program_size), 1, binary);
+    fwrite(&load_offset, sizeof(load_offset), 1, binary);
     while(!feof(source)) {
         peek = fgetc(source);
         if (peek == ';') {

@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define MEMSIZE 4096
+#define MEMSIZE 8192
 #define REGISTERS 5
 
 #define IPLBITS         0340
@@ -15,7 +15,7 @@
 #define CARRYFLAG       0001
 
 typedef struct machine_state {
-    uint16_t MEMORY[MEMSIZE];
+    uint8_t MEMORY[MEMSIZE];
     uint16_t PSW;
     uint16_t IR;
     uint16_t PC;

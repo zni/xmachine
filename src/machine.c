@@ -9,8 +9,6 @@
 
 machine_state_t *STATE;
 
-
-
 void exec_halt(machine_state_t *machine)
 {
     machine->HALTED = true;
@@ -33,9 +31,27 @@ void init_machine(machine_state_t *machine)
     for (int i = 0; i < MEMSIZE; i++) { machine->MEMORY[i] = 0; }
 }
 
-void load_program(machine_state_t *machine, uint16_t *program, uint16_t len)
+void load_program(machine_state_t *machine, char *program)
 {
-    for (int i = 0; i < len; i++) { machine->MEMORY[i] = program[i]; }
+    FILE *binary = fopen(program, "r");
+    if (binary == NULL) {
+        fprintf(stderr, "Failed to open binary file.\n");
+        exit(1);
+    }
+
+    uint16_t len = 0;
+    fread(&len, sizeof(uint16_t), 1, binary);
+
+    uint16_t load_offset = 0;
+    fread(&load_offset, sizeof(uint16_t), 1, binary);
+
+    uint16_t program_length = load_offset + len;
+    for (int i = load_offset; i < program_length; i++) {
+        fread(&(machine->MEMORY[i]), sizeof(uint8_t), 1, binary);
+    }
+    fclose(binary);
+
+    machine->PC = load_offset;
 }
 
 void dump_state(machine_state_t *machine, bool dump_memory)
@@ -63,9 +79,9 @@ void dump_state(machine_state_t *machine, bool dump_memory)
                 continue;
             }
 
-            printf("0o%06o: ", r);
+            printf("0o%04o: ", r);
             for (int i = 0; i < 16; i++) {
-                printf("0o%06o ", row[i]);
+                printf("0o%03o ", row[i]);
             }
             printf("\n");
             all_zero = true;
@@ -83,7 +99,8 @@ void run_machine(machine_state_t *machine)
     uint16_t branch_bit;
     while (!machine->HALTED) {
         machine->MBR = machine->PC;
-        machine->MAR = machine->MEMORY[machine->MBR];
+        machine->MAR = machine->MEMORY[machine->MBR] << 8;
+        machine->MAR |= machine->MEMORY[machine->MBR + 1];
         machine->IR = machine->MAR;
 
         /*
@@ -99,6 +116,7 @@ void run_machine(machine_state_t *machine)
          * 
          * Downsides:
          * Brain slowly turned to mush.
+         * Can't safely trap invalid op codes.
          */
 
         high_bit     = (machine->IR & 0100000) >> 15;
@@ -173,44 +191,23 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    FILE *binary = fopen(argv[1], "r");
-    if (binary == NULL) {
-        fprintf(stderr, "Failed to open binary file.\n");
-        return 1;
-    }
-
-    uint16_t len = 0;
-    fread(&len, sizeof(uint16_t), 1, binary);
-
-    uint16_t *program = malloc(sizeof(uint16_t) * len);
-    if (program == NULL) {
-        fprintf(stderr, "Failed to allocate program.\n");
-        return 1;
-    }
-
-    for (int i = 0; i < len; i++) {
-        fread(&(program[i]), sizeof(uint16_t), 1, binary);
-    }
-    fclose(binary);
-
     machine_state_t machine;
     STATE = &machine;
 
     // Setup a signal handler for SIGSEGV and SIGBUS,
     // as unknown opcodes seem to be able to trigger both.
+#ifdef __unix__
     struct sigaction sa;
     sa.sa_flags = SIGINFO;
-    sa.sa_sigaction = NULL;
     sa.sa_handler = &handle_unknown_opcode;
     sigaction(SIGSEGV, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);
+#endif
 
     init_machine(&machine);
-    load_program(&machine, program, len);
-    run_machine(&machine);
+    load_program(&machine, argv[1]);
+    //run_machine(&machine);
     dump_state(&machine, true);
-
-    free(program);
 
     return 0;
 }
