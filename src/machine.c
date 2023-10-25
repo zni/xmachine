@@ -1,9 +1,14 @@
 #include <inttypes.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "include/handlers.h"
 #include "include/machine_state.h"
+
+machine_state_t *STATE;
+
 
 
 void exec_halt(machine_state_t *machine)
@@ -147,6 +152,19 @@ void run_machine(machine_state_t *machine)
     }
 }
 
+/*
+ * If we get here, there was most likely an unknown op code encountered.
+ * So, halt the machine, even though at this point it basically is halted.
+ * Dump the state of the machine and exit.
+ */
+void handle_unknown_opcode(int signo)
+{
+    fprintf(stderr, "HALTING\n");
+    exec_halt(STATE);
+    dump_state(STATE, true);
+
+    exit(1);
+}
 
 int main(int argc, char** argv)
 {
@@ -176,6 +194,16 @@ int main(int argc, char** argv)
     fclose(binary);
 
     machine_state_t machine;
+    STATE = &machine;
+
+    // Setup a signal handler for SIGSEGV and SIGBUS,
+    // as unknown opcodes seem to be able to trigger both.
+    struct sigaction sa;
+    sa.sa_flags = SIGINFO;
+    sa.sa_sigaction = NULL;
+    sa.sa_handler = &handle_unknown_opcode;
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
 
     init_machine(&machine);
     load_program(&machine, program, len);
