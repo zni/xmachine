@@ -9,11 +9,6 @@
 
 machine_state_t *STATE;
 
-void exec_halt(machine_state_t *machine)
-{
-    machine->HALTED = true;
-}
-
 void init_machine(machine_state_t *machine)
 {
     machine->ALU = 0;
@@ -26,6 +21,8 @@ void init_machine(machine_state_t *machine)
     machine->HALTED = false;
     machine->SRC = NULL;
     machine->DEST = NULL;
+    machine->SRCB = NULL;
+    machine->DESTB = NULL;
 
     for (int i = 0; i < REGISTERS; i++) { machine->R[i] = 0;}
     for (int i = 0; i < MEMSIZE; i++) { machine->MEMORY[i] = 0; }
@@ -104,82 +101,19 @@ void run_machine(machine_state_t *machine)
         machine->MAR |= machine->MEMORY[machine->MBR];
         machine->IR = machine->MAR;
 
-        /*
-         * I've spent so long on this, I'm not sure what I was trying to gain anymore.
-         * 
-         * Basically, grab the high bit, if it's set we're in the high op codes.
-         * From there, look at each position of the op code. They become our indexes
-         * into the jump tables. Once they're established, do some slight of hand,
-         * and voila we are calling our op code of choice.
-         * 
-         * Benefits of this:
-         * Can swap out handlers as needed, if needed, probably YAGNI.
-         * 
-         * Downsides:
-         * Brain slowly turned to mush.
-         * Can't safely trap invalid op codes.
-         */
-
-        high_bit     = (machine->IR & 0100000) >> 15;
-        index_tier_1 = (machine->IR & 0070000) >> 12;
-        index_tier_2 = (machine->IR & 0007000) >> 9;
-        index_tier_3 = (machine->IR & 0000700) >> 6;
-        branch_bit   = (machine->IR & 0000400) >> 8;
-
-        if (high_bit != 0) {
-            if (index_tier_1 != 0) {
-                // The high index is only set for a specific group of opcodes.
-                index_tier_2 = index_tier_1;
-                index_tier_1 = 7;
-
-                high_opcodes[index_tier_1][index_tier_2](machine);
-            } else {
-                index_tier_1 = index_tier_2;
-                index_tier_2 = index_tier_3;
-
-                // If we are between index 0 and 3, we have a branch instruction.
-                // So look at the branch bit for our index.
-                if ((index_tier_1 >= 0) && (index_tier_1 <= 3)) {
-                    index_tier_2 = branch_bit ? 4 : 0;
-                }
-
-                high_opcodes[index_tier_1][index_tier_2](machine);
-            }
-        } else {
-            if (index_tier_1 != 0) {
-                index_tier_2 = index_tier_1 - 1;
-                index_tier_1 = 8;
-                low_opcodes[index_tier_1][index_tier_2](machine);
-            } else if (index_tier_2 != 0) {
-                index_tier_1 = index_tier_2;
-                index_tier_2 = index_tier_3;
-
-                // If we are between index 1 and 3, we have a branch instruction.
-                // Look at the branch bit to determine our second index.
-                if ((index_tier_1) >= 1 && (index_tier_1 <= 3)) {
-                    index_tier_2 = branch_bit ? 4 : 0;
-                }
-                low_opcodes[index_tier_1][index_tier_2](machine);
-            } else if (index_tier_3 != 0) {
-                index_tier_1 = 0;
-                index_tier_2 = index_tier_3;
-                low_opcodes[index_tier_1][index_tier_2](machine);
-            } else {
-                exec_halt(machine);
-            }
-        }
+        exec_instruction(machine);
     }
 }
 
 /*
- * If we get here, there was most likely an unknown op code encountered.
+ * If we get here, we're spiraling out of control.
  * So, halt the machine, even though at this point it basically is halted.
  * Dump the state of the machine and exit.
  */
-void handle_unknown_opcode(int signo)
+void handle_user_interrupt(int signo)
 {
     fprintf(stderr, "HALTING\n");
-    exec_halt(STATE);
+    HALT(STATE);
     dump_state(STATE, true);
 
     exit(1);
@@ -195,15 +129,12 @@ int main(int argc, char** argv)
     machine_state_t machine;
     STATE = &machine;
 
-    // Setup a signal handler for SIGSEGV and SIGBUS,
-    // as unknown opcodes seem to be able to trigger both.
-#ifdef __unix__
+    // Setup a signal handler for SIGINT.
     struct sigaction sa;
     sa.sa_flags = SIGINFO;
-    sa.sa_handler = &handle_unknown_opcode;
-    sigaction(SIGSEGV, &sa, NULL);
-    sigaction(SIGBUS, &sa, NULL);
-#endif
+    sa.sa_handler = &handle_user_interrupt;
+    sigaction(SIGINT, &sa, NULL);
+
 
     init_machine(&machine);
     load_program(&machine, argv[1]);

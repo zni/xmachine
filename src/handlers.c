@@ -1,5 +1,7 @@
 #include <stdio.h>
+
 #include "include/machine_state.h"
+#include "include/opcodes.h"
 
 void setup_dest_addressing(machine_state_t *machine)
 {
@@ -22,6 +24,25 @@ void setup_dest_addressing(machine_state_t *machine)
     }
 }
 
+void setup_dest_byte_addressing(machine_state_t *machine)
+{
+    if ((machine->IR & 077) == 027) {
+        machine->PC += 2;
+        machine->MBR = machine->PC;
+        machine->DESTB = &(machine->MEMORY[machine->MBR]);
+
+    } else if ((machine->IR & 077) == 037) {
+        machine->PC += 2;
+        machine->MBR = machine->PC;
+        machine->MAR = machine->MEMORY[machine->MBR];
+        machine->DESTB = &(machine->MEMORY[machine->MAR]);
+
+    // From register.
+    } else if ((machine->IR & 070) == 00) {
+        machine->DESTB = &(machine->R[(machine->IR & 007)]);
+    }
+}
+
 void setup_src_addressing(machine_state_t *machine)
 {
     // From immediate address.
@@ -40,6 +61,27 @@ void setup_src_addressing(machine_state_t *machine)
     // From register.
     } else if ((machine->IR & 07000) == 0) {
         machine->SRC = &(machine->R[(machine->IR & 00700) >> 6]);
+    }
+}
+
+void setup_src_byte_addressing(machine_state_t *machine)
+{
+    // From immediate address.
+    if ((machine->IR & 07700) == 02700) {
+        machine->PC += 2;
+        machine->MBR = machine->PC;
+        machine->SRCB = &(machine->MEMORY[machine->MBR]);
+
+    // From absolute address.
+    } else if ((machine->IR & 03700) == 03700) {
+        machine->PC += 2;
+        machine->MBR = machine->PC;
+        machine->MAR = machine->MEMORY[machine->MBR];
+        machine->SRCB = &(machine->MEMORY[machine->MAR]);
+
+    // From register.
+    } else if ((machine->IR & 07000) == 0) {
+        machine->SRCB = &(machine->R[(machine->IR & 00700) >> 6]);
     }
 }
 
@@ -205,10 +247,10 @@ void MOV(machine_state_t *machine)
 
 void MOVB(machine_state_t *machine)
 {
-    setup_src_addressing(machine);
-    setup_dest_addressing(machine);
+    setup_src_byte_addressing(machine);
+    setup_dest_byte_addressing(machine);
 
-    *machine->DEST = (*machine->SRC & 0377);
+    *machine->DESTB = *machine->SRCB;
     machine->PC += 2;
 }
 
@@ -225,7 +267,13 @@ void CMP(machine_state_t *machine)
 
 void CMPB(machine_state_t *machine)
 {
-    NOP(machine);
+    setup_src_byte_addressing(machine);
+    setup_dest_byte_addressing(machine);
+
+    machine->ALU = *machine->DESTB;
+    machine->ALU -= *machine->SRCB;
+    machine->PC += 2;
+    set_zero_flag(machine);
 }
 
 void BIT(machine_state_t *machine)
@@ -584,4 +632,227 @@ void XOR(machine_state_t *machine)
     machine->ALU ^= *machine->DEST;
     *REG = machine->ALU;
     machine->PC += 2;
+}
+
+void HALT(machine_state_t *machine)
+{
+    machine->HALTED = true;
+}
+
+void exec_instruction(machine_state_t *machine)
+{
+    switch (machine->IR & 0177400) {
+    // Branch OPS
+    case BR_op:
+        BR(machine);
+        break;
+    case BNE_op:
+        BNE(machine);
+        break;
+    case BEQ_op:
+        BEQ(machine);
+        break;
+    case BGE_op:
+        BGE(machine);
+        break;
+    case BLT_op:
+        BLT(machine);
+        break;
+    case BGT_op:
+        BGT(machine);
+        break;
+    case BLE_op:
+        BLE(machine);
+        break;
+    case BPL_op:
+        BPL(machine);
+        break;
+    case BMI_op:
+        BMI(machine);
+        break;
+    case BHI_op:
+        BHI(machine);
+        break;
+    case BLOS_op:
+        BLOS(machine);
+        break;
+    case BVC_op:
+        BVC(machine);
+        break;
+    case BVS_op:
+        BVS(machine);
+        break;
+    case BCC_op:
+        BCC(machine);
+        break;
+    case BCS_op:
+        BCS(machine);
+        break;
+    
+    default:
+        // Double OP Register Source
+        switch (machine->IR & 0177000) {       
+        case MUL_op:
+            MUL(machine);
+            break;
+        case DIV_op:
+            DIV(machine);
+            break;
+        case ASH_op:
+            ASH(machine);
+            break;
+        case ASHC_op:
+            ASHC(machine);
+            break;
+        case XOR_op:
+            XOR(machine);
+            break;
+        default:
+            switch (machine->IR & 0170000) {
+            // Double OPs
+            case MOV_op:
+                MOV(machine);
+                break;
+            case MOVB_op:
+                MOVB(machine);
+                break;
+            case CMP_op:
+                CMP(machine);
+                break;
+            case CMPB_op:
+                CMPB(machine);
+                break;
+            case BIT_op:
+                BIT(machine);
+                break;
+            case BITB_op:
+                BITB(machine);
+                break;
+            case BIC_op:
+                BIC(machine);
+                break;
+            case BICB_op:
+                BICB(machine);
+                break;
+            case BIS_op:
+                BIS(machine);
+                break;
+            case BISB_op:
+                BISB(machine);
+                break;
+            case ADD_op:
+                ADD(machine);
+                break;
+            case SUB_op:
+                SUB(machine);
+                break;
+            default:
+                // Single OPs
+                switch (machine->IR & 0177700) {
+                case JMP_op:
+                    JMP(machine);
+                    break;
+                case SWAB_op:
+                    SWAB(machine);
+                    break;
+                case CLR_op:
+                    CLR(machine);
+                    break;
+                case CLRB_op:
+                    CLRB(machine);
+                    break;
+                case COM_op:
+                    COM(machine);
+                    break;
+                case COMB_op:
+                    COMB(machine);
+                    break;
+                case INC_op:
+                    INC(machine);
+                    break;
+                case INCB_op:
+                    INCB(machine);
+                    break;
+                case DEC_op:
+                    DEC(machine);
+                    break;
+                case DECB_op:
+                    DECB(machine);
+                    break;
+                case NEG_op:
+                    NEG(machine);
+                    break;
+                case NEGB_op:
+                    NEGB(machine);
+                    break;
+                case ADC_op:
+                    ADC(machine);
+                    break;
+                case ADCB_op:
+                    ADCB(machine);
+                    break;
+                case SBC_op:
+                    SBC(machine);
+                    break;
+                case SBCB_op:
+                    SBCB(machine);
+                    break;
+                case TST_op:
+                    TST(machine);
+                    break;
+                case TSTB_op:
+                    TSTB(machine);
+                    break;
+                case ROR_op:
+                    ROR(machine);
+                    break;
+                case RORB_op:
+                    RORB(machine);
+                    break;
+                case ROL_op:
+                    ROL(machine);
+                    break;
+                case ROLB_op:
+                    ROLB(machine);
+                    break;
+                case ASR_op:
+                    ASR(machine);
+                    break;
+                case ASRB_op:
+                    ASRB(machine);
+                    break;
+                case ASL_op:
+                    ASL(machine);
+                    break;
+                case ASLB_op:
+                    ASLB(machine);
+                    break;
+                case MTPS_op:
+                    MTPS(machine);
+                    break;
+                case MFPI_op:
+                    MFPI(machine);
+                    break;
+                case MFPD_op:
+                    MFPD(machine);
+                    break;
+                case MTPI_op:
+                    MTPI(machine);
+                    break;
+                case MTPD_op:
+                    MTPD(machine);
+                    break;
+                case SXT_op:
+                    SXT(machine);
+                    break;
+                case MFPS_op:
+                    MFPS(machine);
+                    break;
+                default:
+                    HALT(machine);
+                    break;
+                }
+            }
+        }
+    }
 }

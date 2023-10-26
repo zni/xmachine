@@ -23,8 +23,10 @@ typedef struct machine_state {
     uint16_t MBR;
     uint16_t ALU;
     uint16_t SP;
-    uint16_t *DEST;
+    uint8_t *SRCB;
+    uint8_t *DESTB;
     uint16_t *SRC;
+    uint16_t *DEST;
     uint16_t R[5];
     bool HALTED;
 } machine_state_t;
