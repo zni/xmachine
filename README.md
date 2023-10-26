@@ -30,13 +30,13 @@ I could have just parsed the text files and loaded them, but I wanted an extra s
 Anywho... to build `test/mov.mcode` for example:
 
 ```
-bin/asm test/mov.mcode testbin/mov.bin
+bin/asm test/mov.mcode 400 testbin/mov.bin
 ```
 
 basically:
 
 ```
-bin/asm <source> <output binary>
+bin/asm <source> <program offset> <output binary>
 ```
 
 The format of the input `.mcode` files is as follows:
