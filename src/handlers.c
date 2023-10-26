@@ -3,34 +3,135 @@
 #include "include/machine_state.h"
 #include "include/opcodes.h"
 
+// Destination Addressing
+
+void setup_pc_dest_addressing(machine_state_t *machine)
+{
+    uint8_t mode = (machine->IR & 070) >> 3;
+    switch (mode) {
+        // From register.
+        case 0:
+            machine->DEST = &(machine->R[(machine->IR & 007)]);
+            break;
+
+        // From immediate.
+        case 2:
+            machine->PC += 2;
+            machine->MBR = machine->PC;
+            machine->DEST = &(machine->MEMORY[machine->MBR]);
+            break;
+
+        // From absolute.
+        case 3:
+            machine->PC += 2;
+            machine->MBR = machine->PC;
+            machine->MAR = machine->MEMORY[machine->MBR];
+            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            break;
+
+    }
+}
+
+void setup_sp_dest_addressing(machine_state_t *machine)
+{
+    return;
+}
+
+void setup_general_dest_addressing(machine_state_t *machine)
+{
+    uint8_t mode = (machine->IR & 070) >> 3;
+    uint8_t reg = machine->IR & 007;
+    switch (mode) {
+        // Register.
+        case 0:
+            machine->DEST = &(machine->R[reg]);
+            break;
+
+        // Deferred.
+        case 1:
+            machine->MAR = machine->R[reg];
+            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            break;
+
+        // Autoincrement.
+        //
+        // NOTE: (incremented by one or two) to address the next word or
+        // byte depending upon whether the instruction **operates on byte or word data**
+        case 2:
+            machine->MAR = machine->R[reg];
+            machine->R[reg] += 2; // XXX word advance.
+            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            break;
+
+        // Deferred autoincrement.
+        case 3:
+            uint16_t deferred = machine->R[reg];
+            machine->MAR = machine->MEMORY[deferred];
+            machine->MEMORY[deferred] += 2;
+            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            break;
+        
+        // Autodecrement.
+        //
+        // NOTE: (decremented by one or two) to address the next word or
+        // byte depending upon whether the instruction **operates on byte or word data**
+        case 4:
+            machine->MAR = machine->R[reg];
+            machine->R[reg] -= 2; // XXX word advance.
+            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            break;
+
+        // Deferred autodecrement.
+        case 5:
+            uint16_t deferred = machine->R[reg];
+            machine->MAR = machine->MEMORY[deferred];
+            machine->MEMORY[deferred] -= 2;
+            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            break;
+
+        // Indexed.
+        case 6:
+            machine->PC += 2;
+            machine->MAR = machine->PC;
+            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            machine->DEST = &(machine->MEMORY[machine->R[reg] + index]);
+            break;
+
+        // Deferred indexed.
+        case 7:
+            machine->PC += 2;
+            machine->MAR = machine->PC;
+            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            machine->MAR = machine->R[reg];
+            machine->DEST = &(machine->MEMORY[machine->MEMORY[machine->MAR] + index]);
+            break;
+    }
+}
+
 void setup_dest_addressing(machine_state_t *machine)
 {
-    // From immediate.
-    if ((machine->IR & 077) == 027) {
-        machine->PC += 2;
-        machine->MBR = machine->PC;
-        machine->DEST = &(machine->MEMORY[machine->MBR]);
-
-    // From absolute.
-    } else if ((machine->IR & 077) == 037) {
-        machine->PC += 2;
-        machine->MBR = machine->PC;
-        machine->MAR = machine->MEMORY[machine->MBR];
-        machine->DEST = &(machine->MEMORY[machine->MAR]);
-
-    // From register.
-    } else if ((machine->IR & 070) == 00) {
-        machine->DEST = &(machine->R[(machine->IR & 007)]);
+    uint8_t reg = machine->IR & 007;
+    switch (reg) {
+        case 7:
+            setup_pc_dest_addressing(machine);
+            break;
+        case 6:
+            setup_sp_dest_addressing(machine);
+            break;
+        default:
+            setup_general_dest_addressing(machine);
     }
 }
 
 void setup_dest_byte_addressing(machine_state_t *machine)
 {
+    // From immediate.
     if ((machine->IR & 077) == 027) {
         machine->PC += 2;
         machine->MBR = machine->PC;
         machine->DESTB = &(machine->MEMORY[machine->MBR]);
 
+    // From absolute.
     } else if ((machine->IR & 077) == 037) {
         machine->PC += 2;
         machine->MBR = machine->PC;
@@ -43,24 +144,124 @@ void setup_dest_byte_addressing(machine_state_t *machine)
     }
 }
 
+
+// Source Addressing
+
+void setup_pc_src_addressing(machine_state_t *machine)
+{
+    uint8_t mode = (machine->IR & 07000) >> 9;
+    switch (mode) {
+        // From register.
+        case 0:
+            machine->SRC = &(machine->R[(machine->IR & 007)]);
+            break;
+
+        // From immediate.
+        case 2:
+            machine->PC += 2;
+            machine->MBR = machine->PC;
+            machine->SRC = &(machine->MEMORY[machine->MBR]);
+            break;
+
+        // From absolute.
+        case 3:
+            machine->PC += 2;
+            machine->MBR = machine->PC;
+            machine->MAR = machine->MEMORY[machine->MBR];
+            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            break;
+
+    }
+}
+
+void setup_sp_src_addressing(machine_state_t *machine)
+{
+    return;
+}
+
+void setup_general_src_addressing(machine_state_t *machine)
+{
+    uint8_t mode = (machine->IR & 07000) >> 9;
+    uint8_t reg = (machine->IR & 00700) >> 6;
+    switch (mode) {
+        // Register.
+        case 0:
+            machine->SRC = &(machine->R[reg]);
+            break;
+
+        // Deferred.
+        case 1:
+            machine->MAR = machine->R[reg];
+            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            break;
+
+        // Autoincrement.
+        //
+        // NOTE: (incremented by one or two) to address the next word or
+        // byte depending upon whether the instruction **operates on byte or word data**
+        case 2:
+            machine->MAR = machine->R[reg];
+            machine->R[reg] += 2; // XXX word advance.
+            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            break;
+
+        // Deferred autoincrement.
+        case 3:
+            uint16_t deferred = machine->R[reg];
+            machine->MAR = machine->MEMORY[deferred];
+            machine->MEMORY[deferred] += 2;
+            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            break;
+        
+        // Autodecrement.
+        //
+        // NOTE: (decremented by one or two) to address the next word or
+        // byte depending upon whether the instruction **operates on byte or word data**
+        case 4:
+            machine->MAR = machine->R[reg];
+            machine->R[reg] -= 2; // XXX word advance.
+            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            break;
+
+        // Deferred autodecrement.
+        case 5:
+            uint16_t deferred = machine->R[reg];
+            machine->MAR = machine->MEMORY[deferred];
+            machine->MEMORY[deferred] -= 2;
+            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            break;
+
+        // Indexed.
+        case 6:
+            machine->PC += 2;
+            machine->MAR = machine->PC;
+            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            machine->SRC = &(machine->MEMORY[machine->R[reg] + index]);
+            break;
+
+        // Deferred indexed.
+        case 7:
+            machine->PC += 2;
+            machine->MAR = machine->PC;
+            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            machine->MAR = machine->R[reg];
+            machine->SRC = &(machine->MEMORY[machine->MEMORY[machine->MAR] + index]);
+            break;
+    }
+}
+
 void setup_src_addressing(machine_state_t *machine)
 {
-    // From immediate address.
-    if ((machine->IR & 07700) == 02700) {
-        machine->PC += 2;
-        machine->MBR = machine->PC;
-        machine->SRC = &(machine->MEMORY[machine->MBR]);
-
-    // From absolute address.
-    } else if ((machine->IR & 03700) == 03700) {
-        machine->PC += 2;
-        machine->MBR = machine->PC;
-        machine->MAR = machine->MEMORY[machine->MBR];
-        machine->SRC = &(machine->MEMORY[machine->MAR]);
-
-    // From register.
-    } else if ((machine->IR & 07000) == 0) {
-        machine->SRC = &(machine->R[(machine->IR & 00700) >> 6]);
+    uint8_t reg = (machine->IR & 00700) >> 6;
+    switch (reg) {
+        case 7:
+            setup_pc_src_addressing(machine);
+            break;
+        case 6:
+            setup_sp_src_addressing(machine);
+            break;
+        default:
+            setup_general_src_addressing(machine);
     }
 }
 
