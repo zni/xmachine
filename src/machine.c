@@ -89,11 +89,6 @@ void dump_state(machine_state_t *machine, bool dump_memory)
 
 void run_machine(machine_state_t *machine)
 {
-    uint16_t high_bit;
-    uint16_t index_tier_1;
-    uint16_t index_tier_2;
-    uint16_t index_tier_3;
-    uint16_t branch_bit;
     while (!machine->HALTED) {
         machine->MBR = machine->PC;
         // Words are stored little endian.
@@ -107,16 +102,12 @@ void run_machine(machine_state_t *machine)
 
 /*
  * If we get here, we're spiraling out of control.
- * So, halt the machine, even though at this point it basically is halted.
- * Dump the state of the machine and exit.
+ * Halt the machine.
  */
 void handle_user_interrupt(int signo)
 {
     fprintf(stderr, "HALTING\n");
     HALT(STATE);
-    dump_state(STATE, true);
-
-    exit(1);
 }
 
 int main(int argc, char** argv)
@@ -129,11 +120,16 @@ int main(int argc, char** argv)
     machine_state_t machine;
     STATE = &machine;
 
+#if (defined(_POSIX_VERSION))
     // Setup a signal handler for SIGINT.
     struct sigaction sa;
     sa.sa_flags = SIGINFO;
     sa.sa_handler = &handle_user_interrupt;
     sigaction(SIGINT, &sa, NULL);
+#elif (defined(__WIN32__))
+    // Use the old style signal handler.
+    signal(SIGINT, &handle_user_interrupt);
+#endif
 
 
     init_machine(&machine);
