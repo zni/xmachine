@@ -53,7 +53,11 @@ man and it was the simplest way to tell the program to stop.
 The format of the output file is as follows:
 
 ```
-<16-bits number of program instructions> <16-bit instruction 01> ... <16-bit instruction n>
+<16-bits number of program instructions>
+<16-bit program offset>
+<16-bit instruction 01> 
+... 
+<16-bit instruction n>
 ```
 
 ### machine
