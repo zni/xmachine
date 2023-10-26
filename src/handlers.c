@@ -39,6 +39,8 @@ void setup_sp_dest_addressing(machine_state_t *machine)
 
 void setup_general_dest_addressing(machine_state_t *machine)
 {
+    uint16_t index = 0;
+    uint16_t deferred = 0;
     uint8_t mode = (machine->IR & 070) >> 3;
     uint8_t reg = machine->IR & 007;
     switch (mode) {
@@ -65,7 +67,7 @@ void setup_general_dest_addressing(machine_state_t *machine)
 
         // Deferred autoincrement.
         case 3:
-            uint16_t deferred = machine->R[reg];
+            deferred = machine->R[reg];
             machine->MAR = machine->MEMORY[deferred];
             machine->MEMORY[deferred] += 2;
             machine->DEST = &(machine->MEMORY[machine->MAR]);
@@ -83,7 +85,7 @@ void setup_general_dest_addressing(machine_state_t *machine)
 
         // Deferred autodecrement.
         case 5:
-            uint16_t deferred = machine->R[reg];
+            deferred = machine->R[reg];
             machine->MAR = machine->MEMORY[deferred];
             machine->MEMORY[deferred] -= 2;
             machine->DEST = &(machine->MEMORY[machine->MAR]);
@@ -93,7 +95,7 @@ void setup_general_dest_addressing(machine_state_t *machine)
         case 6:
             machine->PC += 2;
             machine->MAR = machine->PC;
-            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
             machine->DEST = &(machine->MEMORY[machine->R[reg] + index]);
             break;
 
@@ -101,7 +103,7 @@ void setup_general_dest_addressing(machine_state_t *machine)
         case 7:
             machine->PC += 2;
             machine->MAR = machine->PC;
-            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
             machine->MAR = machine->R[reg];
             machine->DEST = &(machine->MEMORY[machine->MEMORY[machine->MAR] + index]);
             break;
@@ -158,6 +160,8 @@ void setup_sp_dest_byte_addressing(machine_state_t *machine)
 
 void setup_general_dest_byte_addressing(machine_state_t *machine)
 {
+    uint16_t index = 0;
+    uint16_t deferred = 0;
     uint8_t mode = (machine->IR & 070) >> 3;
     uint8_t reg = machine->IR & 007;
     switch (mode) {
@@ -184,7 +188,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
 
         // Deferred autoincrement.
         case 3:
-            uint16_t deferred = machine->R[reg];
+            deferred = machine->R[reg];
             machine->MAR = machine->MEMORY[deferred];
             machine->MEMORY[deferred]++;
             machine->DESTB = &(machine->MEMORY[machine->MAR]);
@@ -202,7 +206,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
 
         // Deferred autodecrement.
         case 5:
-            uint16_t deferred = machine->R[reg];
+            deferred = machine->R[reg];
             machine->MAR = machine->MEMORY[deferred];
             machine->MEMORY[deferred]--;
             machine->DESTB = &(machine->MEMORY[machine->MAR]);
@@ -212,7 +216,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
         case 6:
             machine->PC += 2;
             machine->MAR = machine->PC;
-            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
             machine->DESTB = &(machine->MEMORY[machine->R[reg] + index]);
             break;
 
@@ -220,7 +224,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
         case 7:
             machine->PC += 2;
             machine->MAR = machine->PC;
-            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
             machine->MAR = machine->R[reg];
             machine->DESTB = &(machine->MEMORY[machine->MEMORY[machine->MAR] + index]);
             break;
@@ -279,6 +283,8 @@ void setup_sp_src_addressing(machine_state_t *machine)
 
 void setup_general_src_addressing(machine_state_t *machine)
 {
+    uint16_t index = 0;
+    uint16_t deferred = 0;
     uint8_t mode = (machine->IR & 07000) >> 9;
     uint8_t reg = (machine->IR & 00700) >> 6;
     switch (mode) {
@@ -305,7 +311,7 @@ void setup_general_src_addressing(machine_state_t *machine)
 
         // Deferred autoincrement.
         case 3:
-            uint16_t deferred = machine->R[reg];
+            deferred = machine->R[reg];
             machine->MAR = machine->MEMORY[deferred];
             machine->MEMORY[deferred] += 2;
             machine->SRC = &(machine->MEMORY[machine->MAR]);
@@ -323,7 +329,7 @@ void setup_general_src_addressing(machine_state_t *machine)
 
         // Deferred autodecrement.
         case 5:
-            uint16_t deferred = machine->R[reg];
+            deferred = machine->R[reg];
             machine->MAR = machine->MEMORY[deferred];
             machine->MEMORY[deferred] -= 2;
             machine->SRC = &(machine->MEMORY[machine->MAR]);
@@ -333,7 +339,7 @@ void setup_general_src_addressing(machine_state_t *machine)
         case 6:
             machine->PC += 2;
             machine->MAR = machine->PC;
-            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
             machine->SRC = &(machine->MEMORY[machine->R[reg] + index]);
             break;
 
@@ -341,7 +347,7 @@ void setup_general_src_addressing(machine_state_t *machine)
         case 7:
             machine->PC += 2;
             machine->MAR = machine->PC;
-            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
             machine->MAR = machine->R[reg];
             machine->SRC = &(machine->MEMORY[machine->MEMORY[machine->MAR] + index]);
             break;
@@ -399,6 +405,8 @@ void setup_sp_src_byte_addressing(machine_state_t *machine)
 
 void setup_general_src_byte_addressing(machine_state_t *machine)
 {
+    uint16_t index = 0;
+    uint16_t deferred = 0;
     uint8_t mode = (machine->IR & 07000) >> 9;
     uint8_t reg = (machine->IR & 00700) >> 6;
     switch (mode) {
@@ -425,7 +433,7 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
 
         // Deferred autoincrement.
         case 3:
-            uint16_t deferred = machine->R[reg];
+            deferred = machine->R[reg];
             machine->MAR = machine->MEMORY[deferred];
             machine->MEMORY[deferred]++;
             machine->SRCB = &(machine->MEMORY[machine->MAR]);
@@ -443,7 +451,7 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
 
         // Deferred autodecrement.
         case 5:
-            uint16_t deferred = machine->R[reg];
+            deferred = machine->R[reg];
             machine->MAR = machine->MEMORY[deferred];
             machine->MEMORY[deferred]--;
             machine->SRCB = &(machine->MEMORY[machine->MAR]);
@@ -453,7 +461,7 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
         case 6:
             machine->PC += 2;
             machine->MAR = machine->PC;
-            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
             machine->SRCB = &(machine->MEMORY[machine->R[reg] + index]);
             break;
 
@@ -461,7 +469,7 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
         case 7:
             machine->PC += 2;
             machine->MAR = machine->PC;
-            uint16_t index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
+            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
             machine->MAR = machine->R[reg];
             machine->SRCB = &(machine->MEMORY[machine->MEMORY[machine->MAR] + index]);
             break;
