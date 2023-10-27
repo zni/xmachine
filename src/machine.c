@@ -6,6 +6,7 @@
 
 #include "include/handlers.h"
 #include "include/machine_state.h"
+#include "include/tty.h"
 
 machine_state_t *STATE;
 
@@ -26,6 +27,13 @@ void init_machine(machine_state_t *machine)
 
     for (int i = 0; i < REGISTERS; i++) { machine->R[i] = 0;}
     for (int i = 0; i < MEMSIZE; i++) { machine->MEMORY[i] = 0; }
+
+    machine->TKS = &(machine->MEMORY[TKS_LOC]);
+    machine->TKB = &(machine->MEMORY[TKB_LOC]);
+
+    machine->TPS = &(machine->MEMORY[TPS_LOC]);
+    *machine->TPS ^= TPS_READY;
+    machine->TPB = &(machine->MEMORY[TPB_LOC]);
 }
 
 void load_program(machine_state_t *machine, char *program)
@@ -97,6 +105,9 @@ void run_machine(machine_state_t *machine)
         machine->IR = machine->MAR;
 
         exec_instruction(machine);
+
+        exec_tty_kb(machine);
+        exec_tty_print(machine);
     }
 }
 

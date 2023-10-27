@@ -1,0 +1,11 @@
+;INC TKS
+;MOVB TKB, TPB
+;
+; Echo a single character.
+;
+0005237
+0017500
+0013737
+0017502
+0017506
+.end

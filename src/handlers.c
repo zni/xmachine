@@ -25,7 +25,7 @@ void setup_pc_dest_addressing(machine_state_t *machine)
         case 3:
             machine->PC += 2;
             machine->MBR = machine->PC;
-            machine->MAR = machine->MEMORY[machine->MBR];
+            machine->MAR = machine->MEMORY[machine->MBR] | (machine->MEMORY[machine->MBR + 1] << 8);
             machine->DEST = &(machine->MEMORY[machine->MAR]);
             break;
 
@@ -269,7 +269,7 @@ void setup_pc_src_addressing(machine_state_t *machine)
         case 3:
             machine->PC += 2;
             machine->MBR = machine->PC;
-            machine->MAR = machine->MEMORY[machine->MBR];
+            machine->MAR = machine->MEMORY[machine->MBR] | (machine->MEMORY[machine->MBR + 1] << 8);
             machine->SRC = &(machine->MEMORY[machine->MAR]);
             break;
 
