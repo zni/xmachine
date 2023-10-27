@@ -40,7 +40,8 @@ void init_machine(machine_state_t *machine)
     machine->ALU = 0;
     machine->IR = 0;
     machine->HALTED = false;
-    machine->memory = initialize_memory();
+    machine->memory = NULL;
+    initialize_memory(&(machine->memory));
 }
 
 void load_program(machine_state_t *machine, char *program)
@@ -61,8 +62,10 @@ void load_program(machine_state_t *machine, char *program)
     uint16_t program_length = load_offset + (len * 2);
     for (int i = load_offset; i < program_length; i++) {
         fread(&(byte), sizeof(uint8_t), 1, binary);
+        printf("0o%03o\n", byte);
         machine->memory->direct_write_byte(machine->memory, i, byte);
     }
+    putchar('\n');
     fclose(binary);
 
     machine->memory->set_r(machine->memory, R_PC, load_offset);
@@ -87,18 +90,18 @@ void dump_state(machine_state_t *machine, bool dump_memory)
     if (dump_memory) {
         uint16_t row[16];
         bool all_zero = true;
-        for (int r = 0; r < MEMSIZE; r += 16) {
+        for (int r = 0; r < MEMWORDS; r += 16) {
             for (int c = 0; c < 16; c++) {
                 if (machine->memory->direct_read_word(machine->memory, r+c) != 0) { all_zero = false; }
                 row[c] = machine->memory->direct_read_word(machine->memory, r+c);
             }
-            if (all_zero && ((r + 16) < MEMSIZE)) {
+            if (all_zero && ((r + 16) < MEMWORDS)) {
                 continue;
             }
 
             printf("0o%05o: ", r);
             for (int i = 0; i < 16; i++) {
-                printf("0o%03o ", row[i]);
+                printf("0o%07o ", row[i]);
             }
             printf("\n");
             all_zero = true;
