@@ -7,26 +7,26 @@
 
 void setup_pc_dest_addressing(machine_state_t *machine)
 {
+    uint16_t pc = 0;
     uint8_t mode = (machine->IR & 070) >> 3;
     switch (mode) {
         // From register.
         case 0:
-            machine->DEST = &(machine->R[(machine->IR & 007)]);
+            machine->memory->dest = translate_register(machine->IR & 007);
             break;
 
         // From immediate.
         case 2:
-            machine->PC += 2;
-            machine->MBR = machine->PC;
-            machine->DEST = &(machine->MEMORY[machine->MBR]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            machine->memory->dest = pc;
             break;
 
         // From absolute.
         case 3:
-            machine->PC += 2;
-            machine->MBR = machine->PC;
-            machine->MAR = machine->MEMORY[machine->MBR] | (machine->MEMORY[machine->MBR + 1] << 8);
-            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            machine->memory->word_advance_r(machine->memory, 7);
+            pc = machine->memory->get_r(machine->memory, 7);
+            machine->memory->dest = machine->memory->direct_read_word(machine->memory, pc);
             break;
 
     }
@@ -39,20 +39,23 @@ void setup_sp_dest_addressing(machine_state_t *machine)
 
 void setup_general_dest_addressing(machine_state_t *machine)
 {
+    uint16_t pc = 0;
     uint16_t index = 0;
     uint16_t deferred = 0;
-    uint8_t mode = (machine->IR & 070) >> 3;
-    uint8_t reg = machine->IR & 007;
+    uint16_t mode = (machine->IR & 070) >> 3;
+    uint16_t reg = machine->IR & 007;
     switch (mode) {
         // Register.
         case 0:
-            machine->DEST = &(machine->R[reg]);
+            machine->memory->dest = machine->memory->get_r(machine->memory, reg);
             break;
 
         // Deferred.
         case 1:
-            machine->MAR = machine->R[reg];
-            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            machine->memory->dest = machine->memory->direct_read_word(
+                machine->memory,
+                machine->memory->get_r(machine->memory, reg)
+            );
             break;
 
         // Autoincrement.
@@ -60,17 +63,19 @@ void setup_general_dest_addressing(machine_state_t *machine)
         // NOTE: (incremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 2:
-            machine->MAR = machine->R[reg];
-            machine->R[reg] += 2; // XXX word advance.
-            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            machine->memory->dest = machine->memory->direct_read_word(
+                machine->memory, 
+                machine->memory->get_r(machine->memory, reg)
+            );
+            machine->memory->word_advance_r(machine->memory, reg);
             break;
 
         // Deferred autoincrement.
         case 3:
-            deferred = machine->R[reg];
-            machine->MAR = machine->MEMORY[deferred];
-            machine->MEMORY[deferred] += 2;
-            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            index = machine->memory->direct_read_word(machine->memory, deferred);
+            machine->memory->word_advance(machine->memory, deferred);
+            machine->memory->dest = machine->memory->direct_read_word(machine->memory, index);
             break;
         
         // Autodecrement.
@@ -78,34 +83,40 @@ void setup_general_dest_addressing(machine_state_t *machine)
         // NOTE: (decremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 4:
-            machine->MAR = machine->R[reg];
-            machine->R[reg] -= 2; // XXX word advance.
-            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            machine->memory->word_decrease_r(machine->memory, reg);
+            machine->memory->dest = machine->memory->direct_read_word(machine->memory, deferred);
             break;
 
         // Deferred autodecrement.
         case 5:
-            deferred = machine->R[reg];
-            machine->MAR = machine->MEMORY[deferred];
-            machine->MEMORY[deferred] -= 2;
-            machine->DEST = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            index = machine->memory->direct_read_word(machine->memory, deferred);
+            machine->memory->dest = machine->memory->direct_read_word(machine->memory, index);
+            machine->memory->word_decrease(machine->memory, deferred);
             break;
 
         // Indexed.
         case 6:
-            machine->PC += 2;
-            machine->MAR = machine->PC;
-            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
-            machine->DEST = &(machine->MEMORY[machine->R[reg] + index]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_word(machine->memory, pc);
+            machine->memory->dest = machine->memory->direct_read_word(
+                machine->memory,
+                machine->memory->get_r(machine->memory, reg) + index
+            );
             break;
 
         // Deferred indexed.
         case 7:
-            machine->PC += 2;
-            machine->MAR = machine->PC;
-            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
-            machine->MAR = machine->R[reg];
-            machine->DEST = &(machine->MEMORY[machine->MEMORY[machine->MAR] + index]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_word(machine->memory, pc);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            machine->memory->dest = machine->memory->direct_read_word(
+                machine->memory, 
+                machine->memory->direct_read_word(machine->memory, deferred) + index
+            );
             break;
     }
 }
@@ -128,26 +139,26 @@ void setup_dest_addressing(machine_state_t *machine)
 
 void setup_pc_dest_byte_addressing(machine_state_t *machine)
 {
+    uint16_t pc = 0;
     uint8_t mode = (machine->IR & 070) >> 3;
     switch (mode) {
         // From register.
         case 0:
-            machine->DESTB = &(machine->R[(machine->IR & 007)]);
+            machine->memory->dest = translate_register(machine->IR & 007);
             break;
 
         // From immediate.
         case 2:
-            machine->PC += 2;
-            machine->MBR = machine->PC;
-            machine->DESTB = &(machine->MEMORY[machine->MBR]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            machine->memory->dest = pc;
             break;
 
         // From absolute.
         case 3:
-            machine->PC += 2;
-            machine->MBR = machine->PC;
-            machine->MAR = machine->MEMORY[machine->MBR];
-            machine->DESTB = &(machine->MEMORY[machine->MAR]);
+            machine->memory->word_advance_r(machine->memory, 7);
+            pc = machine->memory->get_r(machine->memory, 7);
+            machine->memory->dest = machine->memory->direct_read_word(machine->memory, pc);
             break;
 
     }
@@ -160,6 +171,7 @@ void setup_sp_dest_byte_addressing(machine_state_t *machine)
 
 void setup_general_dest_byte_addressing(machine_state_t *machine)
 {
+    uint16_t pc = 0;
     uint16_t index = 0;
     uint16_t deferred = 0;
     uint8_t mode = (machine->IR & 070) >> 3;
@@ -167,13 +179,15 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
     switch (mode) {
         // Register.
         case 0:
-            machine->DESTB = &(machine->R[reg]);
+            machine->memory->dest = machine->memory->get_r(machine->memory, reg);
             break;
 
         // Deferred.
         case 1:
-            machine->MAR = machine->R[reg];
-            machine->DESTB = &(machine->MEMORY[machine->MAR]);
+            machine->memory->dest = machine->memory->direct_read_byte(
+                machine->memory,
+                machine->memory->get_r(machine->memory, reg)
+            );
             break;
 
         // Autoincrement.
@@ -181,17 +195,19 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
         // NOTE: (incremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 2:
-            machine->MAR = machine->R[reg];
-            machine->R[reg]++; // XXX byte advance.
-            machine->DESTB = &(machine->MEMORY[machine->MAR]);
+            machine->memory->dest = machine->memory->direct_read_byte(
+                machine->memory, 
+                machine->memory->get_r(machine->memory, reg)
+            );
+            machine->memory->byte_advance_r(machine->memory, reg);
             break;
 
         // Deferred autoincrement.
         case 3:
-            deferred = machine->R[reg];
-            machine->MAR = machine->MEMORY[deferred];
-            machine->MEMORY[deferred]++;
-            machine->DESTB = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            index = machine->memory->direct_read_byte(machine->memory, deferred);
+            machine->memory->byte_advance(machine->memory, deferred);
+            machine->memory->dest = machine->memory->direct_read_byte(machine->memory, index);
             break;
         
         // Autodecrement.
@@ -199,34 +215,40 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
         // NOTE: (decremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 4:
-            machine->MAR = machine->R[reg];
-            machine->R[reg]--; // XXX byte advance.
-            machine->DESTB = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            machine->memory->byte_decrease_r(machine->memory, reg);
+            machine->memory->dest = machine->memory->direct_read_byte(machine->memory, deferred);
             break;
 
         // Deferred autodecrement.
         case 5:
-            deferred = machine->R[reg];
-            machine->MAR = machine->MEMORY[deferred];
-            machine->MEMORY[deferred]--;
-            machine->DESTB = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            index = machine->memory->direct_read_byte(machine->memory, deferred);
+            machine->memory->dest = machine->memory->direct_read_byte(machine->memory, index);
+            machine->memory->byte_decrease(machine->memory, deferred);
             break;
 
         // Indexed.
         case 6:
-            machine->PC += 2;
-            machine->MAR = machine->PC;
-            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
-            machine->DESTB = &(machine->MEMORY[machine->R[reg] + index]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_byte(machine->memory, pc);
+            machine->memory->dest = machine->memory->direct_read_byte(
+                machine->memory,
+                machine->memory->get_r(machine->memory, reg) + index
+            );
             break;
 
         // Deferred indexed.
         case 7:
-            machine->PC += 2;
-            machine->MAR = machine->PC;
-            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
-            machine->MAR = machine->R[reg];
-            machine->DESTB = &(machine->MEMORY[machine->MEMORY[machine->MAR] + index]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_byte(machine->memory, pc);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            machine->memory->dest = machine->memory->direct_read_byte(
+                machine->memory, 
+                machine->memory->direct_read_byte(machine->memory, deferred) + index
+            );
             break;
     }
 }
@@ -251,26 +273,26 @@ void setup_dest_byte_addressing(machine_state_t *machine)
 
 void setup_pc_src_addressing(machine_state_t *machine)
 {
+    uint16_t pc = 0;
     uint8_t mode = (machine->IR & 07000) >> 9;
     switch (mode) {
         // From register.
         case 0:
-            machine->SRC = &(machine->R[(machine->IR & 007)]);
+            machine->memory->src = translate_register(machine->IR & 007);
             break;
 
         // From immediate.
         case 2:
-            machine->PC += 2;
-            machine->MBR = machine->PC;
-            machine->SRC = &(machine->MEMORY[machine->MBR]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            machine->memory->src = pc;
             break;
 
         // From absolute.
         case 3:
-            machine->PC += 2;
-            machine->MBR = machine->PC;
-            machine->MAR = machine->MEMORY[machine->MBR] | (machine->MEMORY[machine->MBR + 1] << 8);
-            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            machine->memory->word_advance_r(machine->memory, 7);
+            pc = machine->memory->get_r(machine->memory, 7);
+            machine->memory->src = machine->memory->direct_read_word(machine->memory, pc);
             break;
 
     }
@@ -283,6 +305,7 @@ void setup_sp_src_addressing(machine_state_t *machine)
 
 void setup_general_src_addressing(machine_state_t *machine)
 {
+    uint16_t pc = 0;
     uint16_t index = 0;
     uint16_t deferred = 0;
     uint8_t mode = (machine->IR & 07000) >> 9;
@@ -290,13 +313,15 @@ void setup_general_src_addressing(machine_state_t *machine)
     switch (mode) {
         // Register.
         case 0:
-            machine->SRC = &(machine->R[reg]);
+            machine->memory->src = machine->memory->get_r(machine->memory, reg);
             break;
 
         // Deferred.
         case 1:
-            machine->MAR = machine->R[reg];
-            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            machine->memory->src = machine->memory->direct_read_word(
+                machine->memory,
+                machine->memory->get_r(machine->memory, reg)
+            );
             break;
 
         // Autoincrement.
@@ -304,17 +329,19 @@ void setup_general_src_addressing(machine_state_t *machine)
         // NOTE: (incremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 2:
-            machine->MAR = machine->R[reg];
-            machine->R[reg] += 2; // XXX word advance.
-            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            machine->memory->src = machine->memory->direct_read_word(
+                machine->memory, 
+                machine->memory->get_r(machine->memory, reg)
+            );
+            machine->memory->word_advance_r(machine->memory, reg);
             break;
 
         // Deferred autoincrement.
         case 3:
-            deferred = machine->R[reg];
-            machine->MAR = machine->MEMORY[deferred];
-            machine->MEMORY[deferred] += 2;
-            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            index = machine->memory->direct_read_word(machine->memory, deferred);
+            machine->memory->word_advance(machine->memory, deferred);
+            machine->memory->src = machine->memory->direct_read_word(machine->memory, index);
             break;
         
         // Autodecrement.
@@ -322,34 +349,40 @@ void setup_general_src_addressing(machine_state_t *machine)
         // NOTE: (decremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 4:
-            machine->MAR = machine->R[reg];
-            machine->R[reg] -= 2; // XXX word advance.
-            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            machine->memory->word_decrease_r(machine->memory, reg);
+            machine->memory->src = machine->memory->direct_read_word(machine->memory, deferred);
             break;
 
         // Deferred autodecrement.
         case 5:
-            deferred = machine->R[reg];
-            machine->MAR = machine->MEMORY[deferred];
-            machine->MEMORY[deferred] -= 2;
-            machine->SRC = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            index = machine->memory->direct_read_word(machine->memory, deferred);
+            machine->memory->src = machine->memory->direct_read_word(machine->memory, index);
+            machine->memory->word_decrease(machine->memory, deferred);
             break;
 
         // Indexed.
         case 6:
-            machine->PC += 2;
-            machine->MAR = machine->PC;
-            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
-            machine->SRC = &(machine->MEMORY[machine->R[reg] + index]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_word(machine->memory, pc);
+            machine->memory->src = machine->memory->direct_read_word(
+                machine->memory,
+                machine->memory->get_r(machine->memory, reg) + index
+            );
             break;
 
         // Deferred indexed.
         case 7:
-            machine->PC += 2;
-            machine->MAR = machine->PC;
-            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
-            machine->MAR = machine->R[reg];
-            machine->SRC = &(machine->MEMORY[machine->MEMORY[machine->MAR] + index]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_word(machine->memory, pc);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            machine->memory->src = machine->memory->direct_read_word(
+                machine->memory, 
+                machine->memory->direct_read_word(machine->memory, deferred) + index
+            );
             break;
     }
 }
@@ -373,26 +406,26 @@ void setup_src_addressing(machine_state_t *machine)
 
 void setup_pc_src_byte_addressing(machine_state_t *machine)
 {
+    uint16_t pc = 0;
     uint8_t mode = (machine->IR & 07000) >> 9;
     switch (mode) {
         // From register.
         case 0:
-            machine->SRCB = &(machine->R[(machine->IR & 007)]);
+            machine->memory->src = translate_register(machine->IR & 007);
             break;
 
         // From immediate.
         case 2:
-            machine->PC += 2;
-            machine->MBR = machine->PC;
-            machine->SRCB = &(machine->MEMORY[machine->MBR]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            machine->memory->src = pc;
             break;
 
         // From absolute.
         case 3:
-            machine->PC += 2;
-            machine->MBR = machine->PC;
-            machine->MAR = machine->MEMORY[machine->MBR];
-            machine->SRCB = &(machine->MEMORY[machine->MAR]);
+            machine->memory->word_advance_r(machine->memory, 7);
+            pc = machine->memory->get_r(machine->memory, 7);
+            machine->memory->src = machine->memory->direct_read_word(machine->memory, pc);
             break;
 
     }
@@ -405,6 +438,7 @@ void setup_sp_src_byte_addressing(machine_state_t *machine)
 
 void setup_general_src_byte_addressing(machine_state_t *machine)
 {
+    uint16_t pc = 0;
     uint16_t index = 0;
     uint16_t deferred = 0;
     uint8_t mode = (machine->IR & 07000) >> 9;
@@ -412,13 +446,15 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
     switch (mode) {
         // Register.
         case 0:
-            machine->SRCB = &(machine->R[reg]);
+            machine->memory->src = machine->memory->get_r(machine->memory, reg);
             break;
 
         // Deferred.
         case 1:
-            machine->MAR = machine->R[reg];
-            machine->SRCB = &(machine->MEMORY[machine->MAR]);
+            machine->memory->src = machine->memory->direct_read_byte(
+                machine->memory,
+                machine->memory->get_r(machine->memory, reg)
+            );
             break;
 
         // Autoincrement.
@@ -426,17 +462,19 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
         // NOTE: (incremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 2:
-            machine->MAR = machine->R[reg];
-            machine->R[reg]++; // XXX byte advance.
-            machine->SRCB = &(machine->MEMORY[machine->MAR]);
+            machine->memory->src = machine->memory->direct_read_byte(
+                machine->memory, 
+                machine->memory->get_r(machine->memory, reg)
+            );
+            machine->memory->byte_advance_r(machine->memory, reg);
             break;
 
         // Deferred autoincrement.
         case 3:
-            deferred = machine->R[reg];
-            machine->MAR = machine->MEMORY[deferred];
-            machine->MEMORY[deferred]++;
-            machine->SRCB = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            index = machine->memory->direct_read_byte(machine->memory, deferred);
+            machine->memory->byte_advance(machine->memory, deferred);
+            machine->memory->src = machine->memory->direct_read_byte(machine->memory, index);
             break;
         
         // Autodecrement.
@@ -444,34 +482,40 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
         // NOTE: (decremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 4:
-            machine->MAR = machine->R[reg];
-            machine->R[reg]--; // XXX byte advance.
-            machine->SRCB = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            machine->memory->byte_decrease_r(machine->memory, reg);
+            machine->memory->src = machine->memory->direct_read_byte(machine->memory, deferred);
             break;
 
         // Deferred autodecrement.
         case 5:
-            deferred = machine->R[reg];
-            machine->MAR = machine->MEMORY[deferred];
-            machine->MEMORY[deferred]--;
-            machine->SRCB = &(machine->MEMORY[machine->MAR]);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            index = machine->memory->direct_read_byte(machine->memory, deferred);
+            machine->memory->src = machine->memory->direct_read_byte(machine->memory, index);
+            machine->memory->byte_decrease(machine->memory, deferred);
             break;
 
         // Indexed.
         case 6:
-            machine->PC += 2;
-            machine->MAR = machine->PC;
-            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
-            machine->SRCB = &(machine->MEMORY[machine->R[reg] + index]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_byte(machine->memory, pc);
+            machine->memory->src = machine->memory->direct_read_byte(
+                machine->memory,
+                machine->memory->get_r(machine->memory, reg) + index
+            );
             break;
 
         // Deferred indexed.
         case 7:
-            machine->PC += 2;
-            machine->MAR = machine->PC;
-            index = machine->MEMORY[machine->MAR] | (machine->MEMORY[machine->MAR + 1] << 8);
-            machine->MAR = machine->R[reg];
-            machine->SRCB = &(machine->MEMORY[machine->MEMORY[machine->MAR] + index]);
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_byte(machine->memory, pc);
+            deferred = machine->memory->get_r(machine->memory, reg);
+            machine->memory->src = machine->memory->direct_read_byte(
+                machine->memory, 
+                machine->memory->direct_read_byte(machine->memory, deferred) + index
+            );
             break;
     }
 }
@@ -493,10 +537,14 @@ void setup_src_byte_addressing(machine_state_t *machine)
 
 void set_zero_flag(machine_state_t *machine, uint16_t value)
 {
+    uint16_t PS = 0;
     if (value == 0) {
-        machine->PSW |= ZEROFLAG;
+        PS = machine->memory->get_r(machine->memory, R_PS);
+        machine->memory->set_r(machine->memory, R_PS, PS | ZEROFLAG);
     } else {
-        machine->PSW = (machine->PSW & ZEROFLAG) ? (machine->PSW ^ ZEROFLAG) : machine->PSW;
+        PS = machine->memory->get_r(machine->memory, R_PS);
+        PS = (PS & ZEROFLAG) ? (PS ^ ZEROFLAG) : PS;
+        machine->memory->set_r(machine->memory, R_PS, PS);
     }
 }
 
@@ -507,157 +555,186 @@ int8_t get_branch_offset(machine_state_t *machine)
 
 void NOP(machine_state_t *machine)
 {
-    machine->PC += 2;
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BR(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->PC += (int8_t) (2 * OFFSET);
+    machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
 }
 
 void BNE(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = machine->PSW & ZEROFLAG;
+    machine->ALU = ps & ZEROFLAG;
     if (machine->ALU == 0)
-        machine->PC += (2 * OFFSET);
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BEQ(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = machine->PSW & ZEROFLAG;
+    machine->ALU = ps & ZEROFLAG;
     if (machine->ALU)
-        machine->PC += 2 * OFFSET;
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BGE(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = (machine->PSW & NEGATIVEFLAG) >> 3;
-    machine->ALU ^= (machine->PSW & OVERFLOWFLAG) >> 1;
+    machine->ALU = (ps & NEGATIVEFLAG) >> 3;
+    machine->ALU ^= (ps & OVERFLOWFLAG) >> 1;
     if (machine->ALU == 0)
-        machine->PC += 2 * OFFSET;
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BLT(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = (machine->PSW & NEGATIVEFLAG) >> 3;
-    machine->ALU ^= (machine->PSW & OVERFLOWFLAG) >> 1;
+    machine->ALU = (ps & NEGATIVEFLAG) >> 3;
+    machine->ALU ^= (ps & OVERFLOWFLAG) >> 1;
     if (machine->ALU)
-        machine->PC += 2 * OFFSET;
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BGT(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = (machine->PSW & ZEROFLAG) >> 2;
-    machine->ALU |= ((machine->PSW & NEGATIVEFLAG) >> 3) ^ ((machine->PSW & OVERFLOWFLAG) >> 1); 
+    machine->ALU = (ps & ZEROFLAG) >> 2;
+    machine->ALU |= ((ps & NEGATIVEFLAG) >> 3) ^ ((ps & OVERFLOWFLAG) >> 1); 
     if (machine->ALU == 0)
-        machine->PC += 2 * OFFSET;
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BLE(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = (machine->PSW & ZEROFLAG) >> 2;
-    machine->ALU |= ((machine->PSW & NEGATIVEFLAG) >> 3) ^ ((machine->PSW & OVERFLOWFLAG) >> 1); 
+    machine->ALU = (ps & ZEROFLAG) >> 2;
+    machine->ALU |= ((ps & NEGATIVEFLAG) >> 3) ^ ((ps & OVERFLOWFLAG) >> 1); 
     if (machine->ALU)
-        machine->PC += 2 * OFFSET;
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BPL(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    if ((machine->PSW & NEGATIVEFLAG) == 0)
-        machine->PC += 2 * OFFSET;
+    if ((ps & NEGATIVEFLAG) == 0)
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BMI(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    if (machine->PSW & NEGATIVEFLAG)
-        machine->PC += 2 * OFFSET;
+    if (ps & NEGATIVEFLAG)
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BHI(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = machine->PSW & CARRYFLAG;
-    machine->ALU |= (machine->PSW & ZEROFLAG) >> 2;
+    machine->ALU = ps & CARRYFLAG;
+    machine->ALU |= (ps & ZEROFLAG) >> 2;
     if (machine->ALU == 0)
-        machine->PC += 2 * OFFSET;
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BLOS(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = machine->PSW & CARRYFLAG;
-    machine->ALU |= (machine->PSW & ZEROFLAG) >> 2;
+    machine->ALU = ps & CARRYFLAG;
+    machine->ALU |= (ps & ZEROFLAG) >> 2;
     if (machine->ALU)
-        machine->PC += 2 * OFFSET;
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BVC(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = machine->PSW & OVERFLOWFLAG;
+    machine->ALU = ps & OVERFLOWFLAG;
     if (machine->ALU == 0)
-        machine->PC += 2 * OFFSET;
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BVS(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = machine->PSW & OVERFLOWFLAG;
+    machine->ALU = ps & OVERFLOWFLAG;
     if (machine->ALU)
-        machine->PC += 2 * OFFSET;
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BCC(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = machine->PSW & CARRYFLAG;
+    machine->ALU = ps & CARRYFLAG;
     if (machine->ALU == 0)
-        machine->PC += 2 * OFFSET;
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BCS(machine_state_t *machine)
 {
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
-    machine->ALU = machine->PSW & CARRYFLAG;
+    machine->ALU = ps & CARRYFLAG;
     if (machine->ALU)
-        machine->PC += 2 * OFFSET;
+        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
     else
-        machine->PC += 2;
+        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void MOV(machine_state_t *machine)
@@ -665,9 +742,9 @@ void MOV(machine_state_t *machine)
     setup_src_addressing(machine);
     setup_dest_addressing(machine);
 
-    *machine->DEST = *machine->SRC;
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->SRC);
+    machine->memory->write_word(machine->memory, machine->memory->read_word(machine->memory));
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->SRC);
 }
 
 void MOVB(machine_state_t *machine)
@@ -675,9 +752,9 @@ void MOVB(machine_state_t *machine)
     setup_src_byte_addressing(machine);
     setup_dest_byte_addressing(machine);
 
-    *machine->DESTB = *machine->SRCB;
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->SRCB);
+    machine->memory->write_byte(machine->memory, machine->memory->read_byte(machine->memory));
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->SRCB);
 }
 
 void CMP(machine_state_t *machine)
@@ -685,10 +762,10 @@ void CMP(machine_state_t *machine)
     setup_src_addressing(machine);
     setup_dest_addressing(machine);
 
-    machine->ALU = *machine->DEST;
-    machine->ALU -= *machine->SRC;
-    machine->PC += 2;
-    set_zero_flag(machine, machine->ALU);
+    machine->ALU = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    machine->ALU -= machine->memory->read_word(machine->memory);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, machine->ALU);
 }
 
 void CMPB(machine_state_t *machine)
@@ -696,10 +773,10 @@ void CMPB(machine_state_t *machine)
     setup_src_byte_addressing(machine);
     setup_dest_byte_addressing(machine);
 
-    machine->ALU = *machine->DESTB;
-    machine->ALU -= *machine->SRCB;
-    machine->PC += 2;
-    set_zero_flag(machine, machine->ALU);
+    machine->ALU = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
+    machine->ALU -= machine->memory->read_byte(machine->memory);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, machine->ALU);
 }
 
 void BIT(machine_state_t *machine)
@@ -707,11 +784,11 @@ void BIT(machine_state_t *machine)
     setup_src_addressing(machine);
     setup_dest_addressing(machine);
 
-    machine->ALU = *machine->DEST;
-    machine->ALU &= *machine->SRC;
-    *machine->DEST = machine->ALU;
-    set_zero_flag(machine, machine->ALU);
-    machine->PC += 2;
+    machine->ALU = machine->memory->read_word(machine->memory);
+    machine->ALU &= machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    machine->memory->write_word(machine->memory, machine->ALU);
+    //set_zero_flag(machine, machine->ALU);
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BITB(machine_state_t *machine)
@@ -724,10 +801,10 @@ void BIC(machine_state_t *machine)
     setup_src_addressing(machine);
     setup_dest_addressing(machine);
 
-    machine->ALU = *machine->DEST;
-    machine->ALU &= ~(*machine->SRC);
-    *machine->DEST = machine->ALU;
-    machine->PC += 2;
+    machine->ALU = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    machine->ALU &= ~(machine->memory->read_word(machine->memory));
+    machine->memory->write_word(machine->memory, machine->ALU);
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BICB(machine_state_t *machine)
@@ -740,10 +817,10 @@ void BIS(machine_state_t *machine)
     setup_src_addressing(machine);
     setup_dest_addressing(machine);
 
-    machine->ALU = *machine->DEST;
-    machine->ALU |= *machine->SRC;
-    *machine->DEST = machine->ALU;
-    machine->PC += 2;
+    machine->ALU = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    machine->ALU |= machine->memory->read_word(machine->memory);
+    machine->memory->write_word(machine->memory, machine->ALU);
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BISB(machine_state_t *machine)
@@ -756,10 +833,10 @@ void ADD(machine_state_t *machine)
     setup_src_addressing(machine);
     setup_dest_addressing(machine);
 
-    machine->ALU = *machine->DEST;
-    machine->ALU += *machine->SRC;
-    *machine->DEST = machine->ALU;
-    machine->PC += 2;
+    machine->ALU = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    machine->ALU += machine->memory->read_word(machine->memory);
+    machine->memory->write_word(machine->memory, machine->ALU);
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void SUB(machine_state_t *machine)
@@ -767,226 +844,264 @@ void SUB(machine_state_t *machine)
     setup_src_addressing(machine);
     setup_dest_addressing(machine);
 
-    machine->ALU = *machine->DEST;
-    machine->ALU -= *machine->SRC;
-    *machine->DEST = machine->ALU;
-    machine->PC += 2;
+    machine->ALU = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    machine->ALU -= machine->memory->read_word(machine->memory);
+    machine->memory->write_word(machine->memory, machine->ALU);
+    machine->memory->word_advance_r(machine->memory, R_PC);
     set_zero_flag(machine, machine->ALU);
 }
 
 void JMP(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->PC = *machine->DEST;
+    machine->memory->set_r(
+        machine->memory, 
+        R_PC, 
+        machine->memory->direct_read_word(machine->memory, machine->memory->dest)
+    );
 }
 
 void SWAB(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->MBR = machine->MAR & 077;
-    *machine->DEST = ((*machine->DEST & 0177400) >> 8) | ((*machine->DEST & 000377) << 8);
-    machine->PC += 2;
+    uint16_t word = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    machine->memory->write_word(machine->memory, ((word & 0177400) >> 8) | ((word & 000377) << 8));
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void CLR(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    *machine->DEST = 0;
-    machine->PC += 2;
+    machine->memory->write_word(machine->memory, 0);
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void CLRB(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->MBR = machine->MAR & 077;
-    *machine->DEST = (*machine->DEST & 0177400);
-    machine->PC += 2;
+    machine->memory->write_byte(machine->memory, 0);
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void COM(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->MBR = machine->MAR & 077;
-    *machine->DEST = ~(*machine->DEST);
-    machine->PC += 2;
+    machine->memory->write_word(
+        machine->memory,
+        ~(machine->memory->direct_read_word(machine->memory, machine->memory->dest))
+    );
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void COMB(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->MBR = machine->MAR & 077;
-    *machine->DEST = ~(*machine->DEST & 000377) | (*machine->DEST & 0177400);
-    machine->PC += 2;
+    machine->memory->write_byte(
+        machine->memory,
+        ~(machine->memory->direct_read_byte(machine->memory, machine->memory->dest))
+    );
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void INC(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    (*machine->DEST)++;
-    machine->PC += 2;
+    uint16_t word = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    word++;
+    machine->memory->write_word(machine->memory, word);
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void INCB(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->MBR = machine->MAR & 077;
-    *machine->DEST = ((*machine->DEST & 000377) + 1) | (*machine->DEST & 0177400);
-    machine->PC += 2;
+    uint8_t byte = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
+    byte++;
+    machine->memory->write_byte(machine->memory, byte);
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void DEC(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    (*machine->DEST)--;
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DEST);
+    uint16_t word = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    word--;
+    machine->memory->write_word(machine->memory, word);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DEST);
 }
 
 void DECB(machine_state_t *machine)
 {
     setup_dest_byte_addressing(machine);
-    (*machine->DESTB)--;
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DESTB);
+    uint8_t byte = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
+    byte--;
+    machine->memory->write_byte(machine->memory, byte);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DESTB);
 }
 
 void NEG(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->MBR = machine->MAR & 077;
-    *machine->DEST = ~(*machine->DEST) + 1;
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DEST);
+    uint16_t word = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    machine->memory->write_word(machine->memory, ~(word) + 1);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DEST);
 }
 
 void NEGB(machine_state_t *machine)
 {
     setup_dest_byte_addressing(machine);
-    machine->MBR = machine->MAR & 077;
-    *machine->DESTB = ~(*machine->DESTB) + 1;
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DESTB);
+    uint8_t byte = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
+    machine->memory->write_byte(machine->memory, ~(byte) + 1);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DESTB);
 }
 
 void ADC(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->MBR = machine->MAR & 077;
-    *machine->DEST += (machine->PSW & CARRYFLAG);
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DEST);
+    uint16_t word = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    word += (machine->memory->get_r(machine->memory, R_PS) & CARRYFLAG);
+    machine->memory->write_word(machine->memory, word);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DEST);
 }
 
 void ADCB(machine_state_t *machine)
 {
     setup_dest_byte_addressing(machine);
-    *machine->DESTB += (machine->PSW & CARRYFLAG);
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DESTB);
+    uint8_t byte = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
+    byte += (machine->memory->get_r(machine->memory, R_PS) & CARRYFLAG);
+    machine->memory->write_byte(machine->memory, byte);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DESTB);
 }
 
 void SBC(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    *machine->DEST = *machine->DEST - (machine->PSW & CARRYFLAG);
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DEST);
+    uint16_t word = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    word = word - (machine->memory->get_r(machine->memory, R_PS) & CARRYFLAG);
+    machine->memory->write_word(machine->memory, word);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DEST);
 }
 
 void SBCB(machine_state_t *machine)
 {
     setup_dest_byte_addressing(machine);
-    *machine->DESTB = *machine->DESTB - (machine->PSW & CARRYFLAG);
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DESTB);
+    uint8_t byte = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
+    byte = byte - (machine->memory->get_r(machine->memory, R_PS) & CARRYFLAG);
+    machine->memory->write_byte(machine->memory, byte);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DESTB);
 }
 
 void TST(machine_state_t *machine)
 {
-    setup_dest_addressing(machine);
-    set_zero_flag(machine, *machine->DEST);
+    //setup_dest_addressing(machine);
+    //set_zero_flag(machine, *machine->DEST);
+    NOP(machine);
 }
 
 void TSTB(machine_state_t *machine)
 {
-    setup_dest_byte_addressing(machine);
-    set_zero_flag(machine, *machine->DESTB);
+    //setup_dest_byte_addressing(machine);
+    //set_zero_flag(machine, *machine->DESTB);
+    NOP(machine);
 }
 
 void ROR(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    *machine->DEST = (*machine->DEST << 1) | (*machine->DEST >> 15);
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DEST);
+    uint16_t word = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    word = (word << 1) | (word >> 15);
+    machine->memory->write_word(machine->memory, word);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DEST);
 }
 
 void RORB(machine_state_t *machine)
 {
     setup_dest_byte_addressing(machine);
-    *machine->DESTB = (*machine->DESTB<< 1) | (*machine->DESTB >> 7);
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DESTB);
+    uint8_t byte = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
+    byte = (byte << 1) | (byte >> 7);
+    machine->memory->write_byte(machine->memory, byte);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DESTB);
 }
 
 void ROL(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    *machine->DEST = (*machine->DEST << 15) | (*machine->DEST >> 1);
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DEST);
+    uint16_t word = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    word = (word << 15) | (word >> 1);
+    machine->memory->write_word(machine->memory, word);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DEST);
 }
 
 void ROLB(machine_state_t *machine)
 {
     setup_dest_byte_addressing(machine);
-    *machine->DESTB = (*machine->DESTB << 7) | (*machine->DESTB >> 1);
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DESTB);
+    uint8_t byte = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
+    byte = (byte << 7) | (byte >> 1);
+    machine->memory->write_byte(machine->memory, byte);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DESTB);
 }
 
 void ASR(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->ALU = *machine->DEST;
+    machine->ALU = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
     machine->ALU >>= 1;
-    *machine->DEST = machine->ALU;
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DEST);
+    machine->memory->write_word(machine->memory, machine->ALU);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DEST);
 }
 
 void ASRB(machine_state_t *machine)
 {
     setup_dest_byte_addressing(machine);
-    *machine->DESTB >>= 1;
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DESTB);
+    machine->ALU = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
+    machine->ALU >>= 1;
+    machine->memory->write_byte(machine->memory, machine->ALU);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DESTB);
 }
 
 void ASL(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->ALU = *machine->DEST;
+    machine->ALU = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
     machine->ALU <<= 1;
-    *machine->DEST = machine->ALU;
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DEST);
+    machine->memory->write_word(machine->memory, machine->ALU);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DEST);
 }
 
 void ASLB(machine_state_t *machine)
 {
     setup_dest_byte_addressing(machine);
-    *machine->DESTB <<= 1;
-    machine->PC += 2;
-    set_zero_flag(machine, *machine->DESTB);
+    machine->ALU = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
+    machine->ALU <<= 1;
+    machine->memory->write_byte(machine->memory, machine->ALU);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+    //set_zero_flag(machine, *machine->DESTB);
 }
 
 void MTPS(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->MBR = machine->MAR & 077;
-    machine->PSW = *machine->DEST;
-    machine->PC += 2;
+    machine->memory->set_r(
+        machine->memory, 
+        R_PS, 
+        machine->memory->direct_read_word(machine->memory, machine->memory->dest)
+    );
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void MFPI(machine_state_t *machine)
@@ -1011,32 +1126,36 @@ void MTPD(machine_state_t *machine)
 
 void SXT(machine_state_t *machine)
 {
-    setup_dest_addressing(machine);
-    if (machine->PSW & NEGATIVEFLAG) {
-        *machine->DEST = -1;
-    } else {
-        *machine->DEST = 0;
-    }
-    machine->PC += 2;
+    // setup_dest_addressing(machine);
+    // if (machine->PSW & NEGATIVEFLAG) {
+    //     *machine->DEST = -1;
+    // } else {
+    //     *machine->DEST = 0;
+    // }
+    // machine->memory->word_advance_r(machine->memory, R_PC);
+    NOP(machine);
 }
 
 void MFPS(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    machine->MBR = machine->MAR & 077;
-    *machine->DEST = machine->PSW;
-    machine->PC += 2;
+    machine->memory->write_word(
+        machine->memory,
+        machine->memory->get_r(machine->memory, R_PS)
+    );
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void MUL(machine_state_t *machine)
 {
-    uint16_t *REG = &(machine->R[(machine->IR & 0700) >> 6]);
-    setup_dest_addressing(machine);
+    // uint16_t *REG = &(machine->R[(machine->IR & 0700) >> 6]);
+    // setup_dest_addressing(machine);
 
-    machine->ALU = *machine->DEST;
-    machine->ALU *= *REG;
-    *REG = machine->ALU;
-    machine->PC += 2;
+    // machine->ALU = *machine->DEST;
+    // machine->ALU *= *REG;
+    // *REG = machine->ALU;
+    // machine->memory->word_advance_r(machine->memory, R_PC);
+    NOP(machine);
 }
 
 void DIV(machine_state_t *machine)
@@ -1056,13 +1175,14 @@ void ASHC(machine_state_t *machine)
 
 void XOR(machine_state_t *machine)
 {
-    uint16_t *REG = &(machine->R[(machine->IR & 0700) >> 6]);
-    setup_dest_addressing(machine);
+    // uint16_t *REG = &(machine->R[(machine->IR & 0700) >> 6]);
+    // setup_dest_addressing(machine);
 
-    machine->ALU = *REG;
-    machine->ALU ^= *machine->DEST;
-    *REG = machine->ALU;
-    machine->PC += 2;
+    // machine->ALU = *REG;
+    // machine->ALU ^= *machine->DEST;
+    // *REG = machine->ALU;
+    // machine->memory->word_advance_r(machine->memory, R_PC);
+    NOP(machine);
 }
 
 void HALT(machine_state_t *machine)
