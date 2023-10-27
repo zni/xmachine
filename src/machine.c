@@ -12,14 +12,15 @@ machine_state_t *STATE;
 
 void init_machine(machine_state_t *machine)
 {
+    /*
     machine->ALU = 0;
     machine->MAR = 0;
     machine->MBR = 0;
     machine->PC = 0;
     machine->PSW = 0;
     machine->SP = 0;
-    machine->IR = 0;
-    machine->HALTED = false;
+    
+    
     machine->SRC = NULL;
     machine->DEST = NULL;
     machine->SRCB = NULL;
@@ -34,6 +35,12 @@ void init_machine(machine_state_t *machine)
     machine->TPS = &(machine->MEMORY[TPS_LOC]);
     *machine->TPS ^= TPS_READY;
     machine->TPB = &(machine->MEMORY[TPB_LOC]);
+    */
+
+    machine->ALU = 0;
+    machine->IR = 0;
+    machine->HALTED = false;
+    machine->memory = initialize_memory();
 }
 
 void load_program(machine_state_t *machine, char *program)
@@ -50,17 +57,20 @@ void load_program(machine_state_t *machine, char *program)
     uint16_t load_offset = 0;
     fread(&load_offset, sizeof(uint16_t), 1, binary);
 
+    uint8_t byte = 0;
     uint16_t program_length = load_offset + (len * 2);
     for (int i = load_offset; i < program_length; i++) {
-        fread(&(machine->MEMORY[i]), sizeof(uint8_t), 1, binary);
+        fread(&(byte), sizeof(uint8_t), 1, binary);
+        machine->memory->direct_write_byte(machine->memory, i, byte);
     }
     fclose(binary);
 
-    machine->PC = load_offset;
+    machine->memory->set_r(machine->memory, R_PC, load_offset);
 }
 
 void dump_state(machine_state_t *machine, bool dump_memory)
 {
+    /*
     printf("PSW: 0o%06o\n", machine->PSW);
     printf("IR : 0o%06o\n", machine->IR);
     printf("PC : 0o%06o\n", machine->PC);
@@ -68,17 +78,19 @@ void dump_state(machine_state_t *machine, bool dump_memory)
     printf("MBR: 0o%06o\n", machine->MBR);
     printf("ALU: 0o%06o\n", machine->ALU);
     printf("SP : 0o%06o\n", machine->SP);
+
     for (int i = 0; i < 5; i++) {
         printf("R%d : 0o%06o\n", i, machine->R[i]);
     }
+    */
 
     if (dump_memory) {
         uint16_t row[16];
         bool all_zero = true;
         for (int r = 0; r < MEMSIZE; r += 16) {
             for (int c = 0; c < 16; c++) {
-                if (machine->MEMORY[r+c] != 0) { all_zero = false; }
-                row[c] = machine->MEMORY[r+c];
+                if (machine->memory->direct_read_word(machine->memory, r+c) != 0) { all_zero = false; }
+                row[c] = machine->memory->direct_read_word(machine->memory, r+c);
             }
             if (all_zero && ((r + 16) < MEMSIZE)) {
                 continue;
@@ -98,17 +110,22 @@ void dump_state(machine_state_t *machine, bool dump_memory)
 void run_machine(machine_state_t *machine)
 {
     while (!machine->HALTED) {
-        machine->MBR = machine->PC;
-        // Words are stored little endian.
-        machine->MAR = machine->MEMORY[machine->MBR + 1] << 8;
-        machine->MAR |= machine->MEMORY[machine->MBR];
-        machine->IR = machine->MAR;
+        machine->memory->src = translate_register(7);
+        uint16_t PC = machine->memory->read_word(machine->memory);
+        machine->memory->src = PC;
+        machine->IR = machine->memory->read_word(machine->memory);
 
         exec_instruction(machine);
 
-        exec_tty_kb(machine);
-        exec_tty_print(machine);
+        //exec_tty_kb(machine);
+        //exec_tty_print(machine);
     }
+}
+
+void shutdown_machine(machine_state_t *machine)
+{
+    free_memory(&machine->memory);
+    machine->memory = NULL;
 }
 
 /*
@@ -147,6 +164,7 @@ int main(int argc, char** argv)
     load_program(&machine, argv[1]);
     run_machine(&machine);
     dump_state(&machine, true);
+    shutdown_machine(&machine);
 
     return 0;
 }
