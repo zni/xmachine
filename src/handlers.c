@@ -567,18 +567,26 @@ void BR(machine_state_t *machine)
 
 void BNE(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
+    int16_t NEW_PC = pc + (int8_t) (2 * OFFSET);
+    printf("NEW_PC: %hu\n", NEW_PC);
     machine->ALU = ps & ZEROFLAG;
     if (machine->ALU == 0)
-        machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
+        machine->memory->set_r(machine->memory, R_PC, (uint16_t) NEW_PC);
     else
         machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BEQ(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -591,6 +599,9 @@ void BEQ(machine_state_t *machine)
 
 void BGE(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -604,6 +615,9 @@ void BGE(machine_state_t *machine)
 
 void BLT(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -617,6 +631,9 @@ void BLT(machine_state_t *machine)
 
 void BGT(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -630,6 +647,9 @@ void BGT(machine_state_t *machine)
 
 void BLE(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -643,6 +663,9 @@ void BLE(machine_state_t *machine)
 
 void BPL(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -654,6 +677,9 @@ void BPL(machine_state_t *machine)
 
 void BMI(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -665,6 +691,9 @@ void BMI(machine_state_t *machine)
 
 void BHI(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -678,6 +707,9 @@ void BHI(machine_state_t *machine)
 
 void BLOS(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -691,6 +723,9 @@ void BLOS(machine_state_t *machine)
 
 void BVC(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -703,6 +738,9 @@ void BVC(machine_state_t *machine)
 
 void BVS(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -715,6 +753,9 @@ void BVS(machine_state_t *machine)
 
 void BCC(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -727,6 +768,9 @@ void BCC(machine_state_t *machine)
 
 void BCS(machine_state_t *machine)
 {
+    // Branch is relying on PC being advanced to next instruction.
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -928,7 +972,7 @@ void DEC(machine_state_t *machine)
     word--;
     machine->memory->write_word(machine->memory, word);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DEST);
+    set_zero_flag(machine, word);
 }
 
 void DECB(machine_state_t *machine)
@@ -1182,7 +1226,13 @@ void XOR(machine_state_t *machine)
     // machine->ALU ^= *machine->DEST;
     // *REG = machine->ALU;
     // machine->memory->word_advance_r(machine->memory, R_PC);
-    NOP(machine);
+    uint8_t reg = (machine->IR & 0700) >> 6;
+    setup_dest_addressing(machine);
+
+    machine->ALU = machine->memory->get_r(machine->memory, reg);
+    machine->ALU ^= machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    machine->memory->write_word(machine->memory, machine->ALU);
+    machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void HALT(machine_state_t *machine)
