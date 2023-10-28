@@ -6,6 +6,7 @@
 
 #include "include/handlers.h"
 #include "include/machine_state.h"
+#include "include/objreader.h"
 #include "include/tty.h"
 
 machine_state_t *STATE;
@@ -44,7 +45,7 @@ void init_machine(machine_state_t *machine)
     initialize_memory(&(machine->memory));
 }
 
-void load_program(machine_state_t *machine, char *program)
+void load_program_from_mcode(machine_state_t *machine, char *program)
 {
     FILE *binary = fopen(program, "r");
     if (binary == NULL) {
@@ -62,10 +63,8 @@ void load_program(machine_state_t *machine, char *program)
     uint16_t program_length = load_offset + (len * 2);
     for (int i = load_offset; i < program_length; i++) {
         fread(&(byte), sizeof(uint8_t), 1, binary);
-        printf("0o%03o\n", byte);
         machine->memory->direct_write_byte(machine->memory, i, byte);
     }
-    putchar('\n');
     fclose(binary);
 
     machine->memory->set_r(machine->memory, R_PC, load_offset);
@@ -73,29 +72,24 @@ void load_program(machine_state_t *machine, char *program)
 
 void dump_state(machine_state_t *machine, bool dump_memory)
 {
-    /*
-    printf("PSW: 0o%06o\n", machine->PSW);
-    printf("IR : 0o%06o\n", machine->IR);
-    printf("PC : 0o%06o\n", machine->PC);
-    printf("MAR: 0o%06o\n", machine->MAR);
-    printf("MBR: 0o%06o\n", machine->MBR);
-    printf("ALU: 0o%06o\n", machine->ALU);
-    printf("SP : 0o%06o\n", machine->SP);
 
-    for (int i = 0; i < 5; i++) {
-        printf("R%d : 0o%06o\n", i, machine->R[i]);
+    printf("PSW: 0o%06o\n", machine->memory->get_r(machine->memory, R_PS));
+    printf("PC : 0o%06o\n", machine->memory->get_r(machine->memory, R_PC));
+    printf("SP : 0o%06o\n", machine->memory->get_r(machine->memory, R_SP));
+
+    for (int i = 0; i < 6; i++) {
+        printf("R%d : 0o%06o\n", i, machine->memory->get_r(machine->memory, i));
     }
-    */
 
     if (dump_memory) {
         uint16_t row[16];
         bool all_zero = true;
-        for (int r = 0; r < MEMWORDS; r += 16) {
-            for (int c = 0; c < 16; c++) {
+        for (int r = 0; r < MEMWORDS; r += 32) {
+            for (int c = 0, i = 0; c < 32; c += 2, i++) {
                 if (machine->memory->direct_read_word(machine->memory, r+c) != 0) { all_zero = false; }
-                row[c] = machine->memory->direct_read_word(machine->memory, r+c);
+                row[i] = machine->memory->direct_read_word(machine->memory, r+c);
             }
-            if (all_zero && ((r + 16) < MEMWORDS)) {
+            if (all_zero && ((r + 16) < MEMWORDS) && (r != 0)) {
                 continue;
             }
 
@@ -113,8 +107,7 @@ void dump_state(machine_state_t *machine, bool dump_memory)
 void run_machine(machine_state_t *machine)
 {
     while (!machine->HALTED) {
-        machine->memory->src = translate_register(7);
-        uint16_t PC = machine->memory->read_word(machine->memory);
+        uint16_t PC = machine->memory->get_r(machine->memory, R_PC);
         machine->memory->src = PC;
         machine->IR = machine->memory->read_word(machine->memory);
 
@@ -164,7 +157,8 @@ int main(int argc, char** argv)
 
 
     init_machine(&machine);
-    load_program(&machine, argv[1]);
+    // load_program_from_mcode(&machine, argv[1]);
+    load_program_from_obj(&machine, argv[1]);
     run_machine(&machine);
     dump_state(&machine, true);
     shutdown_machine(&machine);

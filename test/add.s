@@ -1,0 +1,3 @@
+MOV #10, R0
+MOV #01, R1
+ADD R0, R1

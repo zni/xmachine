@@ -41,7 +41,8 @@ void write_byte(memory_t *m, uint8_t byte)
 
 uint16_t read_word(memory_t *m)
 {
-    return m->_memory[m->src] | (m->_memory[m->src + 1] << 8);
+    uint16_t word = m->_memory[m->src] | (m->_memory[m->src + 1] << 8);
+    return word;
 }
 
 uint8_t read_byte(memory_t *m)
@@ -51,8 +52,8 @@ uint8_t read_byte(memory_t *m)
 
 uint16_t direct_read_word(memory_t *m, uint16_t loc)
 {
-    loc = loc * 2;
-    return (m->_memory[loc] | (m->_memory[loc + 1] << 8));
+    uint16_t word = (m->_memory[loc] | (m->_memory[loc + 1] << 8));
+    return word;
 }
 
 uint8_t direct_read_byte(memory_t *m, uint16_t loc)

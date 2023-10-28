@@ -16,6 +16,7 @@
 #define R7 017416
 #define R8 017420
 
+#define R_SP 6
 #define R_PC 7
 #define R_PS 8
 
