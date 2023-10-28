@@ -101,7 +101,7 @@ void byte_decrease(memory_t *m, uint16_t loc)
     uint16_t val = m->_memory[loc] | (m->_memory[loc + 1] << 8);
     val -= 1;
     m->_memory[loc] = val & 0377;
-    m->_memory[loc + 1] = (val & 0177400) >> 8;   
+    m->_memory[loc + 1] = (val & 0177400) >> 8;
 }
 
 void word_advance_r(memory_t *m, uint16_t r)
