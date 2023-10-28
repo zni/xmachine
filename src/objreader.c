@@ -24,7 +24,7 @@ int is_text_block(FILE *obj)
         fread(&chksum, sizeof(uint8_t), 1, obj);
         return 0;
     } else {
-        fseek(obj, -4, SEEK_CUR);
+        fseek(obj, -5, SEEK_CUR);
         return 1;
     }
 }
@@ -59,7 +59,7 @@ void load_text_block(machine_state_t *machine, FILE *obj)
 
 void load_program_from_obj(machine_state_t *machine, char* object_file)
 {
-    FILE *obj = fopen(object_file, "r");
+    FILE *obj = fopen(object_file, "rb");
 
     // Skip past other data blocks.
     while(!is_text_block(obj) && !feof(obj));

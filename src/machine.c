@@ -11,7 +11,7 @@
 
 machine_state_t *STATE;
 
-void init_machine(machine_state_t *machine)
+void init_machine(machine_state_t *machine, bool step)
 {
     /*
     machine->ALU = 0;
@@ -41,6 +41,7 @@ void init_machine(machine_state_t *machine)
     machine->ALU = 0;
     machine->IR = 0;
     machine->HALTED = false;
+    machine->STEP = step;
     machine->memory = NULL;
     initialize_memory(&(machine->memory));
 }
@@ -73,12 +74,13 @@ void load_program_from_mcode(machine_state_t *machine, char *program)
 void dump_state(machine_state_t *machine, bool dump_memory)
 {
 
-    printf("PSW: 0o%06o\n", machine->memory->get_r(machine->memory, R_PS));
-    printf("PC : 0o%06o\n", machine->memory->get_r(machine->memory, R_PC));
-    printf("SP : 0o%06o\n", machine->memory->get_r(machine->memory, R_SP));
+    printf("PSW: 0o%07o\n", machine->memory->get_r(machine->memory, R_PS));
+    printf("PC : 0o%07o\n", machine->memory->get_r(machine->memory, R_PC));
+    printf("SP : 0o%07o\n", machine->memory->get_r(machine->memory, R_SP));
+    printf("IR : 0o%07o\n", machine->IR);
 
     for (int i = 0; i < 6; i++) {
-        printf("R%d : 0o%06o\n", i, machine->memory->get_r(machine->memory, i));
+        printf("R%d : 0o%07o\n", i, machine->memory->get_r(machine->memory, i));
     }
 
     if (dump_memory) {
@@ -113,6 +115,10 @@ void run_machine(machine_state_t *machine)
 
         exec_instruction(machine);
 
+        if (machine->STEP) {
+            dump_state(machine, true);
+            getc(stdin);
+        }
         //exec_tty_kb(machine);
         //exec_tty_print(machine);
     }
@@ -137,8 +143,23 @@ void handle_user_interrupt(int signo)
 int main(int argc, char** argv)
 {
     if (argc < 2) {
-        fprintf(stderr, "usage: machine <binary>\n");
+        fprintf(stderr, "usage: machine -l -s <binary>\n");
         return 1;
+    }
+
+    bool step = false;
+    bool list_only = false;
+    for (int i = 1; i < argc; i++) {
+        if (strnlen(argv[1], 2) < 2 && argv[i][0] != '-') {
+            continue;
+        }
+
+        if (strncmp("-l", argv[i], 2) == 0) {
+            list_only = true;
+            break;
+        } else if (strncmp("-s", argv[i], 2) == 0) {
+            step = true;
+        }
     }
 
     machine_state_t machine;
@@ -155,13 +176,19 @@ int main(int argc, char** argv)
     signal(SIGINT, &handle_user_interrupt);
 #endif
 
-
-    init_machine(&machine);
-    // load_program_from_mcode(&machine, argv[1]);
-    load_program_from_obj(&machine, argv[1]);
-    run_machine(&machine);
-    dump_state(&machine, true);
-    shutdown_machine(&machine);
+    if (list_only) {
+        init_machine(&machine, step);
+        load_program_from_obj(&machine, argv[argc - 1]);
+        dump_state(&machine, true);
+        shutdown_machine(&machine);
+    } else {
+        init_machine(&machine, step);
+        // load_program_from_mcode(&machine, argv[1]);
+        load_program_from_obj(&machine, argv[argc - 1]);
+        run_machine(&machine);
+        dump_state(&machine, true);
+        shutdown_machine(&machine);
+    }
 
     return 0;
 }

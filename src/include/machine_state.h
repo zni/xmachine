@@ -43,6 +43,7 @@ typedef struct machine_state {
     uint16_t ALU;
     uint16_t IR;
     bool HALTED;
+    bool STEP;
     memory_t *memory;
 /*
     uint16_t *TKB;
