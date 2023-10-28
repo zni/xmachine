@@ -114,12 +114,14 @@ void run_machine(machine_state_t *machine)
         machine->memory->src = PC;
         machine->IR = machine->memory->read_word(machine->memory);
 
-        exec_instruction(machine);
-
         if (machine->STEP) {
             dump_state(machine, true);
             getc(stdin);
         }
+
+        exec_instruction(machine);
+
+
         //exec_tty_kb(machine);
         //exec_tty_print(machine);
     }
