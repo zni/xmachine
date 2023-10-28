@@ -47,7 +47,7 @@ void setup_general_dest_addressing(machine_state_t *machine)
     switch (mode) {
         // Register.
         case 0:
-            machine->memory->dest = machine->memory->get_r(machine->memory, reg);
+            machine->memory->dest = translate_register(reg);
             break;
 
         // Deferred.
@@ -179,7 +179,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
     switch (mode) {
         // Register.
         case 0:
-            machine->memory->dest = machine->memory->get_r(machine->memory, reg);
+            machine->memory->dest = translate_register(reg);;
             break;
 
         // Deferred.
@@ -313,7 +313,7 @@ void setup_general_src_addressing(machine_state_t *machine)
     switch (mode) {
         // Register.
         case 0:
-            machine->memory->src = machine->memory->get_r(machine->memory, reg);
+            machine->memory->src = translate_register(reg);
             break;
 
         // Deferred.
@@ -446,7 +446,7 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
     switch (mode) {
         // Register.
         case 0:
-            machine->memory->src = machine->memory->get_r(machine->memory, reg);
+            machine->memory->src = translate_register(reg);
             break;
 
         // Deferred.
