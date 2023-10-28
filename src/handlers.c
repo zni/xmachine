@@ -45,12 +45,12 @@ void setup_general_dest_addressing(machine_state_t *machine)
     uint16_t mode = (machine->IR & 070) >> 3;
     uint16_t reg = machine->IR & 007;
     switch (mode) {
-        // Register.
+        // Register: Rn
         case 0:
             machine->memory->dest = translate_register(reg);
             break;
 
-        // Deferred.
+        // Deferred: (Rn)
         case 1:
             machine->memory->dest = machine->memory->direct_read_word(
                 machine->memory,
@@ -58,19 +58,16 @@ void setup_general_dest_addressing(machine_state_t *machine)
             );
             break;
 
-        // Autoincrement.
+        // Autoincrement: (Rn)+
         //
         // NOTE: (incremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 2:
-            machine->memory->dest = machine->memory->direct_read_word(
-                machine->memory, 
-                machine->memory->get_r(machine->memory, reg)
-            );
+            machine->memory->dest = machine->memory->get_r(machine->memory, reg);
             machine->memory->word_advance_r(machine->memory, reg);
             break;
 
-        // Deferred autoincrement.
+        // Deferred autoincrement: @(Rn)+
         case 3:
             deferred = machine->memory->get_r(machine->memory, reg);
             index = machine->memory->direct_read_word(machine->memory, deferred);
@@ -78,7 +75,7 @@ void setup_general_dest_addressing(machine_state_t *machine)
             machine->memory->dest = machine->memory->direct_read_word(machine->memory, index);
             break;
         
-        // Autodecrement.
+        // Autodecrement: -(Rn)
         //
         // NOTE: (decremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
@@ -88,7 +85,7 @@ void setup_general_dest_addressing(machine_state_t *machine)
             machine->memory->dest = machine->memory->direct_read_word(machine->memory, deferred);
             break;
 
-        // Deferred autodecrement.
+        // Deferred autodecrement: @-(Rn)
         case 5:
             deferred = machine->memory->get_r(machine->memory, reg);
             index = machine->memory->direct_read_word(machine->memory, deferred);
@@ -96,7 +93,7 @@ void setup_general_dest_addressing(machine_state_t *machine)
             machine->memory->word_decrease(machine->memory, deferred);
             break;
 
-        // Indexed.
+        // Indexed: X(Rn)
         case 6:
             machine->memory->word_advance_r(machine->memory, R_PC);
             pc = machine->memory->get_r(machine->memory, R_PC);
@@ -107,7 +104,7 @@ void setup_general_dest_addressing(machine_state_t *machine)
             );
             break;
 
-        // Deferred indexed.
+        // Deferred indexed: @X(Rn)
         case 7:
             machine->memory->word_advance_r(machine->memory, R_PC);
             pc = machine->memory->get_r(machine->memory, R_PC);
@@ -177,12 +174,12 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
     uint8_t mode = (machine->IR & 070) >> 3;
     uint8_t reg = machine->IR & 007;
     switch (mode) {
-        // Register.
+        // Register: Rn
         case 0:
             machine->memory->dest = translate_register(reg);;
             break;
 
-        // Deferred.
+        // Deferred: (Rn)
         case 1:
             machine->memory->dest = machine->memory->direct_read_byte(
                 machine->memory,
@@ -190,7 +187,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
             );
             break;
 
-        // Autoincrement.
+        // Autoincrement: (Rn) +
         //
         // NOTE: (incremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
@@ -202,7 +199,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
             machine->memory->byte_advance_r(machine->memory, reg);
             break;
 
-        // Deferred autoincrement.
+        // Deferred autoincrement: @(Rn)+
         case 3:
             deferred = machine->memory->get_r(machine->memory, reg);
             index = machine->memory->direct_read_byte(machine->memory, deferred);
@@ -210,7 +207,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
             machine->memory->dest = machine->memory->direct_read_byte(machine->memory, index);
             break;
         
-        // Autodecrement.
+        // Autodecrement: -(Rn)
         //
         // NOTE: (decremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
@@ -220,7 +217,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
             machine->memory->dest = machine->memory->direct_read_byte(machine->memory, deferred);
             break;
 
-        // Deferred autodecrement.
+        // Deferred autodecrement: @-(Rn)
         case 5:
             deferred = machine->memory->get_r(machine->memory, reg);
             index = machine->memory->direct_read_byte(machine->memory, deferred);
@@ -228,7 +225,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
             machine->memory->byte_decrease(machine->memory, deferred);
             break;
 
-        // Indexed.
+        // Indexed: X(Rn)
         case 6:
             machine->memory->word_advance_r(machine->memory, R_PC);
             pc = machine->memory->get_r(machine->memory, R_PC);
@@ -239,7 +236,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
             );
             break;
 
-        // Deferred indexed.
+        // Deferred indexed: @X(Rn)
         case 7:
             machine->memory->word_advance_r(machine->memory, R_PC);
             pc = machine->memory->get_r(machine->memory, R_PC);
@@ -311,12 +308,12 @@ void setup_general_src_addressing(machine_state_t *machine)
     uint8_t mode = (machine->IR & 07000) >> 9;
     uint8_t reg = (machine->IR & 00700) >> 6;
     switch (mode) {
-        // Register.
+        // Register: Rn
         case 0:
             machine->memory->src = translate_register(reg);
             break;
 
-        // Deferred.
+        // Deferred: (Rn)
         case 1:
             machine->memory->src = machine->memory->direct_read_word(
                 machine->memory,
@@ -324,7 +321,7 @@ void setup_general_src_addressing(machine_state_t *machine)
             );
             break;
 
-        // Autoincrement.
+        // Autoincrement: (Rn)+
         //
         // NOTE: (incremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
@@ -336,7 +333,7 @@ void setup_general_src_addressing(machine_state_t *machine)
             machine->memory->word_advance_r(machine->memory, reg);
             break;
 
-        // Deferred autoincrement.
+        // Deferred autoincrement: @(Rn)+
         case 3:
             deferred = machine->memory->get_r(machine->memory, reg);
             index = machine->memory->direct_read_word(machine->memory, deferred);
@@ -344,7 +341,7 @@ void setup_general_src_addressing(machine_state_t *machine)
             machine->memory->src = machine->memory->direct_read_word(machine->memory, index);
             break;
         
-        // Autodecrement.
+        // Autodecrement: -(Rn)
         //
         // NOTE: (decremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
@@ -354,7 +351,7 @@ void setup_general_src_addressing(machine_state_t *machine)
             machine->memory->src = machine->memory->direct_read_word(machine->memory, deferred);
             break;
 
-        // Deferred autodecrement.
+        // Deferred autodecrement: @-(Rn)
         case 5:
             deferred = machine->memory->get_r(machine->memory, reg);
             index = machine->memory->direct_read_word(machine->memory, deferred);
@@ -362,7 +359,7 @@ void setup_general_src_addressing(machine_state_t *machine)
             machine->memory->word_decrease(machine->memory, deferred);
             break;
 
-        // Indexed.
+        // Indexed: X(Rn)
         case 6:
             machine->memory->word_advance_r(machine->memory, R_PC);
             pc = machine->memory->get_r(machine->memory, R_PC);
@@ -373,7 +370,7 @@ void setup_general_src_addressing(machine_state_t *machine)
             );
             break;
 
-        // Deferred indexed.
+        // Deferred indexed: @X(Rn)
         case 7:
             machine->memory->word_advance_r(machine->memory, R_PC);
             pc = machine->memory->get_r(machine->memory, R_PC);
@@ -444,12 +441,12 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
     uint8_t mode = (machine->IR & 07000) >> 9;
     uint8_t reg = (machine->IR & 00700) >> 6;
     switch (mode) {
-        // Register.
+        // Register: Rn
         case 0:
             machine->memory->src = translate_register(reg);
             break;
 
-        // Deferred.
+        // Deferred: (Rn)
         case 1:
             machine->memory->src = machine->memory->direct_read_byte(
                 machine->memory,
@@ -457,7 +454,7 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
             );
             break;
 
-        // Autoincrement.
+        // Autoincrement: (Rn)+
         //
         // NOTE: (incremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
@@ -469,7 +466,7 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
             machine->memory->byte_advance_r(machine->memory, reg);
             break;
 
-        // Deferred autoincrement.
+        // Deferred autoincrement: @(Rn)+
         case 3:
             deferred = machine->memory->get_r(machine->memory, reg);
             index = machine->memory->direct_read_byte(machine->memory, deferred);
@@ -477,7 +474,7 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
             machine->memory->src = machine->memory->direct_read_byte(machine->memory, index);
             break;
         
-        // Autodecrement.
+        // Autodecrement: -(Rn)
         //
         // NOTE: (decremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
@@ -487,7 +484,7 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
             machine->memory->src = machine->memory->direct_read_byte(machine->memory, deferred);
             break;
 
-        // Deferred autodecrement.
+        // Deferred autodecrement: @-(Rn)
         case 5:
             deferred = machine->memory->get_r(machine->memory, reg);
             index = machine->memory->direct_read_byte(machine->memory, deferred);
@@ -495,7 +492,7 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
             machine->memory->byte_decrease(machine->memory, deferred);
             break;
 
-        // Indexed.
+        // Indexed: X(Rn)
         case 6:
             machine->memory->word_advance_r(machine->memory, R_PC);
             pc = machine->memory->get_r(machine->memory, R_PC);
@@ -506,7 +503,7 @@ void setup_general_src_byte_addressing(machine_state_t *machine)
             );
             break;
 
-        // Deferred indexed.
+        // Deferred indexed: @X(Rn)
         case 7:
             machine->memory->word_advance_r(machine->memory, R_PC);
             pc = machine->memory->get_r(machine->memory, R_PC);
