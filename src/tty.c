@@ -94,6 +94,7 @@ void init_tty_subsystem(machine_state_t *machine)
     // Teleprinter Effects
     machine->memory->register_read_side_effect(machine->memory, TPB_LOC, clear_TPB);
 
+    // Set the READY for the first time.
     machine->memory->direct_write_word(machine->memory, TPS_LOC, TPS_READY);
 
     // Let's mess up the terminal. Canonical mode and echo be-gone!

@@ -36,13 +36,22 @@ void load_text_block(machine_state_t *machine, FILE *obj)
 
     fread(&byte01, sizeof(uint8_t), 1, obj);            // Read 01 00 data block tag.
     fread(&byte02, sizeof(uint8_t), 1, obj);
+
+#ifdef DEBUG_OBJ
     printf("data block: %03o %03o\n", byte01, byte02);
+#endif
 
     fread(&len, sizeof(uint16_t), 1, obj);              // Read length word.
+
+#ifdef DEBUG_OBJ
     printf("\tlen: %hu\n", len);
+#endif
 
     fread(&tag, sizeof(uint8_t), 1, obj);                // Read block type byte.
+
+#ifdef DEBUG_OBJ
     printf("\ttag: %03o\n", tag);
+#endif
 
     fread(&load_offset, sizeof(uint16_t), 1, obj);      // Read load address word.
     fread(&pad, sizeof(uint8_t), 1, obj);               // Skip past pad byte.
@@ -54,8 +63,11 @@ void load_text_block(machine_state_t *machine, FILE *obj)
         fread(&byte01, sizeof(uint8_t), 1, obj);
         fread(&byte02, sizeof(uint8_t), 1, obj);
         word = (byte02 << 8) | byte01;
-        printf("%07o: %07o: %03o %03o\n", loc, word, byte01, byte02);
         machine->memory->direct_write_word(machine->memory, loc, word);
+
+#ifdef DEBUG_OBJ
+        printf("%07o: %07o: %03o %03o\n", loc, word, byte01, byte02);
+#endif
     }
 }
 
