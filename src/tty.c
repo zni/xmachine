@@ -96,13 +96,15 @@ void init_tty_subsystem(machine_state_t *machine)
 
     machine->memory->direct_write_word(machine->memory, TPS_LOC, TPS_READY);
 
+    // Let's mess up the terminal. Canonical mode and echo be-gone!
     tcgetattr(STDIN_FILENO, &TERMINAL_DEFAULT);
     XMACHINE_TERMINAL = TERMINAL_DEFAULT;
-    XMACHINE_TERMINAL.c_lflag &= ~(ICANON);
+    XMACHINE_TERMINAL.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &XMACHINE_TERMINAL);
 }
 
 void shutdown_tty_subsystem()
 {
+    // Back to normal.
     tcsetattr(STDIN_FILENO, TCSANOW, &TERMINAL_DEFAULT);
 }
