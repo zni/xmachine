@@ -20,6 +20,7 @@ void init_machine(machine_state_t *machine, bool step)
     machine->STEP = step;
     machine->memory = NULL;
     initialize_memory(&(machine->memory));
+    init_tty_subsystem(machine);
 }
 
 void load_program_from_mcode(machine_state_t *machine, char *program)
@@ -54,6 +55,7 @@ void dump_state(machine_state_t *machine, bool dump_memory)
     printf("PC : 0o%07o\n", machine->memory->get_r(machine->memory, R_PC));
     printf("SP : 0o%07o\n", machine->memory->get_r(machine->memory, R_SP));
     printf("IR : 0o%07o\n", machine->IR);
+    printf("ALU: 0o%07o\n", machine->ALU);
 
     for (int i = 0; i < 6; i++) {
         printf("R%d : 0o%07o\n", i, machine->memory->get_r(machine->memory, i));
@@ -95,6 +97,8 @@ void run_machine(machine_state_t *machine)
         }
 
         exec_instruction(machine);
+        exec_tty_kb(machine);
+        exec_tty_print(machine);
     }
 }
 
@@ -102,6 +106,8 @@ void shutdown_machine(machine_state_t *machine)
 {
     free_memory(&machine->memory);
     machine->memory = NULL;
+
+    shutdown_tty_subsystem();
 }
 
 /*
@@ -139,13 +145,13 @@ int main(int argc, char** argv)
     machine_state_t machine;
     STATE = &machine;
 
-#if (defined(_POSIX_VERSION))
+#if (defined(_XOPEN_SOURCE))
     // Setup a signal handler for SIGINT.
     struct sigaction sa;
     sa.sa_flags = SIGINFO;
     sa.sa_handler = &handle_user_interrupt;
     sigaction(SIGINT, &sa, NULL);
-#elif (defined(__WIN32__))
+#elif (defined(__WIN32__) || (defined(__unix__)))
     // Use the old style signal handler.
     signal(SIGINT, &handle_user_interrupt);
 #endif

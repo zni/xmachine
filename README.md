@@ -1,7 +1,26 @@
 # xmachine
 
-Take a dash of PDP-11 instructions, while borrowing some of its registers, 
-and add in a few other made up things. What do you get? This. This stuff.
+```
+$ bin/machine testbin/echo.obj 
+data block: 001 000
+        len: 36
+        tag: 003
+0000000: 0016700: 300 035
+0000002: 0000020: 020 000
+0000004: 0016701: 301 035
+0000006: 0000016: 016 000
+0000010: 0016702: 302 035
+0000012: 0000016: 016 000
+0000014: 0005210: 210 012
+0000016: 0111112: 112 222
+0000020: 0000775: 375 001
+0000022: 0000000: 000 000
+0000024: 0017500: 100 037
+0000026: 0017502: 102 037
+0000030: 0017504: 104 037
+0000032: 0017506: 106 037
+hheelloo  mmyy  ssoonn  wweellccoommee  ttoo  mmaaaaaacchhiinnee
+```
 
 ## The goal
 

@@ -1,40 +1,52 @@
 #include <ctype.h>
 #include <stdio.h>
+#include <termios.h>
+#include <unistd.h>
 #include "include/machine_state.h"
+#include "include/memory.h"
+#include "include/tty.h"
+
+struct termios TERMINAL_DEFAULT, XMACHINE_TERMINAL;
 
 /* Teletype Keyboard Functions */
 
-void clear_TKB(machine_state_t *machine)
+void clear_TKB(memory_t *m)
 {
-    *machine->TKB = 0;
+    m->direct_write_word(m, TKB_LOC, 0);
 }
 
-void clear_flags_TKS(machine_state_t *machine)
+void clear_flags_TKS(memory_t *m)
 {
-    *machine->TKS = 0;
+    m->direct_write_word(m, TKS_LOC, 0);
 }
 
-uint16_t read_TKB(machine_state_t *machine)
+void read_TKB(memory_t *m)
 {
-    uint16_t b = *machine->TKB;
-    clear_TKB(machine);
-    clear_flags_TKS(machine);
-    return b;
+    clear_TKB(m);
+    clear_flags_TKS(m);
 }
 
 void fill_buffer_TKB(machine_state_t *machine)
 {
-    *machine->TKB = (uint16_t) fgetc(stdin);
+    uint16_t TKB = (uint16_t) fgetc(stdin);
+    machine->memory->direct_write_word(machine->memory, TKB_LOC, TKB);
 }
 
 void exec_tty_kb(machine_state_t *machine)
 {
-    if (*machine->TKS & TKS_RDRENB) {
-        *machine->TKS ^= TKS_BUSY;
+    machine->memory->src = TKS_LOC;
+    machine->memory->dest = TKS_LOC;
+    uint16_t TKS = machine->memory->read_word(machine->memory);
+    if (TKS & TKS_RDRENB) {
+        TKS ^= TKS_BUSY;
+        machine->memory->write_word(machine->memory, TKS);
+
         fill_buffer_TKB(machine);
-        *machine->TKS ^= TKS_DONE;
-        *machine->TKS ^= TKS_BUSY;
-        *machine->TKS ^= TKS_RDRENB;
+
+        TKS ^= TKS_DONE;
+        TKS ^= TKS_BUSY;
+        TKS ^= TKS_RDRENB;
+        machine->memory->write_word(machine->memory, TKS);
     }
 }
 
@@ -42,27 +54,55 @@ void exec_tty_kb(machine_state_t *machine)
 
 uint8_t buffer_filled_TPB(machine_state_t *machine)
 {
-    return *machine->TPB != 0;
+    uint8_t buffer = machine->memory->direct_read_byte(machine->memory, TPB_LOC);
+    return (buffer != 0);
 }
 
 void clear_flags_TPS(machine_state_t *machine)
 {
-    *machine->TPS = 0;
+    machine->memory->direct_write_word(machine->memory, TPS_LOC, 0);
 }
 
-uint8_t fetch_and_clear_buffer_TPB(machine_state_t *machine)
+void clear_TPB(memory_t *m)
 {
-    uint8_t c = (uint8_t) *machine->TPB;
-    *machine->TPB = 0;
-    return c;
+    uint16_t TPS = m->direct_read_word(m, TPS_LOC);
+    m->direct_write_word(m, TPB_LOC, 0);
+    m->direct_write_word(m, TPS_LOC, TPS | TPS_READY);
+}
+
+uint8_t fetch_buffer_TPB(machine_state_t *machine)
+{
+    return machine->memory->direct_read_byte(machine->memory, TPB_LOC);
 }
 
 void exec_tty_print(machine_state_t *machine)
 {
-    if ((*machine->TPS & TPS_READY) && buffer_filled_TPB(machine)) {
+    uint16_t TPS = machine->memory->direct_read_word(machine->memory, TPS_LOC);
+    if ((TPS & TPS_READY)) {
         clear_flags_TPS(machine);
-        uint8_t c = fetch_and_clear_buffer_TPB(machine);
-        fputc(c, stdout);
-        *machine->TPS ^= TPS_READY;
+        uint8_t c = fetch_buffer_TPB(machine);
+        if (c != 0)
+            fputc(c, stdout);
     }
+}
+
+void init_tty_subsystem(machine_state_t *machine)
+{
+    // Teletype Keyboard Effects
+    machine->memory->register_read_side_effect(machine->memory, TKB_LOC, read_TKB);
+
+    // Teleprinter Effects
+    machine->memory->register_read_side_effect(machine->memory, TPB_LOC, clear_TPB);
+
+    machine->memory->direct_write_word(machine->memory, TPS_LOC, TPS_READY);
+
+    tcgetattr(STDIN_FILENO, &TERMINAL_DEFAULT);
+    XMACHINE_TERMINAL = TERMINAL_DEFAULT;
+    XMACHINE_TERMINAL.c_lflag &= ~(ICANON);
+    tcsetattr(STDIN_FILENO, TCSANOW, &XMACHINE_TERMINAL);
+}
+
+void shutdown_tty_subsystem()
+{
+    tcsetattr(STDIN_FILENO, TCSANOW, &TERMINAL_DEFAULT);
 }

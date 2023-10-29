@@ -36,16 +36,18 @@ void load_text_block(machine_state_t *machine, FILE *obj)
 
     fread(&byte01, sizeof(uint8_t), 1, obj);            // Read 01 00 data block tag.
     fread(&byte02, sizeof(uint8_t), 1, obj);
-    fread(&len, sizeof(uint16_t), 1, obj);              // Read length word.   
+    printf("data block: %03o %03o\n", byte01, byte02);
+
+    fread(&len, sizeof(uint16_t), 1, obj);              // Read length word.
+    printf("\tlen: %hu\n", len);
+
     fread(&tag, sizeof(uint8_t), 1, obj);                // Read block type byte.
+    printf("\ttag: %03o\n", tag);
+
     fread(&load_offset, sizeof(uint16_t), 1, obj);      // Read load address word.
     fread(&pad, sizeof(uint8_t), 1, obj);               // Skip past pad byte.
     len -= 8;                                           // Adjust the length.
     loc = load_offset;
-
-    printf("data block: %03o %03o\n", byte01, byte02);
-    printf("\tlen: %hu\n", len + 8);
-    printf("\ttag: %03o\n", tag);
 
     machine->memory->set_r(machine->memory, R_PC, load_offset);
     for (int i = 0; i < len; i += 2, loc += 2) {
