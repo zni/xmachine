@@ -956,25 +956,27 @@ void DECB(machine_state_t *machine)
     byte--;
     machine->memory->write_byte(machine->memory, byte);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DESTB);
+    set_zero_flag(machine, byte);
 }
 
 void NEG(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
-    uint16_t word = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
-    machine->memory->write_word(machine->memory, ~(word) + 1);
+    machine->ALU = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    machine->ALU = ~(machine->ALU) + 1;
+    machine->memory->write_word(machine->memory, machine->ALU);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DEST);
+    set_zero_flag(machine, machine->ALU);
 }
 
 void NEGB(machine_state_t *machine)
 {
     setup_dest_byte_addressing(machine);
     uint8_t byte = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
-    machine->memory->write_byte(machine->memory, ~(byte) + 1);
+    byte = ~(byte) + 1;
+    machine->memory->write_byte(machine->memory, byte);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DESTB);
+    set_zero_flag(machine, byte);
 }
 
 void ADC(machine_state_t *machine)
@@ -984,7 +986,7 @@ void ADC(machine_state_t *machine)
     word += (machine->memory->get_r(machine->memory, R_PS) & CARRYFLAG);
     machine->memory->write_word(machine->memory, word);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DEST);
+    set_zero_flag(machine, word);
 }
 
 void ADCB(machine_state_t *machine)
@@ -994,7 +996,7 @@ void ADCB(machine_state_t *machine)
     byte += (machine->memory->get_r(machine->memory, R_PS) & CARRYFLAG);
     machine->memory->write_byte(machine->memory, byte);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DESTB);
+    set_zero_flag(machine, byte);
 }
 
 void SBC(machine_state_t *machine)
@@ -1004,7 +1006,7 @@ void SBC(machine_state_t *machine)
     word = word - (machine->memory->get_r(machine->memory, R_PS) & CARRYFLAG);
     machine->memory->write_word(machine->memory, word);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DEST);
+    set_zero_flag(machine, word);
 }
 
 void SBCB(machine_state_t *machine)
@@ -1014,21 +1016,21 @@ void SBCB(machine_state_t *machine)
     byte = byte - (machine->memory->get_r(machine->memory, R_PS) & CARRYFLAG);
     machine->memory->write_byte(machine->memory, byte);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DESTB);
+    set_zero_flag(machine, byte);
 }
 
 void TST(machine_state_t *machine)
 {
-    //setup_dest_addressing(machine);
-    //set_zero_flag(machine, *machine->DEST);
-    NOP(machine);
+    setup_dest_addressing(machine);
+    machine->ALU = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    set_zero_flag(machine, machine->ALU);
 }
 
 void TSTB(machine_state_t *machine)
 {
-    //setup_dest_byte_addressing(machine);
-    //set_zero_flag(machine, *machine->DESTB);
-    NOP(machine);
+    setup_dest_byte_addressing(machine);
+    machine->ALU = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
+    set_zero_flag(machine, machine->ALU);
 }
 
 void ROR(machine_state_t *machine)
@@ -1038,7 +1040,7 @@ void ROR(machine_state_t *machine)
     word = (word << 1) | (word >> 15);
     machine->memory->write_word(machine->memory, word);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DEST);
+    set_zero_flag(machine, word);
 }
 
 void RORB(machine_state_t *machine)
@@ -1048,7 +1050,7 @@ void RORB(machine_state_t *machine)
     byte = (byte << 1) | (byte >> 7);
     machine->memory->write_byte(machine->memory, byte);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DESTB);
+    set_zero_flag(machine, byte);
 }
 
 void ROL(machine_state_t *machine)
@@ -1058,7 +1060,7 @@ void ROL(machine_state_t *machine)
     word = (word << 15) | (word >> 1);
     machine->memory->write_word(machine->memory, word);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DEST);
+    set_zero_flag(machine, word);
 }
 
 void ROLB(machine_state_t *machine)
@@ -1068,7 +1070,7 @@ void ROLB(machine_state_t *machine)
     byte = (byte << 7) | (byte >> 1);
     machine->memory->write_byte(machine->memory, byte);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DESTB);
+    set_zero_flag(machine, byte);
 }
 
 void ASR(machine_state_t *machine)
@@ -1078,7 +1080,7 @@ void ASR(machine_state_t *machine)
     machine->ALU >>= 1;
     machine->memory->write_word(machine->memory, machine->ALU);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DEST);
+    set_zero_flag(machine, machine->ALU);
 }
 
 void ASRB(machine_state_t *machine)
@@ -1088,7 +1090,7 @@ void ASRB(machine_state_t *machine)
     machine->ALU >>= 1;
     machine->memory->write_byte(machine->memory, machine->ALU);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DESTB);
+    set_zero_flag(machine, machine->ALU);
 }
 
 void ASL(machine_state_t *machine)
@@ -1098,7 +1100,7 @@ void ASL(machine_state_t *machine)
     machine->ALU <<= 1;
     machine->memory->write_word(machine->memory, machine->ALU);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DEST);
+    set_zero_flag(machine, machine->ALU);
 }
 
 void ASLB(machine_state_t *machine)
@@ -1108,7 +1110,7 @@ void ASLB(machine_state_t *machine)
     machine->ALU <<= 1;
     machine->memory->write_byte(machine->memory, machine->ALU);
     machine->memory->word_advance_r(machine->memory, R_PC);
-    //set_zero_flag(machine, *machine->DESTB);
+    set_zero_flag(machine, machine->ALU);
 }
 
 void MTPS(machine_state_t *machine)
@@ -1193,13 +1195,6 @@ void ASHC(machine_state_t *machine)
 
 void XOR(machine_state_t *machine)
 {
-    // uint16_t *REG = &(machine->R[(machine->IR & 0700) >> 6]);
-    // setup_dest_addressing(machine);
-
-    // machine->ALU = *REG;
-    // machine->ALU ^= *machine->DEST;
-    // *REG = machine->ALU;
-    // machine->memory->word_advance_r(machine->memory, R_PC);
     uint8_t reg = (machine->IR & 0700) >> 6;
     setup_dest_addressing(machine);
 
@@ -1207,6 +1202,7 @@ void XOR(machine_state_t *machine)
     machine->ALU ^= machine->memory->direct_read_word(machine->memory, machine->memory->dest);
     machine->memory->write_word(machine->memory, machine->ALU);
     machine->memory->word_advance_r(machine->memory, R_PC);
+    set_zero_flag(machine, machine->ALU);
 }
 
 void HALT(machine_state_t *machine)
@@ -1263,10 +1259,10 @@ void exec_instruction(machine_state_t *machine)
     case BCS_op:
         BCS(machine);
         break;
-    
+
     default:
         // Double OP Register Source
-        switch (machine->IR & 0177000) {       
+        switch (machine->IR & 0177000) {
         case MUL_op:
             MUL(machine);
             break;
