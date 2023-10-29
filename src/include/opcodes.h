@@ -27,6 +27,10 @@ enum op_codes {
     ASHC_op = 0073000,
     XOR_op  = 0074000,
 
+    // Subroutine
+    JSR_op  = 0004000,
+    RTS_op  = 0000200,
+
     // Double OPs
     MOV_op  = 0010000,
     MOVB_op = 0110000,

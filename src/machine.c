@@ -145,7 +145,7 @@ int main(int argc, char** argv)
     machine_state_t machine;
     STATE = &machine;
 
-#if (defined(_XOPEN_SOURCE))
+#if (defined(_XOPEN_SOURCE) || defined(__APPLE__))
     // Setup a signal handler for SIGINT.
     struct sigaction sa;
     sa.sa_flags = SIGINFO;

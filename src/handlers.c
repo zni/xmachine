@@ -40,7 +40,13 @@ void setup_pc_dest_addressing(machine_state_t *machine)
 
 void setup_sp_dest_addressing(machine_state_t *machine)
 {
-    return;
+    uint16_t mode = (machine->IR & 070) >> 3;
+    uint16_t reg = machine->IR & 007;
+    switch (mode) {
+        case 0:
+            machine->memory->dest = translate_register(reg);
+            break;
+    }
 }
 
 void setup_general_dest_addressing(machine_state_t *machine)
@@ -172,7 +178,13 @@ void setup_pc_dest_byte_addressing(machine_state_t *machine)
 
 void setup_sp_dest_byte_addressing(machine_state_t *machine)
 {
-    return;
+    uint16_t mode = (machine->IR & 070) >> 3;
+    uint16_t reg = machine->IR & 007;
+    switch (mode) {
+        case 0:
+            machine->memory->dest = translate_register(reg);
+            break;
+    }
 }
 
 void setup_general_dest_byte_addressing(machine_state_t *machine)
@@ -193,7 +205,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
             machine->memory->dest = machine->memory->get_r(machine->memory, reg);
             break;
 
-        // Autoincrement: (Rn) +
+        // Autoincrement: (Rn)+
         //
         // NOTE: (incremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
@@ -306,7 +318,13 @@ void setup_pc_src_addressing(machine_state_t *machine)
 
 void setup_sp_src_addressing(machine_state_t *machine)
 {
-    return;
+    uint16_t mode = (machine->IR & 070) >> 3;
+    uint16_t reg = machine->IR & 007;
+    switch (mode) {
+        case 0:
+            machine->memory->src = translate_register(reg);
+            break;
+    }
 }
 
 void setup_general_src_addressing(machine_state_t *machine)
@@ -438,7 +456,13 @@ void setup_pc_src_byte_addressing(machine_state_t *machine)
 
 void setup_sp_src_byte_addressing(machine_state_t *machine)
 {
-    return;
+    uint16_t mode = (machine->IR & 070) >> 3;
+    uint16_t reg = machine->IR & 007;
+    switch (mode) {
+        case 0:
+            machine->memory->src = translate_register(reg);
+            break;
+    }
 }
 
 void setup_general_src_byte_addressing(machine_state_t *machine)
@@ -1235,6 +1259,38 @@ void XOR(machine_state_t *machine)
     set_zero_flag(machine, machine->ALU);
 }
 
+void JSR(machine_state_t *machine)
+{
+    uint8_t reg = (machine->IR & 0700) >> 6;
+    setup_dest_addressing(machine);
+    machine->memory->word_advance_r(machine->memory, R_PC);
+
+    uint16_t tmp = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
+    uint16_t reg_contents = machine->memory->get_r(machine->memory, reg);
+
+    uint16_t sp = machine->memory->get_r(machine->memory, R_SP);
+    machine->memory->direct_write_word(machine->memory, sp, reg_contents);
+    machine->memory->word_decrease_r(machine->memory, R_SP);
+
+    uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
+    machine->memory->set_r(machine->memory, reg, pc);
+    machine->memory->set_r(machine->memory, R_PC, tmp);
+}
+
+void RTS(machine_state_t *machine)
+{
+    uint8_t reg = machine->IR & 07;
+    uint16_t reg_contents = machine->memory->get_r(machine->memory, reg);
+    machine->memory->set_r(machine->memory, R_PC, reg_contents);
+    
+    machine->memory->word_advance_r(machine->memory, R_SP);
+    uint16_t sp = machine->memory->get_r(machine->memory, R_SP);
+    uint16_t top_stack = machine->memory->direct_read_word(machine->memory, sp);
+
+
+    machine->memory->set_r(machine->memory, reg, top_stack);
+}
+
 void HALT(machine_state_t *machine)
 {
     machine->HALTED = true;
@@ -1291,7 +1347,7 @@ void exec_instruction(machine_state_t *machine)
         break;
 
     default:
-        // Double OP Register Source
+        // Double OP Register Source and JSR
         switch (machine->IR & 0177000) {
         case MUL_op:
             MUL(machine);
@@ -1307,6 +1363,9 @@ void exec_instruction(machine_state_t *machine)
             break;
         case XOR_op:
             XOR(machine);
+            break;
+        case JSR_op:
+            JSR(machine);
             break;
         default:
             switch (machine->IR & 0170000) {
@@ -1448,6 +1507,9 @@ void exec_instruction(machine_state_t *machine)
                     break;
                 case MFPS_op:
                     MFPS(machine);
+                    break;
+                case RTS_op:
+                    RTS(machine);
                     break;
                 default:
                     HALT(machine);
