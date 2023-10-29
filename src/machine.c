@@ -14,31 +14,6 @@ machine_state_t *STATE;
 
 void init_machine(machine_state_t *machine, bool step)
 {
-    /*
-    machine->ALU = 0;
-    machine->MAR = 0;
-    machine->MBR = 0;
-    machine->PC = 0;
-    machine->PSW = 0;
-    machine->SP = 0;
-    
-    
-    machine->SRC = NULL;
-    machine->DEST = NULL;
-    machine->SRCB = NULL;
-    machine->DESTB = NULL;
-
-    for (int i = 0; i < REGISTERS; i++) { machine->R[i] = 0;}
-    for (int i = 0; i < MEMSIZE; i++) { machine->MEMORY[i] = 0; }
-
-    machine->TKS = &(machine->MEMORY[TKS_LOC]);
-    machine->TKB = &(machine->MEMORY[TKB_LOC]);
-
-    machine->TPS = &(machine->MEMORY[TPS_LOC]);
-    *machine->TPS ^= TPS_READY;
-    machine->TPB = &(machine->MEMORY[TPB_LOC]);
-    */
-
     machine->ALU = 0;
     machine->IR = 0;
     machine->HALTED = false;
@@ -120,10 +95,6 @@ void run_machine(machine_state_t *machine)
         }
 
         exec_instruction(machine);
-
-
-        //exec_tty_kb(machine);
-        //exec_tty_print(machine);
     }
 }
 
