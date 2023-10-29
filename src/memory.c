@@ -1,6 +1,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include "include/memory.h"
+#include "include/tty.h"
+
+void process_write_side_effects(memory_t*, uint16_t);
+void process_read_side_effects(memory_t*, uint16_t);
 
 uint16_t translate_register(uint16_t reg)
 {
@@ -32,44 +36,54 @@ void write_word(memory_t *m, uint16_t word)
     if (m->dest % 2 != 0) { m->dest--; }
     m->_memory[m->dest] = word & 0377;
     m->_memory[m->dest + 1] = (word & 0177400) >> 8;
+    process_write_side_effects(m, m->dest);
 }
 
 void write_byte(memory_t *m, uint8_t byte)
 {
     m->_memory[m->dest] = byte;
+    process_write_side_effects(m, m->dest);
 }
 
 uint16_t read_word(memory_t *m)
 {
     uint16_t word = m->_memory[m->src] | (m->_memory[m->src + 1] << 8);
+    process_read_side_effects(m, m->src);
     return word;
 }
 
 uint8_t read_byte(memory_t *m)
 {
-    return m->_memory[m->src];
+    uint8_t byte = m->_memory[m->src];
+    process_read_side_effects(m, m->src);
+    return byte;
 }
 
 uint16_t direct_read_word(memory_t *m, uint16_t loc)
 {
     uint16_t word = (m->_memory[loc] | (m->_memory[loc + 1] << 8));
+    process_read_side_effects(m, loc);
     return word;
 }
 
 uint8_t direct_read_byte(memory_t *m, uint16_t loc)
 {
-    return m->_memory[loc];
+    uint8_t byte = m->_memory[loc];
+    process_read_side_effects(m, loc);
+    return byte;
 }
 
 void direct_write_word(memory_t *m, uint16_t loc, uint16_t v)
 {
     m->_memory[loc] = v & 0377;
     m->_memory[loc + 1] = (v & 0177400) >> 8;
+    process_write_side_effects(m, loc);
 }
 
 void direct_write_byte(memory_t *m, uint16_t loc, uint8_t v)
 {
     m->_memory[loc] = v;
+    process_write_side_effects(m, loc);
 }
 
 void word_advance(memory_t *m, uint16_t loc)
@@ -155,11 +169,72 @@ uint16_t get_r(memory_t *m, uint16_t r)
     return m->_memory[loc] | (m->_memory[loc + 1] << 8);
 }
 
+bool register_read_side_effect(memory_t *m, uint16_t loc, void (*handler)(memory_t*))
+{
+    for (int i = 0; i < MAX_HANDLERS; i++) {
+        if (m->read_side_effects[i].loc == INACTIVE_HANDLER_LOC) {
+            m->read_side_effects[i].loc = loc;
+            m->read_side_effects[i].handler = handler;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void process_read_side_effects(memory_t *m, uint16_t loc)
+{
+    for (int i = 0; i < MAX_HANDLERS; i++) {
+        if (m->read_side_effects[i].loc == loc) {
+            m->read_side_effects[i].handler(m);
+            break;
+        }
+    }
+}
+
+bool register_write_side_effect(memory_t *m, uint16_t loc, void (*handler)(memory_t*))
+{
+    for (int i = 0; i < MAX_HANDLERS; i++) {
+        if (m->write_side_effects[i].loc == INACTIVE_HANDLER_LOC) {
+            m->write_side_effects[i].loc = loc;
+            m->write_side_effects[i].handler = handler;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void process_write_side_effects(memory_t *m, uint16_t loc)
+{
+    for (int i = 0; i < MAX_HANDLERS; i++) {
+        if (m->write_side_effects[i].loc == loc) {
+            m->write_side_effects[i].handler(m);
+            break;
+        }
+    }
+}
+
+
 void initialize_memory(memory_t **m)
 {
     *m = malloc(sizeof(memory_t));
     (*m)->_memory = malloc(sizeof(uint8_t) * MEMBYTES);
     memset((*m)->_memory, 0, MEMBYTES);
+
+    (*m)->read_side_effects = malloc(sizeof(side_effect_t) * MAX_HANDLERS);
+    for (int i = 0; i < MAX_HANDLERS; i++) {
+        (*m)->read_side_effects[i].handler = NULL;
+        (*m)->read_side_effects[i].loc = INACTIVE_HANDLER_LOC;
+    }
+    (*m)->write_side_effects = malloc(sizeof(side_effect_t) * MAX_HANDLERS);
+    for (int i = 0; i < MAX_HANDLERS; i++) {
+        (*m)->write_side_effects[i].handler = NULL;
+        (*m)->write_side_effects[i].loc = INACTIVE_HANDLER_LOC;
+    }
+
+    (*m)->register_read_side_effect = &register_read_side_effect;
+    (*m)->register_write_side_effect = &register_write_side_effect;
 
     (*m)->write_word = &write_word;
     (*m)->write_byte = &write_byte;
@@ -187,6 +262,13 @@ void free_memory(memory_t **m)
 {
     free((*m)->_memory);
     (*m)->_memory = NULL;
+
+    free((*m)->read_side_effects);
+    (*m)->read_side_effects = NULL;
+
+    free((*m)->write_side_effects);
+    (*m)->write_side_effects = NULL;
+
     free(*m);
     m = NULL;
 }
