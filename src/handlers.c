@@ -220,7 +220,7 @@ void setup_pc_dest_byte_addressing(machine_state_t *machine)
         case 6:
             machine->memory->word_advance_r(machine->memory, R_PC);
             pc = machine->memory->get_r(machine->memory, R_PC);
-            machine->memory->dest = pc + machine->memory->direct_read_byte(machine->memory, pc);
+            machine->memory->dest = pc + machine->memory->direct_read_word(machine->memory, pc);
             break;
 
     }
@@ -538,7 +538,7 @@ void setup_pc_src_byte_addressing(machine_state_t *machine)
         case 6:
             machine->memory->word_advance_r(machine->memory, R_PC);
             pc = machine->memory->get_r(machine->memory, R_PC);
-            machine->memory->src = pc + machine->memory->direct_read_byte(machine->memory, pc);
+            machine->memory->src = pc + machine->memory->direct_read_word(machine->memory, pc);
             break;
     }
 }
@@ -680,8 +680,6 @@ void BNE(machine_state_t *machine)
     machine->ALU = ps & ZEROFLAG;
     if (machine->ALU == 0)
         machine->memory->set_r(machine->memory, R_PC, (uint16_t) NEW_PC);
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BEQ(machine_state_t *machine)
@@ -695,8 +693,6 @@ void BEQ(machine_state_t *machine)
     machine->ALU = ps & ZEROFLAG;
     if (machine->ALU)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BGE(machine_state_t *machine)
@@ -711,8 +707,6 @@ void BGE(machine_state_t *machine)
     machine->ALU ^= (ps & OVERFLOWFLAG) >> 1;
     if (machine->ALU == 0)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BLT(machine_state_t *machine)
@@ -727,8 +721,6 @@ void BLT(machine_state_t *machine)
     machine->ALU ^= (ps & OVERFLOWFLAG) >> 1;
     if (machine->ALU)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BGT(machine_state_t *machine)
@@ -743,8 +735,6 @@ void BGT(machine_state_t *machine)
     machine->ALU |= ((ps & NEGATIVEFLAG) >> 3) ^ ((ps & OVERFLOWFLAG) >> 1); 
     if (machine->ALU == 0)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BLE(machine_state_t *machine)
@@ -759,8 +749,6 @@ void BLE(machine_state_t *machine)
     machine->ALU |= ((ps & NEGATIVEFLAG) >> 3) ^ ((ps & OVERFLOWFLAG) >> 1); 
     if (machine->ALU)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BPL(machine_state_t *machine)
@@ -773,8 +761,6 @@ void BPL(machine_state_t *machine)
     int8_t OFFSET = get_branch_offset(machine);
     if ((ps & NEGATIVEFLAG) == 0)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BMI(machine_state_t *machine)
@@ -787,8 +773,6 @@ void BMI(machine_state_t *machine)
     int8_t OFFSET = get_branch_offset(machine);
     if (ps & NEGATIVEFLAG)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BHI(machine_state_t *machine)
@@ -803,8 +787,6 @@ void BHI(machine_state_t *machine)
     machine->ALU |= (ps & ZEROFLAG) >> 2;
     if (machine->ALU == 0)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BLOS(machine_state_t *machine)
@@ -819,8 +801,6 @@ void BLOS(machine_state_t *machine)
     machine->ALU |= (ps & ZEROFLAG) >> 2;
     if (machine->ALU)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BVC(machine_state_t *machine)
@@ -834,8 +814,6 @@ void BVC(machine_state_t *machine)
     machine->ALU = ps & OVERFLOWFLAG;
     if (machine->ALU == 0)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BVS(machine_state_t *machine)
@@ -849,8 +827,6 @@ void BVS(machine_state_t *machine)
     machine->ALU = ps & OVERFLOWFLAG;
     if (machine->ALU)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BCC(machine_state_t *machine)
@@ -864,8 +840,6 @@ void BCC(machine_state_t *machine)
     machine->ALU = ps & CARRYFLAG;
     if (machine->ALU == 0)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void BCS(machine_state_t *machine)
@@ -879,8 +853,6 @@ void BCS(machine_state_t *machine)
     machine->ALU = ps & CARRYFLAG;
     if (machine->ALU)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
-    else
-        machine->memory->word_advance_r(machine->memory, R_PC);
 }
 
 void MOV(machine_state_t *machine)
@@ -1346,9 +1318,9 @@ void JSR(machine_state_t *machine)
     uint16_t tmp = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
     uint16_t reg_contents = machine->memory->get_r(machine->memory, reg);
 
-    machine->memory->word_decrease_r(machine->memory, R_SP);
     uint16_t sp = machine->memory->get_r(machine->memory, R_SP);
     machine->memory->direct_write_word(machine->memory, sp, reg_contents);
+    machine->memory->word_decrease_r(machine->memory, R_SP);
 
 
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
@@ -1365,8 +1337,6 @@ void RTS(machine_state_t *machine)
     machine->memory->word_advance_r(machine->memory, R_SP);
     uint16_t sp = machine->memory->get_r(machine->memory, R_SP);
     uint16_t top_stack = machine->memory->direct_read_word(machine->memory, sp);
-
-
     machine->memory->set_r(machine->memory, reg, top_stack);
 }
 
