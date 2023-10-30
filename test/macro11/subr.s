@@ -7,11 +7,12 @@
 		JSR PC, #SUB3
 		HALT
 
-
 ADD4:	ADD #4, R0
+		JSR PC, #ADD6
 		RTS PC
 
 ADD6:	ADD #6, R0
+		JSR PC, #SUB3
 		RTS PC
 
 SUB3:	MOV #3, R1
