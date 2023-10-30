@@ -40,11 +40,61 @@ void setup_pc_dest_addressing(machine_state_t *machine)
 
 void setup_sp_dest_addressing(machine_state_t *machine)
 {
+    uint16_t pc = 0;
+    uint16_t index = 0;
+    uint16_t addr = 0;
+    uint16_t deferred = 0;
     uint16_t mode = (machine->IR & 070) >> 3;
     uint16_t reg = machine->IR & 007;
     switch (mode) {
+        // Register: SP
         case 0:
             machine->memory->dest = translate_register(reg);
+            break;
+
+        // Deferred: (SP), top of the stack
+        case 1:
+            machine->memory->dest = machine->memory->get_r(machine->memory, reg);
+            break;
+
+        // Autoincrement: (Rn)+, get top of stack and then pop it
+        case 2:
+            machine->memory->dest = machine->memory->get_r(machine->memory, reg);
+            machine->memory->word_advance_r(machine->memory, reg);
+            break;
+
+        // Deferred autoincrement: @(SP)+, top of stack is a pointer to a value,
+        // then pop it.
+        case 3:
+            deferred = machine->memory->get_r(machine->memory, reg);
+            addr = machine->memory->direct_read_word(machine->memory, deferred);
+            machine->memory->word_advance_r(machine->memory, reg);
+            machine->memory->dest = addr;
+            break;
+
+        // Autodecrement: -(SP), push value onto stack.
+        case 4:
+            machine->memory->word_decrease_r(machine->memory, reg);
+            addr = machine->memory->get_r(machine->memory, reg);
+            machine->memory->dest = addr;
+            break;
+
+        // Indexed: X(SP), access item X on the stack
+        case 6:
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_word(machine->memory, pc);
+            addr = machine->memory->get_r(machine->memory, reg);
+            machine->memory->dest = addr + index;
+            break;
+
+        // Deferred index: @X(SP), access item pointed to by item X on the stack
+        case 7:
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_word(machine->memory, pc);
+            addr = machine->memory->get_r(machine->memory, reg);
+            machine->memory->dest = machine->memory->direct_read_word(machine->memory, addr + index);
             break;
     }
 }
@@ -176,17 +226,6 @@ void setup_pc_dest_byte_addressing(machine_state_t *machine)
     }
 }
 
-void setup_sp_dest_byte_addressing(machine_state_t *machine)
-{
-    uint16_t mode = (machine->IR & 070) >> 3;
-    uint16_t reg = machine->IR & 007;
-    switch (mode) {
-        case 0:
-            machine->memory->dest = translate_register(reg);
-            break;
-    }
-}
-
 void setup_general_dest_byte_addressing(machine_state_t *machine)
 {
     uint16_t pc = 0;
@@ -272,7 +311,7 @@ void setup_dest_byte_addressing(machine_state_t *machine)
             setup_pc_dest_byte_addressing(machine);
             break;
         case 6:
-            setup_sp_dest_byte_addressing(machine);
+            setup_sp_dest_addressing(machine);
             break;
         default:
             setup_general_dest_byte_addressing(machine);
@@ -318,11 +357,61 @@ void setup_pc_src_addressing(machine_state_t *machine)
 
 void setup_sp_src_addressing(machine_state_t *machine)
 {
-    uint16_t mode = (machine->IR & 070) >> 3;
-    uint16_t reg = machine->IR & 007;
+    uint16_t pc = 0;
+    uint16_t index = 0;
+    uint16_t addr = 0;
+    uint16_t deferred = 0;
+    uint16_t mode = (machine->IR & 07000) >> 9;
+    uint16_t reg = (machine->IR & 00700) >> 6;
     switch (mode) {
+        // Register: SP
         case 0:
             machine->memory->src = translate_register(reg);
+            break;
+
+        // Deferred: (SP), top of the stack
+        case 1:
+            machine->memory->src = machine->memory->get_r(machine->memory, reg);
+            break;
+
+        // Autoincrement: (Rn)+, get top of stack and then pop it
+        case 2:
+            machine->memory->src = machine->memory->get_r(machine->memory, reg);
+            machine->memory->word_advance_r(machine->memory, reg);
+            break;
+
+        // Deferred autoincrement: @(SP)+, top of stack is a pointer to a value,
+        // then pop it.
+        case 3:
+            deferred = machine->memory->get_r(machine->memory, reg);
+            addr = machine->memory->direct_read_word(machine->memory, deferred);
+            machine->memory->word_advance_r(machine->memory, reg);
+            machine->memory->src = addr;
+            break;
+
+        // Autodecrement: -(SP), push value onto stack.
+        case 4:
+            machine->memory->word_decrease_r(machine->memory, reg);
+            addr = machine->memory->get_r(machine->memory, reg);
+            machine->memory->src = addr;
+            break;
+
+        // Indexed: X(SP), access item X on the stack
+        case 6:
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_word(machine->memory, pc);
+            addr = machine->memory->get_r(machine->memory, reg);
+            machine->memory->src = addr + index;
+            break;
+
+        // Deferred index: @X(SP), access item pointed to by item X on the stack
+        case 7:
+            machine->memory->word_advance_r(machine->memory, R_PC);
+            pc = machine->memory->get_r(machine->memory, R_PC);
+            index = machine->memory->direct_read_word(machine->memory, pc);
+            addr = machine->memory->get_r(machine->memory, reg);
+            machine->memory->src = machine->memory->direct_read_word(machine->memory, addr + index);
             break;
     }
 }
@@ -454,17 +543,6 @@ void setup_pc_src_byte_addressing(machine_state_t *machine)
     }
 }
 
-void setup_sp_src_byte_addressing(machine_state_t *machine)
-{
-    uint16_t mode = (machine->IR & 070) >> 3;
-    uint16_t reg = machine->IR & 007;
-    switch (mode) {
-        case 0:
-            machine->memory->src = translate_register(reg);
-            break;
-    }
-}
-
 void setup_general_src_byte_addressing(machine_state_t *machine)
 {
     uint16_t pc = 0;
@@ -550,7 +628,7 @@ void setup_src_byte_addressing(machine_state_t *machine)
             setup_pc_src_byte_addressing(machine);
             break;
         case 6:
-            setup_sp_src_byte_addressing(machine);
+            setup_sp_src_addressing(machine);
             break;
         default:
             setup_general_src_byte_addressing(machine);
@@ -1268,9 +1346,10 @@ void JSR(machine_state_t *machine)
     uint16_t tmp = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
     uint16_t reg_contents = machine->memory->get_r(machine->memory, reg);
 
+    machine->memory->word_decrease_r(machine->memory, R_SP);
     uint16_t sp = machine->memory->get_r(machine->memory, R_SP);
     machine->memory->direct_write_word(machine->memory, sp, reg_contents);
-    machine->memory->word_decrease_r(machine->memory, R_SP);
+
 
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     machine->memory->set_r(machine->memory, reg, pc);

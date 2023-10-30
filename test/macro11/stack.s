@@ -1,0 +1,10 @@
+		MOV #400, SP
+		MOV #4, -(SP)
+		MOV #5, -(SP)
+		JSR PC, #ADDSP
+		HALT
+
+ADDSP:	MOV 2(SP), R0
+		MOV 4(SP), R1
+		ADD R0, R1
+		RTS PC
