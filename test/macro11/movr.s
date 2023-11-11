@@ -1,0 +1,5 @@
+		MOV s000, R0
+		INC R0
+		MOV R0, s000
+		HALT
+s000:	.WORD 4

@@ -90,6 +90,7 @@ void run_machine(machine_state_t *machine)
         uint16_t PC = machine->memory->get_r(machine->memory, R_PC);
         machine->memory->src = PC;
         machine->IR = machine->memory->read_word(machine->memory);
+        machine->memory->word_advance_r(machine->memory, R_PC);
 
         if (machine->STEP) {
             dump_state(machine, true);
