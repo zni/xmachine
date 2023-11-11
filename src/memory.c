@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include "include/memory.h"
 #include "include/tty.h"
@@ -99,7 +100,7 @@ void byte_advance(memory_t *m, uint16_t loc)
     uint16_t val = m->_memory[loc] | (m->_memory[loc + 1] << 8);
     val += 1;
     m->_memory[loc] = val & 0377;
-    m->_memory[loc + 1] = (val & 0177400) >> 8;   
+    m->_memory[loc + 1] = (val & 0177400) >> 8;
 }
 
 void word_decrease(memory_t *m, uint16_t loc)

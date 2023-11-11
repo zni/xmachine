@@ -242,7 +242,7 @@ void setup_general_dest_byte_addressing(machine_state_t *machine)
     switch (mode) {
         // Register: Rn
         case 0:
-            machine->memory->dest = translate_register(reg);;
+            machine->memory->dest = translate_register(reg);
             break;
 
         // Deferred: (Rn)
@@ -550,7 +550,7 @@ void setup_pc_src_byte_addressing(machine_state_t *machine)
             relative = machine->memory->direct_read_word(machine->memory, pc);
             machine->memory->word_advance_r(machine->memory, R_PC);
             pc = machine->memory->get_r(machine->memory, R_PC);
-            machine->memory->dest = pc + relative;;
+            machine->memory->src = pc + relative;
             break;
     }
 }
