@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <threads.h>
 #include <unistd.h>
 
 #include "include/handlers.h"
@@ -114,6 +115,7 @@ void run_machine(machine_state_t *machine)
 void shutdown_machine(machine_state_t *machine)
 {
     thrd_join(machine->disk_thread, NULL);
+    destroy_memory_mtx();
 
     free_memory(&machine->memory);
     machine->memory = NULL;
@@ -143,7 +145,7 @@ int main(int argc, char** argv)
     bool step = false;
     bool list_only = false;
     for (int i = 1; i < argc; i++) {
-        if (strnlen(argv[1], 2) < 2 && argv[i][0] != '-') {
+        if (strlen(argv[1]) < 2 && argv[i][0] != '-') {
             continue;
         }
 

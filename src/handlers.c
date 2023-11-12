@@ -660,6 +660,34 @@ void set_zero_flag(machine_state_t *machine, uint16_t value)
     }
 }
 
+void set_negative_flag_b(machine_state_t *machine, uint8_t value)
+{
+    uint16_t PS = 0;
+    uint8_t mask = 0200;
+    if (value & mask) {
+        PS = machine->memory->get_r(machine->memory, R_PS);
+        machine->memory->set_r(machine->memory, R_PS, PS | NEGATIVEFLAG);
+    } else {
+        PS = machine->memory->get_r(machine->memory, R_PS);
+        PS = (PS & NEGATIVEFLAG) ? (PS ^ NEGATIVEFLAG) : PS;
+        machine->memory->set_r(machine->memory, R_PS, PS);
+    }
+}
+
+void set_negative_flag_w(machine_state_t *machine, uint16_t value)
+{
+    uint16_t PS = 0;
+    uint16_t mask = 0100000;
+    if (value & mask) {
+        PS = machine->memory->get_r(machine->memory, R_PS);
+        machine->memory->set_r(machine->memory, R_PS, PS | NEGATIVEFLAG);
+    } else {
+        PS = machine->memory->get_r(machine->memory, R_PS);
+        PS = (PS & NEGATIVEFLAG) ? (PS ^ NEGATIVEFLAG) : PS;
+        machine->memory->set_r(machine->memory, R_PS, PS);
+    }
+}
+
 int8_t get_branch_offset(machine_state_t *machine)
 {
     return (int8_t) (machine->IR & 0377);
@@ -698,12 +726,11 @@ void BEQ(machine_state_t *machine)
 {
     // Branch is relying on PC being advanced to next instruction.
 
-
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
     machine->ALU = ps & ZEROFLAG;
-    if (machine->ALU)
+    if (machine->ALU == ZEROFLAG)
         machine->memory->set_r(machine->memory, R_PC, pc + (2 * OFFSET));
 }
 
@@ -766,8 +793,6 @@ void BLE(machine_state_t *machine)
 void BPL(machine_state_t *machine)
 {
     // Branch is relying on PC being advanced to next instruction.
-
-
     uint16_t pc = machine->memory->get_r(machine->memory, R_PC);
     uint16_t ps = machine->memory->get_r(machine->memory, R_PS);
     int8_t OFFSET = get_branch_offset(machine);
@@ -871,10 +896,10 @@ void MOV(machine_state_t *machine)
 {
     setup_src_addressing(machine);
     setup_dest_addressing(machine);
-
     machine->ALU = machine->memory->read_word(machine->memory);
     machine->memory->write_word(machine->memory, machine->ALU);
     set_zero_flag(machine, machine->ALU);
+    set_negative_flag_w(machine, machine->ALU);
 }
 
 void MOVB(machine_state_t *machine)
@@ -886,6 +911,7 @@ void MOVB(machine_state_t *machine)
     machine->memory->write_byte(machine->memory, machine->ALU);
 
     set_zero_flag(machine, machine->ALU);
+    set_negative_flag_b(machine, machine->ALU);
 }
 
 void CMP(machine_state_t *machine)
@@ -917,9 +943,7 @@ void BIT(machine_state_t *machine)
 
     machine->ALU = machine->memory->read_word(machine->memory);
     machine->ALU &= machine->memory->direct_read_word(machine->memory, machine->memory->dest);
-    machine->memory->write_word(machine->memory, machine->ALU);
     set_zero_flag(machine, machine->ALU);
-
 }
 
 void BITB(machine_state_t *machine)
@@ -1038,7 +1062,7 @@ void INC(machine_state_t *machine)
 {
     setup_dest_addressing(machine);
     uint16_t word = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
-    word++;
+    ++word;
     machine->memory->write_word(machine->memory, word);
 
 }
@@ -1137,6 +1161,7 @@ void TST(machine_state_t *machine)
     setup_dest_addressing(machine);
     machine->ALU = machine->memory->direct_read_word(machine->memory, machine->memory->dest);
     set_zero_flag(machine, machine->ALU);
+    set_negative_flag_w(machine, machine->ALU);
 
 }
 
@@ -1145,7 +1170,7 @@ void TSTB(machine_state_t *machine)
     setup_dest_byte_addressing(machine);
     machine->ALU = machine->memory->direct_read_byte(machine->memory, machine->memory->dest);
     set_zero_flag(machine, machine->ALU);
-
+    set_negative_flag_b(machine, machine->ALU);
 }
 
 void ROR(machine_state_t *machine)
