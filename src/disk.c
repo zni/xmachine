@@ -27,12 +27,29 @@ void fill_buffer(disk_t *disk, memory_t *memory)
 
 void empty_buffer(disk_t *disk, memory_t *memory)
 {
-    printf("%s()\n", __FUNCTION__);
+    if (disk->index == SECTOR_SIZE) {
+        memory->direct_write_word(memory, RXCS, RXCS_DONE);
+        disk->index = 0;
+        disk->state = S_DONE;
+        disk->current_func = F_IDLE;
+        return;
+    }
+
+    uint16_t flags = memory->direct_read_word(memory, RXCS);
+    uint16_t xfer_status = (flags & RXCS_XFER) >> 7;
+    if (!xfer_status) {
+        memory->direct_write_word(memory, RXCS, 0);
+        memory->direct_write_byte(memory, RXDB, disk->index);
+        disk->index++;
+        memory->direct_write_word(memory, RXCS, RXCS_XFER);
+    }
 }
 
 void write_sector(disk_t *disk, memory_t *memory)
 {
-    printf("%s()\n", __FUNCTION__);
+    if (disk->state == S_SECTOR) {
+
+    }
 }
 
 void read_sector(disk_t *disk, memory_t *memory)
@@ -85,7 +102,6 @@ void exec_disk(disk_t *disk, memory_t *memory)
     uint16_t go;
     while (!bus_shutdown) {
         R_RXCS = memory->direct_read_word(memory, RXCS);
-        printf("%s(%07o)\n", __FUNCTION__, R_RXCS);
         go = RXCS_GO & R_RXCS;
         if (go && ((disk->state == S_BEGIN) || (disk->state == S_DONE))) {
             memory->direct_write_word(memory, RXCS, 0);
@@ -98,8 +114,12 @@ void exec_disk(disk_t *disk, memory_t *memory)
                     disk->current_func = F_FILL_BUFFER;
                     break;
                 case F_EMPTY_BUFFER:
+                    disk->state = S_EMPTY;
+                    disk->current_func = F_EMPTY_BUFFER;
                     break;
                 case F_WRITE_SECTOR:
+                    disk->state = S_SECTOR;
+                    disk->current_func = F_WRITE_SECTOR;
                     break;
                 case F_READ_SECTOR:
                     break;
@@ -114,10 +134,17 @@ void exec_disk(disk_t *disk, memory_t *memory)
                 default:
                     break;
             }
+
         } else if ((disk->state == S_FILL) &&
                    (disk->current_func == F_FILL_BUFFER)) {
             thrd_sleep(&(struct timespec){.tv_nsec=5000000}, NULL);
             disk->fill_buffer(disk, memory);
+
+        } else if ((disk->state == S_EMPTY) &&
+                   (disk->current_func == F_EMPTY_BUFFER)) {
+            thrd_sleep(&(struct timespec){.tv_nsec=5000000}, NULL);
+            disk->empty_buffer(disk, memory);
+
         } else if (disk->state == S_DONE) {
             printf("%s(flags: %07o)\n", __FUNCTION__, R_RXCS);
             memory->direct_write_word(memory, RXCS, RXCS_DONE);
