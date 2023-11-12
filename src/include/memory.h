@@ -20,6 +20,12 @@
 #define R7 017416
 #define R8 017420
 
+#define R_R0 0
+#define R_R1 1
+#define R_R2 2
+#define R_R3 3
+#define R_R4 4
+#define R_R5 5
 #define R_SP 6
 #define R_PC 7
 #define R_PS 8

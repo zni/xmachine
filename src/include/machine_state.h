@@ -6,12 +6,15 @@
 
 #include "memory.h"
 
-#define IPLBITS         0340
-#define TRAPFLAG        0020
-#define NEGATIVEFLAG    0010
-#define ZEROFLAG        0004
-#define OVERFLOWFLAG    0002
-#define CARRYFLAG       0001
+// Processor Status Fields
+#define CURRMODE        0140000
+#define PREVMODE        0030000
+#define IPLBITS         0000340
+#define TRAPFLAG        0000020
+#define NEGATIVEFLAG    0000010
+#define ZEROFLAG        0000004
+#define OVERFLOWFLAG    0000002
+#define CARRYFLAG       0000001
 
 
 typedef struct machine_state {
