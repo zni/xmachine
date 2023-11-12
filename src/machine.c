@@ -18,9 +18,15 @@ void init_machine(machine_state_t *machine, bool step)
     machine->IR = 0;
     machine->HALTED = false;
     machine->STEP = step;
+
     machine->memory = NULL;
     initialize_memory(&(machine->memory));
+    machine->memory->bus_shutdown = false;
+
     init_tty_subsystem(machine);
+    machine->disk_ss.disk = new_disk();
+    machine->disk_ss.memory = machine->memory;
+    thrd_create(&machine->disk_thread, start_disk_subsystem, &(machine->disk_ss));
 }
 
 void load_program_from_mcode(machine_state_t *machine, char *program)
@@ -101,13 +107,19 @@ void run_machine(machine_state_t *machine)
         exec_tty_kb(machine);
         exec_tty_print(machine);
     }
+
+    machine->memory->bus_shutdown = machine->HALTED;
 }
 
 void shutdown_machine(machine_state_t *machine)
 {
+    thrd_join(machine->disk_thread, NULL);
+
     free_memory(&machine->memory);
     machine->memory = NULL;
 
+
+    free_disk(&(machine->disk_ss.disk));
     shutdown_tty_subsystem();
 }
 

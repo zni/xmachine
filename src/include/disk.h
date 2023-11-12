@@ -28,6 +28,14 @@ typedef enum disk_func {
     F_IDLE
 } disk_func_t;
 
+typedef enum disk_state {
+    S_BEGIN,
+    S_SECTOR,
+    S_TRACK,
+    S_FILL,
+    S_EMPTY
+} disk_state_t;
+
 struct disk;
 typedef struct disk disk_t;
 struct disk {
@@ -37,16 +45,22 @@ struct disk {
     uint8_t sector;
 
     disk_func_t current_func;
+    disk_state_t state;
 
-    void (*fill_buffer)(disk_t*);
-    void (*empty_buffer)(disk_t*);
-    void (*read_sector)(disk_t*);
-    void (*write_sector)(disk_t*);
+    void (*fill_buffer)(disk_t*, memory_t*);
+    void (*empty_buffer)(disk_t*, memory_t*);
+    void (*read_sector)(disk_t*, memory_t*);
+    void (*write_sector)(disk_t*, memory_t*);
 };
+
+typedef struct disk_subsystem {
+    disk_t *disk;
+    memory_t *memory;
+} disk_subsystem_t;
 
 disk_t* new_disk();
 void free_disk(disk_t**);
 
-void exec_disk(memory_t*);
+int start_disk_subsystem(void*);
 
 #endif
