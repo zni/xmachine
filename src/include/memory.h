@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <threads.h>
 
 #define MEMBYTES 65535
 #define MEMWORDS 32767
@@ -80,6 +81,7 @@ struct side_effect {
 uint16_t translate_register(uint16_t);
 
 void initialize_memory(memory_t**);
+void destroy_memory_mtx();
 void free_memory(memory_t**);
 
 #endif

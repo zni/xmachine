@@ -33,7 +33,8 @@ typedef enum disk_state {
     S_SECTOR,
     S_TRACK,
     S_FILL,
-    S_EMPTY
+    S_EMPTY,
+    S_DONE
 } disk_state_t;
 
 struct disk;

@@ -7,7 +7,22 @@ void exec_disk(disk_t*, memory_t*);
 
 void fill_buffer(disk_t *disk, memory_t *memory)
 {
-    printf("%s()\n", __FUNCTION__);
+    if (disk->index == SECTOR_SIZE) {
+        memory->direct_write_word(memory, RXCS, RXCS_DONE);
+        disk->index = 0;
+        disk->state = S_DONE;
+        disk->current_func = F_IDLE;
+        return;
+    }
+
+    uint16_t flags = memory->direct_read_word(memory, RXCS);
+    uint16_t xfer_status = (flags & RXCS_XFER) >> 7;
+    if (!xfer_status) {
+        memory->direct_write_word(memory, RXCS, 0);
+        memory->direct_write_byte(memory, RXDB, disk->index);
+        disk->index++;
+        memory->direct_write_word(memory, RXCS, RXCS_XFER);
+    }
 }
 
 void empty_buffer(disk_t *disk, memory_t *memory)
@@ -34,6 +49,7 @@ disk_t* new_disk()
     disk->index = 0;
 
     disk->current_func = F_IDLE;
+    disk->state = S_BEGIN;
 
     disk->fill_buffer = &fill_buffer;
     disk->empty_buffer = &empty_buffer;
@@ -49,14 +65,31 @@ void free_disk(disk_t **disk)
     *disk = NULL;
 }
 
+void clear_RXDB(memory_t *memory)
+{
+    memory->direct_write_word(memory, RXDB, 0);
+    uint16_t R_RXCS = memory->direct_read_word(memory, RXCS);
+    uint16_t flags = 0;
+    if ((R_RXCS & RXCS_XFER) && (R_RXCS & RXCS_DONE)) {
+        flags = RXCS_DONE;
+        memory->direct_write_word(memory, RXCS, flags);
+    } else {
+        memory->direct_write_word(memory, RXCS, flags);
+    }
+}
+
 void exec_disk(disk_t *disk, memory_t *memory)
 {
     bool bus_shutdown = memory->bus_shutdown;
-
+    uint16_t R_RXCS;
+    uint16_t go;
     while (!bus_shutdown) {
-        uint16_t R_RXCS = memory->direct_read_word(memory, RXCS);
-        uint16_t go = RXCS_GO & R_RXCS;
-        if (go && disk->state == S_BEGIN) {
+        R_RXCS = memory->direct_read_word(memory, RXCS);
+        printf("%s(%07o)\n", __FUNCTION__, R_RXCS);
+        go = RXCS_GO & R_RXCS;
+        if (go && ((disk->state == S_BEGIN) || (disk->state == S_DONE))) {
+            memory->direct_write_word(memory, RXCS, 0);
+
             uint16_t function = (RXCS_FS & R_RXCS) >> 1;
 
             switch (function) {
@@ -83,9 +116,13 @@ void exec_disk(disk_t *disk, memory_t *memory)
             }
         } else if ((disk->state == S_FILL) &&
                    (disk->current_func == F_FILL_BUFFER)) {
+            thrd_sleep(&(struct timespec){.tv_nsec=5000000}, NULL);
             disk->fill_buffer(disk, memory);
+        } else if (disk->state == S_DONE) {
+            printf("%s(flags: %07o)\n", __FUNCTION__, R_RXCS);
+            memory->direct_write_word(memory, RXCS, RXCS_DONE);
+            thrd_sleep(&(struct timespec){.tv_sec=5}, NULL);
         }
-
         bus_shutdown = memory->bus_shutdown;
     }
 }
@@ -93,6 +130,7 @@ void exec_disk(disk_t *disk, memory_t *memory)
 int start_disk_subsystem(void *disk_ss)
 {
     disk_subsystem_t *ds = (disk_subsystem_t *) disk_ss;
+    ds->memory->register_read_side_effect(ds->memory, RXDB, clear_RXDB);
     exec_disk(ds->disk, ds->memory);
     return 0;
 }
