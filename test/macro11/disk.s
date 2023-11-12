@@ -1,0 +1,4 @@
+		MOV RXCS, R0
+		MOV #1, (R0)
+		HALT
+RXCS:	.WORD 177170

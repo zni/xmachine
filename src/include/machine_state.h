@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <threads.h>
 
 #include "memory.h"
 #include "disk.h"
@@ -24,7 +25,8 @@ typedef struct machine_state {
     bool HALTED;
     bool STEP;
     memory_t *memory;
-    disk_t *disk;
+    disk_subsystem_t disk_ss;
+    thrd_t disk_thread;
 } machine_state_t;
 
 #endif

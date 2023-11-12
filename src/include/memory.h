@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define MEMBYTES 16384
-#define MEMWORDS 8192
+#define MEMBYTES 65535
+#define MEMWORDS 32767
 
 #define MAX_HANDLERS 20
 #define INACTIVE_HANDLER_LOC 0xFFFF
@@ -68,6 +68,8 @@ struct memory {
     side_effect_t *write_side_effects;
 
     uint8_t *_memory;
+
+    bool bus_shutdown;
 };
 
 struct side_effect {
