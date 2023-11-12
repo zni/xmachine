@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "memory.h"
+#include "disk.h"
 
 // Processor Status Fields
 #define CURRMODE        0140000
@@ -23,6 +24,7 @@ typedef struct machine_state {
     bool HALTED;
     bool STEP;
     memory_t *memory;
+    disk_t *disk;
 } machine_state_t;
 
 #endif
