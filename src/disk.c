@@ -9,7 +9,6 @@ void fill_buffer(disk_t *disk, memory_t *memory)
 {
     uint16_t flags = memory->direct_read_word(memory, RXCS);
     if (disk->index == SECTOR_SIZE) {
-        memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_DONE);
         disk->index = 0;
         disk->state = S_DONE;
         disk->current_func = F_IDLE;
@@ -36,7 +35,6 @@ void empty_buffer(disk_t *disk, memory_t *memory)
 {
     uint16_t flags = memory->direct_read_word(memory, RXCS);
     if (disk->index == SECTOR_SIZE) {
-        memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_DONE);
         disk->index = 0;
         disk->state = S_DONE;
         disk->current_func = F_IDLE;
@@ -83,7 +81,6 @@ void write_sector(disk_t *disk, memory_t *memory)
         disk->current_func = F_IDLE;
         disk->sector = 0;
         disk->track = 0;
-        memory->direct_write_word_OR(memory, RXCS, flags | RXCS_DONE);
     }
 }
 
@@ -118,7 +115,6 @@ void read_sector(disk_t *disk, memory_t *memory)
         disk->current_func = F_IDLE;
         disk->sector = 0;
         disk->track = 0;
-        memory->direct_write_word_OR(memory, RXCS, flags | RXCS_DONE);
     }
 }
 
@@ -159,13 +155,19 @@ void clear_RXDB(memory_t *memory)
 {
     memory->direct_write_word_n(memory, RXDB, 0);
     uint16_t flags = memory->direct_read_word(memory, RXCS);
-    memory->direct_write_word_n(memory, RXCS, flags ^ RXCS_XFER);
+    if (flags & RXCS_XFER) {
+        flags ^= RXCS_XFER;
+    }
+    memory->direct_write_word_n(memory, RXCS, flags);
 }
 
 void clear_RXCS(memory_t *memory)
 {
     uint16_t flags = memory->direct_read_word(memory, RXCS);
-    memory->direct_write_word_n(memory, RXCS, flags ^ RXCS_XFER);
+    if (flags & RXCS_XFER) {
+        flags ^= RXCS_XFER;
+    }
+    memory->direct_write_word_n(memory, RXCS, flags);
 }
 
 void exec_disk(disk_t *disk, memory_t *memory)
@@ -236,7 +238,6 @@ void exec_disk(disk_t *disk, memory_t *memory)
             disk->state = S_BEGIN;
             printf("%s(S_DONE, flags: %07o)\n", __FUNCTION__, R_RXCS);
             memory->direct_write_word_OR(memory, RXCS, R_RXCS | RXCS_DONE);
-            //thrd_sleep(&(struct timespec){.tv_sec=1}, NULL);
             thrd_sleep(&(struct timespec){.tv_nsec=5000000}, NULL);
         }
         bus_shutdown = memory->bus_shutdown;
