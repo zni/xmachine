@@ -9,6 +9,9 @@ mtx_t memory_subsystem_write_mtx;
 void process_write_side_effects(memory_t*, uint16_t);
 void process_read_side_effects(memory_t*, uint16_t);
 
+/**
+ * Translate register number to memory mapped location.
+ */
 uint16_t translate_register(uint16_t reg)
 {
     switch (reg) {
@@ -34,6 +37,9 @@ uint16_t translate_register(uint16_t reg)
     }
 }
 
+/**
+ * Write a word to the location specified by `memory->dest`.
+ */
 void write_word(memory_t *m, uint16_t word)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -45,6 +51,9 @@ void write_word(memory_t *m, uint16_t word)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Write a byte to the location specified by `memory->dest`.
+ */
 void write_byte(memory_t *m, uint8_t byte)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -55,34 +64,42 @@ void write_byte(memory_t *m, uint8_t byte)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Read a word from the location specified by `memory->src`.
+ */
 uint16_t read_word(memory_t *m)
 {
     uint16_t word = m->_memory[m->src] | (m->_memory[m->src + 1] << 8);
     process_read_side_effects(m, m->src);
 
     return word;
-
-
 }
 
+/**
+ * Read a byte from the location specified by `memory->src`.
+ */
 uint8_t read_byte(memory_t *m)
 {
-
     uint8_t byte = m->_memory[m->src];
     process_read_side_effects(m, m->src);
 
     return byte;
 }
 
+/**
+ * Read a word from the location specified by `loc`.
+ */
 uint16_t direct_read_word(memory_t *m, uint16_t loc)
 {
-
     uint16_t word = (m->_memory[loc] | (m->_memory[loc + 1] << 8));
     process_read_side_effects(m, loc);
 
     return word;
 }
 
+/**
+ * Read a byte from the location specified by `loc`.
+ */
 uint8_t direct_read_byte(memory_t *m, uint16_t loc)
 {
 
@@ -92,6 +109,10 @@ uint8_t direct_read_byte(memory_t *m, uint16_t loc)
     return byte;
 }
 
+/**
+ * Read a word from the location specified by `loc`.
+ * DO NOT process side effects.
+ */
 uint16_t direct_read_word_n(memory_t *m, uint16_t loc)
 {
 
@@ -100,6 +121,10 @@ uint16_t direct_read_word_n(memory_t *m, uint16_t loc)
     return word;
 }
 
+/**
+ * Read a byte from the location specified by `loc`.
+ * DO NOT process side effects.
+ */
 uint8_t direct_read_byte_n(memory_t *m, uint16_t loc)
 {
 
@@ -108,6 +133,9 @@ uint8_t direct_read_byte_n(memory_t *m, uint16_t loc)
     return byte;
 }
 
+/**
+ * Write a word to the location specified by `loc`.
+ */
 void direct_write_word(memory_t *m, uint16_t loc, uint16_t v)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -119,6 +147,9 @@ void direct_write_word(memory_t *m, uint16_t loc, uint16_t v)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Write a byte to the location specified by `loc`.
+ */
 void direct_write_byte(memory_t *m, uint16_t loc, uint8_t v)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -129,6 +160,10 @@ void direct_write_byte(memory_t *m, uint16_t loc, uint8_t v)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Write a word to the location specified by `loc`.
+ * DO NOT process side effects.
+ */
 void direct_write_word_n(memory_t *m, uint16_t loc, uint16_t v)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -139,6 +174,10 @@ void direct_write_word_n(memory_t *m, uint16_t loc, uint16_t v)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Write a byte to the location specified by `loc`.
+ * DO NOT process side effects.
+ */
 void direct_write_byte_n(memory_t *m, uint16_t loc, uint8_t v)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -148,6 +187,11 @@ void direct_write_byte_n(memory_t *m, uint16_t loc, uint8_t v)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Write a word to the location specified by `loc`, ORing it with
+ * the current contents of the memory location.
+ * DO NOT process side effects.
+ */
 void direct_write_word_OR(memory_t *m, uint16_t loc, uint16_t v)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -158,6 +202,9 @@ void direct_write_word_OR(memory_t *m, uint16_t loc, uint16_t v)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Advance word at location by 2.
+ */
 void word_advance(memory_t *m, uint16_t loc)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -170,6 +217,9 @@ void word_advance(memory_t *m, uint16_t loc)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Advance byte at location by 1.
+ */
 void byte_advance(memory_t *m, uint16_t loc)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -182,6 +232,9 @@ void byte_advance(memory_t *m, uint16_t loc)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Decrease word at location by 2.
+ */
 void word_decrease(memory_t *m, uint16_t loc)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -194,6 +247,9 @@ void word_decrease(memory_t *m, uint16_t loc)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Decrease byte at location by 1.
+ */
 void byte_decrease(memory_t *m, uint16_t loc)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -206,6 +262,9 @@ void byte_decrease(memory_t *m, uint16_t loc)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Advance word in register by 2.
+ */
 void word_advance_r(memory_t *m, uint16_t r)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -219,6 +278,9 @@ void word_advance_r(memory_t *m, uint16_t r)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Advance byte in register by 2.
+ */
 void byte_advance_r(memory_t *m, uint16_t r)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -232,6 +294,9 @@ void byte_advance_r(memory_t *m, uint16_t r)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Decrease word in register by 2.
+ */
 void word_decrease_r(memory_t *m, uint16_t r)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -245,6 +310,9 @@ void word_decrease_r(memory_t *m, uint16_t r)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Decrease byte in register by 1.
+ */
 void byte_decrease_r(memory_t *m, uint16_t r)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -258,7 +326,11 @@ void byte_decrease_r(memory_t *m, uint16_t r)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
-// TODO probably split this out into a byte and word version.
+/**
+ * Set word in register to `val`.
+ *
+ * TODO probably split this out into a byte and word version.
+ */
 void set_r(memory_t *m, uint16_t r, uint16_t val)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -270,7 +342,11 @@ void set_r(memory_t *m, uint16_t r, uint16_t val)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
-// TODO probably split this out into a byte and word version.
+/**
+ * Get word in register.
+ *
+ * TODO probably split this out into a byte and word version.
+ */
 uint16_t get_r(memory_t *m, uint16_t r)
 {
 
@@ -280,6 +356,10 @@ uint16_t get_r(memory_t *m, uint16_t r)
     return value;
 }
 
+/**
+ * Register a read side effect.
+ * These will be processed when the location `loc` is read.
+ */
 bool register_read_side_effect(memory_t *m, uint16_t loc, void (*handler)(memory_t*))
 {
     for (int i = 0; i < MAX_HANDLERS; i++) {
@@ -293,6 +373,9 @@ bool register_read_side_effect(memory_t *m, uint16_t loc, void (*handler)(memory
     return false;
 }
 
+/**
+ * Process read side effects at location `loc`.
+ */
 void process_read_side_effects(memory_t *m, uint16_t loc)
 {
     for (int i = 0; i < MAX_HANDLERS; i++) {
@@ -303,6 +386,10 @@ void process_read_side_effects(memory_t *m, uint16_t loc)
     }
 }
 
+/**
+ * Register a write side effect.
+ * These will be processed when the location `loc` is written to.
+ */
 bool register_write_side_effect(memory_t *m, uint16_t loc, void (*handler)(memory_t*))
 {
     for (int i = 0; i < MAX_HANDLERS; i++) {
@@ -316,6 +403,9 @@ bool register_write_side_effect(memory_t *m, uint16_t loc, void (*handler)(memor
     return false;
 }
 
+/**
+ * Process write side effects at location `loc`.
+ */
 void process_write_side_effects(memory_t *m, uint16_t loc)
 {
     for (int i = 0; i < MAX_HANDLERS; i++) {
@@ -327,6 +417,10 @@ void process_write_side_effects(memory_t *m, uint16_t loc)
 }
 
 
+/**
+ * Initialize a memory_t struct.
+ * This sets up function pointers and default values.
+ */
 void initialize_memory(memory_t **m)
 {
     *m = malloc(sizeof(memory_t));
@@ -380,11 +474,17 @@ void initialize_memory(memory_t **m)
     mtx_init(&memory_subsystem_write_mtx, mtx_plain|mtx_recursive);
 }
 
+/**
+ * Destroy the mutex(es) held by memory.
+ */
 void destroy_memory_mtx()
 {
     mtx_destroy(&memory_subsystem_write_mtx);
 }
 
+/**
+ * Free a memory_t struct.
+ */
 void free_memory(memory_t **m)
 {
     free((*m)->_memory);
