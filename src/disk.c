@@ -7,8 +7,9 @@ void exec_disk(disk_t*, memory_t*);
 
 void fill_buffer(disk_t *disk, memory_t *memory)
 {
+    uint16_t flags = memory->direct_read_word(memory, RXCS);
     if (disk->index == SECTOR_SIZE) {
-        memory->direct_write_word(memory, RXCS, RXCS_DONE);
+        memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_DONE);
         disk->index = 0;
         disk->state = S_DONE;
         disk->current_func = F_IDLE;
@@ -16,37 +17,38 @@ void fill_buffer(disk_t *disk, memory_t *memory)
     }
 
     uint8_t data = 0;
-    uint16_t flags = memory->direct_read_word(memory, RXCS);
     uint16_t xfer_status = (flags & RXCS_XFER);
+    printf("\t%s(flags: %07o)\n", __FUNCTION__, flags);
     if (xfer_status != RXCS_XFER) {
-        memory->direct_write_word(memory, RXCS, 0);
+        memory->direct_write_word_OR(memory, RXCS, flags);
         data = memory->direct_read_byte_n(memory, RXDB);
         printf("\tfetching data, %d: %04o\n", disk->index, data);
         disk->buffer[disk->index] = data;
         disk->index++;
-        memory->direct_write_word(memory, RXCS, RXCS_XFER);
+        memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_XFER);
     } else {
         printf("\twaiting for write to register\n");
+        thrd_sleep(&(struct timespec){.tv_nsec=5000000}, NULL);
     }
 }
 
 void empty_buffer(disk_t *disk, memory_t *memory)
 {
+    uint16_t flags = memory->direct_read_word(memory, RXCS);
     if (disk->index == SECTOR_SIZE) {
-        memory->direct_write_word(memory, RXCS, RXCS_DONE);
+        memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_DONE);
         disk->index = 0;
         disk->state = S_DONE;
         disk->current_func = F_IDLE;
         return;
     }
 
-    uint16_t flags = memory->direct_read_word(memory, RXCS);
-    uint16_t xfer_status = (flags & RXCS_XFER) >> 7;
-    if (!xfer_status) {
-        memory->direct_write_word(memory, RXCS, 0);
+    uint16_t xfer_status = (flags & RXCS_XFER);
+    if (xfer_status != RXCS_XFER) {
+        memory->direct_write_word_OR(memory, RXCS, flags);
         memory->direct_write_byte_n(memory, RXDB, disk->index);
         disk->index++;
-        memory->direct_write_word(memory, RXCS, RXCS_XFER);
+        memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_XFER);
     }
 }
 
@@ -98,14 +100,14 @@ void free_disk(disk_t **disk)
 void clear_RXDB(memory_t *memory)
 {
     memory->direct_write_word_n(memory, RXDB, 0);
-    uint16_t flags = 0;
-    memory->direct_write_word_n(memory, RXCS, flags);
+    uint16_t flags = memory->direct_read_word(memory, RXCS);
+    memory->direct_write_word_n(memory, RXCS, flags ^ RXCS_XFER);
 }
 
 void clear_RXCS(memory_t *memory)
 {
-    uint16_t flags = 0;
-    memory->direct_write_word_n(memory, RXCS, flags);
+    uint16_t flags = memory->direct_read_word(memory, RXCS);
+    memory->direct_write_word_n(memory, RXCS, flags ^ RXCS_XFER);
 }
 
 void exec_disk(disk_t *disk, memory_t *memory)
@@ -116,8 +118,8 @@ void exec_disk(disk_t *disk, memory_t *memory)
     while (!bus_shutdown) {
         R_RXCS = memory->direct_read_word(memory, RXCS);
         go = RXCS_GO & R_RXCS;
-        printf("go(%07o)\n", go);
         if (go && ((disk->state == S_BEGIN) || (disk->state == S_DONE))) {
+            printf("go(%07o)\n", go);
             memory->direct_write_word(memory, RXCS, 0);
 
             uint16_t function = (RXCS_FS & R_RXCS) >> 1;
@@ -164,8 +166,9 @@ void exec_disk(disk_t *disk, memory_t *memory)
         } else if (disk->state == S_DONE) {
             disk->state = S_BEGIN;
             printf("%s(flags: %07o)\n", __FUNCTION__, R_RXCS);
-            memory->direct_write_word(memory, RXCS, RXCS_DONE);
-            thrd_sleep(&(struct timespec){.tv_sec=1}, NULL);
+            memory->direct_write_word_OR(memory, RXCS, R_RXCS | RXCS_DONE);
+            //thrd_sleep(&(struct timespec){.tv_sec=1}, NULL);
+            thrd_sleep(&(struct timespec){.tv_nsec=5000000}, NULL);
         }
         bus_shutdown = memory->bus_shutdown;
     }
