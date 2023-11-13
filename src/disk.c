@@ -5,6 +5,10 @@
 
 void exec_disk(disk_t*, memory_t*);
 
+/**
+ * Fill the disk buffer with bytes from the RXDB register.
+ * This precedes a call to `write_sector`.
+ */
 void fill_buffer(disk_t *disk, memory_t *memory)
 {
     uint16_t flags = memory->direct_read_word(memory, RXCS);
@@ -31,6 +35,9 @@ void fill_buffer(disk_t *disk, memory_t *memory)
     }
 }
 
+/**
+ * Empty the disk's buffer following a read from the disk to RXDB.
+ */
 void empty_buffer(disk_t *disk, memory_t *memory)
 {
     uint16_t flags = memory->direct_read_word(memory, RXCS);
@@ -50,6 +57,9 @@ void empty_buffer(disk_t *disk, memory_t *memory)
     }
 }
 
+/**
+ * Write the data currently held in the disk buffer to disk.
+ */
 void write_sector(disk_t *disk, memory_t *memory)
 {
     uint16_t flags = memory->direct_read_word(memory, RXCS);
@@ -84,6 +94,9 @@ void write_sector(disk_t *disk, memory_t *memory)
     }
 }
 
+/**
+ * Read data from the disk into the disk buffer.
+ */
 void read_sector(disk_t *disk, memory_t *memory)
 {
     uint16_t flags = memory->direct_read_word(memory, RXCS);
@@ -118,6 +131,9 @@ void read_sector(disk_t *disk, memory_t *memory)
     }
 }
 
+/**
+ * Initialize a new `disk_t` struct.
+ */
 disk_t* new_disk()
 {
     disk_t *disk = malloc(sizeof(disk_t));
@@ -137,6 +153,9 @@ disk_t* new_disk()
     return disk;
 }
 
+/**
+ * Free the memory in use by the `disk_t` struct.
+ */
 void free_disk(disk_t **disk)
 {
     for (int i = 0; i < SECTOR_SIZE; i++) {
@@ -151,6 +170,10 @@ void free_disk(disk_t **disk)
     *disk = NULL;
 }
 
+/**
+ * Side effect read handler for RXDB.
+ * Zeroes RXDB and removes the TR flag after a read.
+ */
 void clear_RXDB(memory_t *memory)
 {
     memory->direct_write_word_n(memory, RXDB, 0);
@@ -161,6 +184,10 @@ void clear_RXDB(memory_t *memory)
     memory->direct_write_word_n(memory, RXCS, flags);
 }
 
+/**
+ * Side effect write handler for RXDB.
+ * Clears the TR flag on write to RXDB.
+ */
 void clear_RXCS(memory_t *memory)
 {
     uint16_t flags = memory->direct_read_word(memory, RXCS);
@@ -170,6 +197,11 @@ void clear_RXCS(memory_t *memory)
     memory->direct_write_word_n(memory, RXCS, flags);
 }
 
+/**
+ * The main driver for the disk subsystem.
+ * Process incoming flag commands and call the
+ * related functions.
+ */
 void exec_disk(disk_t *disk, memory_t *memory)
 {
     bool bus_shutdown = memory->bus_shutdown;
@@ -244,6 +276,9 @@ void exec_disk(disk_t *disk, memory_t *memory)
     }
 }
 
+/**
+ * The function to be passed to `thrd_create`.
+ */
 int start_disk_subsystem(void *disk_ss)
 {
     disk_subsystem_t *ds = (disk_subsystem_t *) disk_ss;
