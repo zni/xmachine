@@ -53,6 +53,7 @@ struct memory {
 
     void (*direct_write_word)(memory_t*, uint16_t, uint16_t);
     void (*direct_write_word_n)(memory_t*, uint16_t, uint16_t);
+    void (*direct_write_word_OR)(memory_t*, uint16_t, uint16_t);
 
     void (*direct_write_byte)(memory_t*, uint16_t, uint8_t);
     void (*direct_write_byte_n)(memory_t*, uint16_t, uint8_t);

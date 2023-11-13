@@ -148,6 +148,16 @@ void direct_write_byte_n(memory_t *m, uint16_t loc, uint8_t v)
     mtx_unlock(&memory_subsystem_write_mtx);
 }
 
+void direct_write_word_OR(memory_t *m, uint16_t loc, uint16_t v)
+{
+    mtx_lock(&memory_subsystem_write_mtx);
+
+    m->_memory[loc] |= v & 0377;
+    m->_memory[loc + 1] |= (v & 0177400) >> 8;
+
+    mtx_unlock(&memory_subsystem_write_mtx);
+}
+
 void word_advance(memory_t *m, uint16_t loc)
 {
     mtx_lock(&memory_subsystem_write_mtx);
@@ -344,6 +354,7 @@ void initialize_memory(memory_t **m)
 
     (*m)->direct_write_word = &direct_write_word;
     (*m)->direct_write_word_n = &direct_write_word_n;
+    (*m)->direct_write_word_OR = &direct_write_word_OR;
 
     (*m)->direct_write_byte = &direct_write_byte;
     (*m)->direct_write_byte_n = &direct_write_byte_n;
