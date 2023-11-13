@@ -46,10 +46,16 @@ struct memory {
     uint8_t  (*read_byte)(memory_t*);
 
     uint16_t (*direct_read_word)(memory_t*, uint16_t);
+    uint16_t (*direct_read_word_n)(memory_t*, uint16_t);
+
     uint8_t (*direct_read_byte)(memory_t*, uint16_t);
+    uint8_t (*direct_read_byte_n)(memory_t*, uint16_t);
 
     void (*direct_write_word)(memory_t*, uint16_t, uint16_t);
+    void (*direct_write_word_n)(memory_t*, uint16_t, uint16_t);
+
     void (*direct_write_byte)(memory_t*, uint16_t, uint8_t);
+    void (*direct_write_byte_n)(memory_t*, uint16_t, uint8_t);
 
     void (*word_advance)(memory_t*, uint16_t);
     void (*byte_advance)(memory_t*, uint16_t);
