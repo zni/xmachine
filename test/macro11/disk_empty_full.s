@@ -13,8 +13,9 @@ TR:		BIT DONE, (R0)		; Test if the DONE flag is set.
 
 H:		MOV #OUT, R2
 
-HOLD:	MOV FCMD, (R0)
-		TSTB (R0)
+		MOV FCMD, (R0)
+
+HOLD:	TSTB (R0)
 		BPL HOLD
 
 TRS:	BIT DONE, (R0)
