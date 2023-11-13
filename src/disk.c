@@ -17,14 +17,16 @@ void fill_buffer(disk_t *disk, memory_t *memory)
 
     uint8_t data = 0;
     uint16_t flags = memory->direct_read_word(memory, RXCS);
-    uint16_t xfer_status = (flags & RXCS_XFER) >> 7;
-    if (!xfer_status) {
+    uint16_t xfer_status = (flags & RXCS_XFER);
+    if (xfer_status != RXCS_XFER) {
         memory->direct_write_word(memory, RXCS, 0);
-        data = memory->direct_read_byte(memory, RXDB);
+        data = memory->direct_read_byte_n(memory, RXDB);
         printf("\tfetching data, %d: %04o\n", disk->index, data);
         disk->buffer[disk->index] = data;
         disk->index++;
         memory->direct_write_word(memory, RXCS, RXCS_XFER);
+    } else {
+        printf("\twaiting for write to register\n");
     }
 }
 
@@ -42,7 +44,7 @@ void empty_buffer(disk_t *disk, memory_t *memory)
     uint16_t xfer_status = (flags & RXCS_XFER) >> 7;
     if (!xfer_status) {
         memory->direct_write_word(memory, RXCS, 0);
-        memory->direct_write_byte(memory, RXDB, disk->index);
+        memory->direct_write_byte_n(memory, RXDB, disk->index);
         disk->index++;
         memory->direct_write_word(memory, RXCS, RXCS_XFER);
     }
@@ -95,15 +97,15 @@ void free_disk(disk_t **disk)
 
 void clear_RXDB(memory_t *memory)
 {
-    memory->direct_write_word(memory, RXDB, 0);
+    memory->direct_write_word_n(memory, RXDB, 0);
     uint16_t flags = 0;
-    memory->direct_write_word(memory, RXCS, flags);
+    memory->direct_write_word_n(memory, RXCS, flags);
 }
 
 void clear_RXCS(memory_t *memory)
 {
     uint16_t flags = 0;
-    memory->direct_write_word(memory, RXCS, flags);
+    memory->direct_write_word_n(memory, RXCS, flags);
 }
 
 void exec_disk(disk_t *disk, memory_t *memory)
@@ -163,7 +165,7 @@ void exec_disk(disk_t *disk, memory_t *memory)
             disk->state = S_BEGIN;
             printf("%s(flags: %07o)\n", __FUNCTION__, R_RXCS);
             memory->direct_write_word(memory, RXCS, RXCS_DONE);
-            thrd_sleep(&(struct timespec){.tv_sec=5}, NULL);
+            thrd_sleep(&(struct timespec){.tv_sec=1}, NULL);
         }
         bus_shutdown = memory->bus_shutdown;
     }
