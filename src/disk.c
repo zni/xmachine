@@ -222,20 +222,19 @@ void exec_disk(disk_t *disk, memory_t *memory)
         } else if ((disk->state == S_EMPTY) &&
                    (disk->current_func == F_EMPTY_BUFFER)) {
             printf("%s(S_EMPTY, %07o)\n", __FUNCTION__, R_RXCS);
-            thrd_sleep(&(struct timespec){.tv_nsec=5000000}, NULL);
             disk->empty_buffer(disk, memory);
 
         } else if ((disk->current_func == F_READ_SECTOR)) {
-            printf("%s(%07o)\n", __FUNCTION__, R_RXCS);
+            printf("%s(F_READ_SECTOR, %07o)\n", __FUNCTION__, R_RXCS);
             disk->read_sector(disk, memory);
 
         } else if ((disk->current_func == F_WRITE_SECTOR)) {
-            printf("%s(%07o)\n", __FUNCTION__, R_RXCS);
+            printf("%s(F_WRITE_SECTOR, %07o)\n", __FUNCTION__, R_RXCS);
             disk->write_sector(disk, memory);
 
         } else if (disk->state == S_DONE) {
             disk->state = S_BEGIN;
-            printf("%s(flags: %07o)\n", __FUNCTION__, R_RXCS);
+            printf("%s(S_DONE, flags: %07o)\n", __FUNCTION__, R_RXCS);
             memory->direct_write_word_OR(memory, RXCS, R_RXCS | RXCS_DONE);
             //thrd_sleep(&(struct timespec){.tv_sec=1}, NULL);
             thrd_sleep(&(struct timespec){.tv_nsec=5000000}, NULL);
