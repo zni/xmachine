@@ -54,14 +54,72 @@ void empty_buffer(disk_t *disk, memory_t *memory)
 
 void write_sector(disk_t *disk, memory_t *memory)
 {
-    if (disk->state == S_SECTOR) {
-
+    uint16_t flags = memory->direct_read_word(memory, RXCS);
+    uint16_t xfer_status = (flags & RXCS_XFER);
+    if (disk->state == S_SECTOR && (xfer_status != RXCS_XFER)) {
+        disk->sector = memory->direct_read_byte_n(memory, RXDB);
+        disk->state = S_TRACK;
+        memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_XFER);
+        printf("\t%s(SECTOR, sector: %04o, track: %04o)\n",
+            __FUNCTION__,
+            disk->sector,
+            disk->track
+        );
+    } else if (disk->state == S_TRACK && (xfer_status != RXCS_XFER)) {
+        disk->track = memory->direct_read_byte_n(memory, RXDB);
+        disk->state = S_WRITE;
+        printf("\t%s(TRACK, sector: %04o, track: %04o)\n",
+            __FUNCTION__,
+            disk->sector,
+            disk->track
+        );
+    } else if (disk->state == S_WRITE) {
+        printf("\t%s(WRITE, sector: %04o, track: %04o)\n",
+            __FUNCTION__,
+            disk->sector,
+            disk->track
+        );
+        disk->state = S_DONE;
+        disk->current_func = F_IDLE;
+        disk->sector = 0;
+        disk->track = 0;
+        memory->direct_write_word_OR(memory, RXCS, flags | RXCS_DONE);
     }
 }
 
 void read_sector(disk_t *disk, memory_t *memory)
 {
-    printf("%s()\n", __FUNCTION__);
+    uint16_t flags = memory->direct_read_word(memory, RXCS);
+    uint16_t xfer_status = (flags & RXCS_XFER);
+    if (disk->state == S_SECTOR && (xfer_status != RXCS_XFER)) {
+        disk->sector = memory->direct_read_byte_n(memory, RXDB);
+        disk->state = S_TRACK;
+        memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_XFER);
+        printf("\t%s(SECTOR, sector: %04o, track: %04o)\n",
+            __FUNCTION__,
+            disk->sector,
+            disk->track
+        );
+    } else if (disk->state == S_TRACK && (xfer_status != RXCS_XFER)) {
+        disk->track = memory->direct_read_byte_n(memory, RXDB);
+        disk->state = S_READ;
+        printf("\t%s(TRACK, sector: %04o, track: %04o)\n",
+            __FUNCTION__,
+            disk->sector,
+            disk->track
+        );
+    } else if (disk->state == S_READ) {
+        printf("\t%s(READ, sector: %04o, track: %04o)\n",
+            __FUNCTION__,
+            disk->sector,
+            disk->track
+        );
+        disk->state = S_DONE;
+        disk->current_func = F_IDLE;
+        disk->sector = 0;
+        disk->track = 0;
+        memory->direct_write_word_OR(memory, RXCS, flags | RXCS_DONE);
+    }
 }
 
 disk_t* new_disk()
@@ -119,7 +177,7 @@ void exec_disk(disk_t *disk, memory_t *memory)
         R_RXCS = memory->direct_read_word(memory, RXCS);
         go = RXCS_GO & R_RXCS;
         if (go && ((disk->state == S_BEGIN) || (disk->state == S_DONE))) {
-            printf("go(%07o)\n", go);
+            printf("go(%07o)\n", R_RXCS);
             memory->direct_write_word(memory, RXCS, 0);
 
             uint16_t function = (RXCS_FS & R_RXCS) >> 1;
@@ -137,8 +195,12 @@ void exec_disk(disk_t *disk, memory_t *memory)
                 case F_WRITE_SECTOR:
                     disk->state = S_SECTOR;
                     disk->current_func = F_WRITE_SECTOR;
+                    memory->direct_write_word(memory, RXCS, RXCS_XFER);
                     break;
                 case F_READ_SECTOR:
+                    disk->state = S_SECTOR;
+                    disk->current_func = F_READ_SECTOR;
+                    memory->direct_write_word(memory, RXCS, RXCS_XFER);
                     break;
                 case F_NOT_USED:
                     break;
@@ -162,6 +224,14 @@ void exec_disk(disk_t *disk, memory_t *memory)
             printf("%s(S_EMPTY, %07o)\n", __FUNCTION__, R_RXCS);
             thrd_sleep(&(struct timespec){.tv_nsec=5000000}, NULL);
             disk->empty_buffer(disk, memory);
+
+        } else if ((disk->current_func == F_READ_SECTOR)) {
+            printf("%s(%07o)\n", __FUNCTION__, R_RXCS);
+            disk->read_sector(disk, memory);
+
+        } else if ((disk->current_func == F_WRITE_SECTOR)) {
+            printf("%s(%07o)\n", __FUNCTION__, R_RXCS);
+            disk->write_sector(disk, memory);
 
         } else if (disk->state == S_DONE) {
             disk->state = S_BEGIN;

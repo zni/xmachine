@@ -34,6 +34,8 @@ typedef enum disk_state {
     S_TRACK,
     S_FILL,
     S_EMPTY,
+    S_WRITE,
+    S_READ,
     S_DONE
 } disk_state_t;
 
