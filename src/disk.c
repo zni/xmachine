@@ -83,7 +83,7 @@ void free_disk(disk_t **disk)
 {
     for (int i = 0; i < SECTOR_SIZE; i++) {
         printf("%02x ", (*disk)->buffer[i]);
-        if ((i % 16) == 0 && i != 0) {
+        if (((i + 1) % 16) == 0 && i != 0) {
             putchar('\n');
         }
     }
@@ -151,8 +151,6 @@ void exec_disk(disk_t *disk, memory_t *memory)
         } else if ((disk->state == S_FILL) &&
                    (disk->current_func == F_FILL_BUFFER)) {
             printf("%s(S_FILL, %07o)\n", __FUNCTION__, R_RXCS);
-            thrd_sleep(&(struct timespec){.tv_nsec=5000000}, NULL);
-            //thrd_sleep(&(struct timespec){.tv_sec=1}, NULL);
             disk->fill_buffer(disk, memory);
 
         } else if ((disk->state == S_EMPTY) &&
