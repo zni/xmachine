@@ -28,7 +28,10 @@ void fill_buffer(disk_t *disk, memory_t *memory)
         printf("\tfetching data, %d: %04o\n", disk->index, data);
         disk->buffer[disk->index] = data;
         disk->index++;
-        memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_XFER);
+        if (disk->index != SECTOR_SIZE)
+            memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_XFER);
+        else
+            memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_DONE);
     } else {
         printf("\twaiting for write to register\n");
         thrd_sleep(&(struct timespec){.tv_nsec=5000000}, NULL);
@@ -53,7 +56,10 @@ void empty_buffer(disk_t *disk, memory_t *memory)
         memory->direct_write_word_OR(memory, RXCS, flags);
         memory->direct_write_byte_n(memory, RXDB, disk->index);
         disk->index++;
-        memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_XFER);
+        if (disk->index != SECTOR_SIZE)
+            memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_XFER);
+        else
+            memory->direct_write_word_OR(memory, RXCS, flags ^ RXCS_DONE);
     }
 }
 

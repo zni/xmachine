@@ -6,14 +6,14 @@
 		MOV FCMD, (R0)		; Issue FILL command.
 
 P:		MOV #DAT, R2		; Setup pointer to data.
-H3:		TSTB (R0)			; Wait for TR flag.
+H3:		BIT DONE, (R0)
+		BNE W
+		TSTB (R0)			; Wait for TR flag.
 		BPL H3
 
 		MOVB (R2)+, (R1)	; Move data to RXDB, reset pointer if we move the null byte.
 		BEQ P
 
-		BIT DONE, (R0)		; Are we done?
-		BNE W				; Then branch to sending WRITE.
 		BR H3				; Else start all over again.
 
 W:		MOV WCMD, (R0)		; Issue WRITE command.
