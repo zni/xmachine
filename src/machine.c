@@ -13,7 +13,7 @@
 
 machine_state_t *STATE;
 
-void init_machine(machine_state_t *machine, bool step)
+void init_machine(machine_state_t *machine, bool step, char *disk_image)
 {
     machine->ALU = 0;
     machine->IR = 0;
@@ -25,7 +25,7 @@ void init_machine(machine_state_t *machine, bool step)
     machine->memory->bus_shutdown = false;
 
     init_tty_subsystem(machine);
-    machine->disk_ss.disk = new_disk();
+    machine->disk_ss.disk = new_disk(disk_image);
     machine->disk_ss.memory = machine->memory;
     thrd_create(&machine->disk_thread, start_disk_subsystem, &(machine->disk_ss));
 }
@@ -142,6 +142,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    char *disk = NULL;
     bool step = false;
     bool list_only = false;
     for (int i = 1; i < argc; i++) {
@@ -154,6 +155,10 @@ int main(int argc, char** argv)
             break;
         } else if (strncmp("-s", argv[i], 2) == 0) {
             step = true;
+        } else if (strncmp("-d", argv[i], 2) == 0) {
+            disk = argv[i];
+            disk++;
+            disk++;
         }
     }
 
@@ -172,12 +177,12 @@ int main(int argc, char** argv)
 #endif
 
     if (list_only) {
-        init_machine(&machine, step);
+        init_machine(&machine, step, disk);
         load_program_from_obj(&machine, argv[argc - 1]);
         dump_state(&machine, true);
         shutdown_machine(&machine);
     } else {
-        init_machine(&machine, step);
+        init_machine(&machine, step, disk);
         // load_program_from_mcode(&machine, argv[1]);
         load_program_from_obj(&machine, argv[argc - 1]);
         run_machine(&machine);

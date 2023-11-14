@@ -87,6 +87,15 @@ void write_sector(disk_t *disk, memory_t *memory)
             disk->sector,
             disk->track
         );
+
+        if (disk->disk_drive != NULL) {
+            // 3328 bytes per track.
+            uint32_t track_offset = 3328 * disk->track;
+            uint32_t disk_offset = track_offset + (128 * disk->sector);
+            fseek(disk->disk_drive, disk_offset, SEEK_SET);
+            fwrite(disk->buffer, sizeof(uint8_t), 128, disk->disk_drive);
+        }
+
         disk->state = S_DONE;
         disk->current_func = F_IDLE;
         disk->sector = 0;
@@ -124,6 +133,15 @@ void read_sector(disk_t *disk, memory_t *memory)
             disk->sector,
             disk->track
         );
+
+        if (disk->disk_drive != NULL) {
+            // 3328 bytes per track.
+            uint32_t track_offset = 3328 * disk->track;
+            uint32_t disk_offset = track_offset + (128 * disk->sector);
+            fseek(disk->disk_drive, disk_offset, SEEK_SET);
+            fread(disk->buffer, sizeof(uint8_t), 128, disk->disk_drive);
+        }
+
         disk->state = S_DONE;
         disk->current_func = F_IDLE;
         disk->sector = 0;
@@ -134,13 +152,19 @@ void read_sector(disk_t *disk, memory_t *memory)
 /**
  * Initialize a new `disk_t` struct.
  */
-disk_t* new_disk()
+disk_t* new_disk(char *disk_image)
 {
     disk_t *disk = malloc(sizeof(disk_t));
     memset(disk->buffer, 0, sizeof(uint8_t) * SECTOR_SIZE);
     disk->sector = 0;
     disk->track = 0;
     disk->index = 0;
+
+    if (disk_image == NULL) {
+        disk->disk_drive = NULL;
+    } else {
+        disk->disk_drive = fopen(disk_image, "r+");
+    }
 
     disk->current_func = F_IDLE;
     disk->state = S_BEGIN;
@@ -165,6 +189,10 @@ void free_disk(disk_t **disk)
         }
     }
     putchar('\n');
+
+    if ((*disk)->disk_drive != NULL) {
+        fclose((*disk)->disk_drive);
+    }
 
     free(*disk);
     *disk = NULL;

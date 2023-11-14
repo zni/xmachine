@@ -49,6 +49,7 @@ struct disk {
 
     disk_func_t current_func;
     disk_state_t state;
+    FILE *disk_drive;
 
     void (*fill_buffer)(disk_t*, memory_t*);
     void (*empty_buffer)(disk_t*, memory_t*);
@@ -61,7 +62,7 @@ typedef struct disk_subsystem {
     memory_t *memory;
 } disk_subsystem_t;
 
-disk_t* new_disk();
+disk_t* new_disk(char*);
 void free_disk(disk_t**);
 
 int start_disk_subsystem(void*);
