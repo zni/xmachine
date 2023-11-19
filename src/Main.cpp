@@ -40,7 +40,9 @@ int main(int argc, char** argv)
     }
 
     if (obj_file == NULL) {
-        std::cout << "usage: xmachine -d <disk image> -o <OBJ file>" << std::endl;
+        std::cout << "usage: xmachine -o <OBJ file>" << std::endl;
+        std::cout << "\t-d <disk image> : file to use with the disk controller" << std::endl;
+        std::cout << "\t-s : single step execution" << std::endl;
         exit(EXIT_FAILURE);
     }
 
