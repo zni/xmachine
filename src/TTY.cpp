@@ -1,3 +1,5 @@
+#include <chrono>
+#include <thread>
 #include <ncurses.h>
 #include "include/TTY.hpp"
 
@@ -7,6 +9,8 @@ TTY::TTY()
     m_TPB = 0;
     m_TKB = 0;
     m_TKS = 0;
+    current_col = 0;
+    current_row = 0;
 }
 
 TTY::~TTY()
@@ -17,6 +21,9 @@ TTY::~TTY()
 void TTY::init_tty()
 {
     initscr();
+    cbreak();
+    noecho();
+    getmaxyx(stdscr, max_cols, max_rows);
 }
 
 void TTY::shutdown_tty()
@@ -155,14 +162,39 @@ bool TTY::is_internal_address(uint32_t addr)
 
 void TTY::read_kb()
 {
-    m_TKB = getchar();
+    m_TKB = getch();
     clear_tks_busy_flag();
     set_tks_done_flag();
 }
 
 void TTY::write_char()
 {
-    addch(m_TPB & 0377);
+    char c = m_TPB & 0377;
+    if (c == '\n') {
+        current_row++;
+        current_col = 0;
+        move(current_row, current_col);
+        refresh();
+        clear_tpb_buffer();
+        set_tps_ready_flag();
+        return;
+    }
+
+    if (current_row == max_rows) {
+        current_row = 0;
+        current_col = 0;
+        clear();
+        refresh();
+    }
+
+    if (current_col == max_cols) {
+        current_row++;
+        current_col = 0;
+    }
+
+    mvaddch(current_row, current_col, m_TPB & 0377);
+    current_col++;
+
     refresh();
     clear_tpb_buffer();
     set_tps_ready_flag();

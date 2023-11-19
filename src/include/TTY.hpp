@@ -77,6 +77,11 @@ class TTY : public IBusElement
         uint16_t m_TPS;
         uint16_t m_TPB;
 
+        uint32_t max_cols;
+        uint32_t current_col;
+        uint32_t max_rows;
+        uint32_t current_row;
+
         Bus *m_bus_connection;
 };
 
