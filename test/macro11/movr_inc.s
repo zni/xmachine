@@ -1,0 +1,9 @@
+		MOV s000, R0
+		MOV #s000, R1
+		INC R0
+		MOV R0, s000
+D:		DEC R0
+		MOV R0, (R1)+
+		BNE D
+		HALT
+s000:	.WORD 4
