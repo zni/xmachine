@@ -12,7 +12,6 @@ void Bus::register_bus_element(IBusElement *element)
 void Bus::send_bus_message(IBusElement *sender, BusMessage t, uint32_t addr, uint16_t data)
 {
     if (t == BusMessage::CLEAR) {
-        std::cout << "Bus::CLEAR" << std::endl;
         this->msyn = NULL;
         this->ssyn = NULL;
         return;

@@ -1,4 +1,6 @@
+#include <chrono>
 #include <iostream>
+#include <thread>
 
 #include "include/DiskController.h"
 #include "include/BusMessage.h"
@@ -58,10 +60,11 @@ void DiskController::execute()
         if (go_flag && ((m_state == DiskControllerState::BEGIN) ||
                         (m_state == DiskControllerState::DONE))) {
             printf("go(%07o)\n", m_RXCS);
-            clear_all_flags();
 
             enum DiskControllerFunction function =
                 static_cast<DiskControllerFunction>((static_cast<uint16_t>(RXCSFlag::FS) & m_RXCS) >> 1);
+
+            clear_all_flags();
 
             switch (function) {
                 case DiskControllerFunction::FILL_BUFFER:
@@ -118,6 +121,7 @@ void DiskController::execute()
             printf("%s(S_DONE, flags: %07o)\n", __FUNCTION__, m_RXCS);
             set_done_flag();
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
@@ -141,7 +145,7 @@ void DiskController::process_bus_message(enum BusMessage t, uint32_t addr, uint1
     printf("\taddr: %07o\n", addr);
     printf("\tdata: %07o\n", data);
     switch (t) {
-        case BusMessage::DATO: {
+        case BusMessage::DATI:
             if (addr == RXCS) {
                 send(BusMessage::SSYN, addr, m_RXCS);
             } else if (addr == RXDB) {
@@ -149,28 +153,29 @@ void DiskController::process_bus_message(enum BusMessage t, uint32_t addr, uint1
                 clear_transfer_flag();
                 clear_buffer_register();
             }
-        }
-        break;
+            break;
 
-        case BusMessage::DATOB: {
-            if (addr == RXCS) {
-                send(BusMessage::SSYN, addr, m_RXCS & 0377);
-            } else if (addr == RXDB) {
-                send(BusMessage::SSYN, addr, m_RXDB & 0377);
-                m_RXDB = 0;
-            }
-        }
-        break;
-
-        case BusMessage::DATI: {
+        case BusMessage::DATOB:
             if (addr == RXCS) {
                 set_status_register(data);
+                send(BusMessage::SSYN, addr, data);
             } else if (addr == RXDB) {
                 m_RXDB = data;
                 clear_transfer_flag();
+                send(BusMessage::SSYN, addr, data);
             }
-        }
-        break;
+            break;
+
+        case BusMessage::DATO:
+            if (addr == RXCS) {
+                set_status_register(data);
+                send(BusMessage::SSYN, addr, data);
+            } else if (addr == RXDB) {
+                m_RXDB = data;
+                clear_transfer_flag();
+                send(BusMessage::SSYN, addr, data);
+            }
+            break;
         case BusMessage::DATIP: {
             break;
         }
@@ -190,9 +195,6 @@ void DiskController::process_bus_message(enum BusMessage t, uint32_t addr, uint1
 void DiskController::fill_buffer()
 {
     if (m_buffer_index == SECTOR_SIZE) {
-        m_buffer_index = 0;
-        m_state = DiskControllerState::DONE;
-        m_function = DiskControllerFunction::IDLE;
         return;
     }
 
@@ -203,31 +205,38 @@ void DiskController::fill_buffer()
         m_internal_buffer[m_buffer_index] = m_RXDB & 0377;
         clear_buffer_register();
         m_buffer_index++;
-        if (m_buffer_index != SECTOR_SIZE)
+        if (m_buffer_index != SECTOR_SIZE) {
             set_transfer_flag();
-        else
+        } else {
+            clear_all_flags();
             set_done_flag();
+            m_buffer_index = 0;
+            m_state = DiskControllerState::DONE;
+            m_function = DiskControllerFunction::IDLE;
+        }
     } else {
-        printf("\twaiting for write to register\n");
+        printf("\twaiting for write to register, %d\n", m_buffer_index);
     }
 }
 
 void DiskController::empty_buffer()
 {
     if (m_buffer_index == SECTOR_SIZE) {
-        m_buffer_index = 0;
-        m_state = DiskControllerState::DONE;
-        m_function = DiskControllerFunction::IDLE;
         return;
     }
 
     if (!is_transfer_flag_set()) {
         m_RXDB = m_internal_buffer[m_buffer_index];
         m_buffer_index++;
-        if (m_buffer_index != SECTOR_SIZE)
+        if (m_buffer_index != SECTOR_SIZE) {
             set_transfer_flag();
-        else
+        } else {
+            clear_all_flags()
             set_done_flag();
+            m_buffer_index = 0;
+            m_state = DiskControllerState::DONE;
+            m_function = DiskControllerFunction::IDLE;
+        }
     }
 }
 
@@ -334,9 +343,7 @@ void DiskController::set_transfer_flag()
 
 void DiskController::clear_transfer_flag()
 {
-    if (m_RXCS & static_cast<uint16_t>(RXCSFlag::XFER)) {
-        m_RXCS ^= static_cast<uint16_t>(RXCSFlag::XFER);
-    }
+    m_RXCS = m_RXCS & ~static_cast<uint16_t>(RXCSFlag::XFER);
 }
 
 bool DiskController::is_transfer_flag_set()

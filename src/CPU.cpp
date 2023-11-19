@@ -32,8 +32,8 @@ CPU::~CPU()
 
 void CPU::send(enum BusMessage t, uint32_t addr, uint16_t data)
 {
+    printf("CPU::send(%d, %07o, %07o)\n", static_cast<std::underlying_type<BusMessage>::type>(t), addr, data);
     m_processed = false;
-
     m_bus_connection->send_bus_message(this, t, addr, data);
 }
 
@@ -75,7 +75,7 @@ void CPU::execute()
             getchar();
             dump();
         }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
@@ -98,7 +98,7 @@ void CPU::process_message(enum BusMessage t, uint32_t addr, uint16_t data)
 {
     m_recv_addr = addr;
     m_recv_data = data;
-    printf("\tCPU\n");
+    printf("CPU::process_message\n");
     printf("\trecv_addr: %07o\n", m_recv_addr);
     printf("\trecv_data: %07o\n", m_recv_data);
     m_processed = true;
@@ -208,16 +208,23 @@ uint16_t CPU::fetch_register_contents(uint16_t reg)
     }
 }
 
+// Convert a high address to a bus address.
+uint32_t CPU::translate_bus_addr(uint32_t addr)
+{
+    if (addr & 0170000) {
+        addr |= 0700000;
+    }
+
+    return addr;
+}
+
 uint16_t CPU::fetch_data(uint32_t addr)
 {
     if (is_internal_bus_addr(addr)) {
         return fetch_data_register(addr);
     }
 
-    // Convert a high address to a bus address.
-    if (addr & 0177000) {
-        addr |= 0700000;
-    }
+    addr = translate_bus_addr(addr);
 
     std::unique_lock lk(data_mtx);
     send(BusMessage::MSYN, 0, 0);
@@ -242,10 +249,7 @@ void CPU::store_data(uint32_t addr, uint16_t data)
         return;
     }
 
-    // Convert a high address to a bus address.
-    if (addr & 0177000) {
-        addr |= 0700000;
-    }
+    addr = translate_bus_addr(addr);
 
     std::unique_lock lk(data_mtx);
     send(BusMessage::MSYN, 0, 0);
@@ -261,6 +265,8 @@ void CPU::store_data_b(uint32_t addr, uint8_t data)
         store_data_register(addr, data);
         return;
     }
+
+    addr = translate_bus_addr(addr);
 
     std::unique_lock lk(data_mtx);
     send(BusMessage::MSYN, 0, 0);

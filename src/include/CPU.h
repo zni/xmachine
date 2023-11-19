@@ -119,6 +119,7 @@ class CPU : public IBusElement
         void inc_register(uint16_t, bool byte = false);
         void dec_register(uint16_t, bool byte = false);
         uint16_t fetch_register_contents(uint16_t);
+        uint32_t translate_bus_addr(uint32_t);
         uint16_t fetch_data(uint32_t);
         uint16_t fetch_data_register(uint32_t);
         void store_data(uint32_t, uint16_t);
