@@ -32,7 +32,12 @@ CPU::~CPU()
 
 void CPU::send(enum BusMessage t, uint32_t addr, uint16_t data)
 {
-    printf("CPU::send(%d, %07o, %07o)\n", static_cast<std::underlying_type<BusMessage>::type>(t), addr, data);
+    printf("CPU::%s(%d, %07o, %07o)\n",
+        __FUNCTION__,
+        static_cast<std::underlying_type<BusMessage>::type>(t),
+        addr,
+        data
+    );
     m_processed = false;
     m_bus_connection->send_bus_message(this, t, addr, data);
 }
@@ -45,7 +50,7 @@ void CPU::recv(enum BusMessage t, uint32_t addr, uint16_t data)
 
 uint16_t CPU::bus_id()
 {
-    return 0000001;;
+    return 0000001;
 }
 
 void CPU::set_bus(Bus *b)
@@ -96,11 +101,15 @@ void CPU::dump()
 
 void CPU::process_message(enum BusMessage t, uint32_t addr, uint16_t data)
 {
+    printf("CPU::%s(%d, %07o, %07o)\n",
+        __FUNCTION__,
+        static_cast<std::underlying_type<BusMessage>::type>(t),
+        addr,
+        data
+    );
+
     m_recv_addr = addr;
     m_recv_data = data;
-    printf("CPU::process_message\n");
-    printf("\trecv_addr: %07o\n", m_recv_addr);
-    printf("\trecv_data: %07o\n", m_recv_data);
     m_processed = true;
     data_recv.notify_one();
 }

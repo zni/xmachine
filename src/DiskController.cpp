@@ -140,10 +140,13 @@ void DiskController::dump()
 
 void DiskController::process_bus_message(enum BusMessage t, uint32_t addr, uint16_t data)
 {
-    std::cout << "DiskController::process_bus_message" << std::endl;
-    std::cout << "\t" << static_cast<std::underlying_type<BusMessage>::type>(t) << std::endl;
-    printf("\taddr: %07o\n", addr);
-    printf("\tdata: %07o\n", data);
+    printf("DiskController::%s(%d, %07o, %07o)\n",
+        __FUNCTION__,
+        static_cast<std::underlying_type<BusMessage>::type>(t),
+        addr,
+        data
+    );
+
     switch (t) {
         case BusMessage::DATI:
             if (addr == RXCS) {
@@ -187,9 +190,6 @@ void DiskController::process_bus_message(enum BusMessage t, uint32_t addr, uint1
         }
         default: break;
     }
-
-    printf("\tRXDB: %07o\n", m_RXDB);
-    printf("\tRXCS: %07o\n", m_RXCS);
 }
 
 void DiskController::fill_buffer()
