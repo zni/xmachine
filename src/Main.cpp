@@ -13,18 +13,43 @@ void handle_user_interrupt(int signo)
 {
     std::cout << std::endl;
     std::cout << "USER HALT..." << std::endl;
+    machine->dump_state();
     machine->halt();
+    exit(EXIT_FAILURE);
 }
 
 int main(int argc, char** argv)
 {
-    if (argc != 2) {
-        std::cout << "usage: xmachine <OBJ file>" << std::endl;
+    bool step = false;
+    char *obj_file = NULL;
+    char *disk_name = NULL;
+    char opt;
+    while ((opt = getopt(argc, argv, "d:o:s")) != -1) {
+        switch (opt) {
+            case 'd':
+                disk_name = optarg;
+                break;
+            case 'o':
+                obj_file = optarg;
+                break;
+            case 's':
+                step = true;
+            default:
+                break;
+        }
+    }
+
+    if (obj_file == NULL) {
+        std::cout << "usage: xmachine -d <disk image> -o <OBJ file>" << std::endl;
         exit(EXIT_FAILURE);
     }
 
-    Machine m(argv[1]);
+    Machine m(obj_file, step);
     machine = &m;
+
+    if (disk_name != NULL) {
+        m.add_disk(disk_name);
+    }
 
     // Use the old style signal handler.
     signal(SIGINT, &handle_user_interrupt);

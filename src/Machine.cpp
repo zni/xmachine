@@ -3,10 +3,11 @@
 #include "include/Machine.h"
 #include "include/OBJ.h"
 
-Machine::Machine(char *obj_file)
+Machine::Machine(char *obj_file, bool single_step)
 {
     m_obj_file = obj_file;
     m_cpu.set_bus(&m_bus);
+    m_cpu.set_step_mode(single_step);
     m_memory.set_bus(&m_bus);
     m_disk.set_bus(&m_bus);
 }
@@ -49,4 +50,9 @@ void Machine::dump_state()
     m_cpu.dump();
     m_memory.dump();
     m_disk.dump();
+}
+
+void Machine::add_disk(char *disk)
+{
+    m_disk.insert_disk_media(disk);
 }

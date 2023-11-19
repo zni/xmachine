@@ -11,13 +11,14 @@
 class Machine
 {
     public:
-        Machine(char *);
+        Machine(char *, bool single_step = false);
         ~Machine();
 
         void init();
         void run();
         void halt();
         void dump_state();
+        void add_disk(char *);
 
     private:
         Bus m_bus;

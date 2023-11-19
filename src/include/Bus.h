@@ -14,7 +14,7 @@ class Bus
         ~Bus();
 
         void register_bus_element(IBusElement*);
-        void send_bus_message(IBusElement*, BusMessageType, uint32_t, uint16_t);
+        void send_bus_message(IBusElement*, BusMessage, uint32_t, uint16_t);
         void set_halt(bool);
         bool halted();
 

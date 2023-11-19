@@ -30,38 +30,16 @@ CPU::~CPU()
 
 }
 
-void CPU::send(enum BusMessageType t, uint32_t addr, uint16_t data)
+void CPU::send(enum BusMessage t, uint32_t addr, uint16_t data)
 {
     m_processed = false;
-    std::cout << "CPU::send";
-    switch (t) {
-        case DATO: std::cout << "\tDATO" << std::endl; break;
-        case DATOB: std::cout << "\tDATOB" << std::endl; break;
-        case DATI: std::cout << "\tDATI" << std::endl; break;
-        case DATIP: std::cout << "\tDATIP" << std::endl; break;
-        case MSYN: std::cout << "\tMSYN" << std::endl; break;
-        case SSYN: std::cout << "\tSSYN" << std::endl; break;
-        case CLEAR: std::cout << "\tCLEAR" << std::endl; break;
-        default: break;
-    }
 
     m_bus_connection->send_bus_message(this, t, addr, data);
 }
 
-void CPU::recv(enum BusMessageType t, uint32_t addr, uint16_t data)
+void CPU::recv(enum BusMessage t, uint32_t addr, uint16_t data)
 {
     m_processed = false;
-    std::cout << "CPU::recv";
-    switch (t) {
-        case DATO: std::cout << "\tDATO" << std::endl; break;
-        case DATOB: std::cout << "\tDATOB" << std::endl; break;
-        case DATI: std::cout << "\tDATI" << std::endl; break;
-        case DATIP: std::cout << "\tDATIP" << std::endl; break;
-        case MSYN: std::cout << "\tMSYN" << std::endl; break;
-        case SSYN: std::cout << "\tSSYN" << std::endl; break;
-        default: break;
-    }
-
     process_message(t, addr, data);
 }
 
@@ -75,19 +53,28 @@ void CPU::set_bus(Bus *b)
     m_bus_connection = b;
 }
 
+void CPU::set_step_mode(bool step_mode)
+{
+    m_single_step = step_mode;
+}
+
 void CPU::execute()
 {
 
     while (!m_bus_connection->halted()) {
         std::unique_lock lk(data_mtx);
-        send(MSYN, 0, 0);
-        send(DATI, m_PC, 0);
+        send(BusMessage::MSYN, 0, 0);
+        send(BusMessage::DATI, m_PC, 0);
         data_recv.wait(lk, [this]{ return m_processed; });
         m_IR = m_recv_data;
         m_PC += 2;
         lk.unlock();
-        send(CLEAR, 0, 0);
+        send(BusMessage::CLEAR, 0, 0);
         exec_instruction();
+        if (m_single_step) {
+            getchar();
+            dump();
+        }
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
@@ -107,11 +94,11 @@ void CPU::dump()
     printf("R5 : %07o\n", m_R5);
 }
 
-void CPU::process_message(enum BusMessageType t, uint32_t addr, uint16_t data)
+void CPU::process_message(enum BusMessage t, uint32_t addr, uint16_t data)
 {
-    std::cout << "CPU::process_message" << std::endl;
     m_recv_addr = addr;
     m_recv_data = data;
+    printf("\tCPU\n");
     printf("\trecv_addr: %07o\n", m_recv_addr);
     printf("\trecv_data: %07o\n", m_recv_data);
     m_processed = true;
@@ -227,12 +214,17 @@ uint16_t CPU::fetch_data(uint32_t addr)
         return fetch_data_register(addr);
     }
 
+    // Convert a high address to a bus address.
+    if (addr & 0177000) {
+        addr |= 0700000;
+    }
+
     std::unique_lock lk(data_mtx);
-    send(MSYN, 0, 0);
-    send(DATI, addr, 0);
+    send(BusMessage::MSYN, 0, 0);
+    send(BusMessage::DATI, addr, 0);
     data_recv.wait(lk, [this]{ return m_processed; });
     lk.unlock();
-    send(CLEAR, 0, 0);
+    send(BusMessage::CLEAR, 0, 0);
 
     return m_recv_data;
 }
@@ -250,12 +242,17 @@ void CPU::store_data(uint32_t addr, uint16_t data)
         return;
     }
 
+    // Convert a high address to a bus address.
+    if (addr & 0177000) {
+        addr |= 0700000;
+    }
+
     std::unique_lock lk(data_mtx);
-    send(MSYN, 0, 0);
-    send(DATO, addr, data);
+    send(BusMessage::MSYN, 0, 0);
+    send(BusMessage::DATO, addr, data);
     data_recv.wait(lk, [this]{ return m_processed; });
     lk.unlock();
-    send(CLEAR, 0, 0);
+    send(BusMessage::CLEAR, 0, 0);
 }
 
 void CPU::store_data_b(uint32_t addr, uint8_t data)
@@ -266,11 +263,11 @@ void CPU::store_data_b(uint32_t addr, uint8_t data)
     }
 
     std::unique_lock lk(data_mtx);
-    send(MSYN, 0, 0);
-    send(DATOB, addr, data);
+    send(BusMessage::MSYN, 0, 0);
+    send(BusMessage::DATOB, addr, data);
     data_recv.wait(lk, [this]{ return m_processed; });
     lk.unlock();
-    send(CLEAR, 0, 0);
+    send(BusMessage::CLEAR, 0, 0);
 }
 
 void CPU::store_data_register(uint32_t addr, uint16_t data)

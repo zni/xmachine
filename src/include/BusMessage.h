@@ -1,7 +1,7 @@
 #ifndef BUSMESSAGE_H
 #define BUSMESSAGE_H
 
-enum BusMessageType {
+enum class BusMessage {
     DATO,
     DATOB,
     DATI,

@@ -103,17 +103,18 @@ class CPU : public IBusElement
         CPU();
         ~CPU();
 
-        void send(enum BusMessageType, uint32_t, uint16_t);
-        void recv(enum BusMessageType, uint32_t, uint16_t);
+        void send(enum BusMessage, uint32_t, uint16_t);
+        void recv(enum BusMessage, uint32_t, uint16_t);
         uint16_t bus_id();
         void set_bus(Bus *);
+        void set_step_mode(bool);
 
         void execute();
 
         void dump();
 
     private:
-        void process_message(enum BusMessageType, uint32_t, uint16_t);
+        void process_message(enum BusMessage, uint32_t, uint16_t);
 
         void inc_register(uint16_t, bool byte = false);
         void dec_register(uint16_t, bool byte = false);
@@ -236,6 +237,8 @@ class CPU : public IBusElement
 
         uint32_t m_recv_addr;
         uint16_t m_recv_data;
+
+        bool m_single_step;
 
         bool m_processed;
 

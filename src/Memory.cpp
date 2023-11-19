@@ -15,35 +15,14 @@ Memory::Memory()
 
 Memory::~Memory() {}
 
-void Memory::send(enum BusMessageType t, uint32_t addr, uint16_t data)
+void Memory::send(enum BusMessage t, uint32_t addr, uint16_t data)
 {
-    std::cout << "Memory::send";
-    switch (t) {
-        case DATO: std::cout << "\tDATO" << std::endl; break;
-        case DATOB: std::cout << "\tDATOB" << std::endl; break;
-        case DATI: std::cout << "\tDATI" << std::endl; break;
-        case DATIP: std::cout << "\tDATIP" << std::endl; break;
-        case MSYN: std::cout << "\tMSYN" << std::endl; break;
-        case SSYN: std::cout << "\tSSYN" << std::endl; break;
-        default: break;
-    }
     m_bus_connection->send_bus_message(this, t, addr, data);
 }
 
-void Memory::recv(enum BusMessageType t, uint32_t addr, uint16_t data)
+void Memory::recv(enum BusMessage t, uint32_t addr, uint16_t data)
 {
-    std::cout << "Memory::recv";
-    switch (t) {
-        case DATO: std::cout << "\tDATO" << std::endl; break;
-        case DATOB: std::cout << "\tDATOB" << std::endl; break;
-        case DATI: std::cout << "\tDATI" << std::endl; break;
-        case DATIP: std::cout << "\tDATIP" << std::endl; break;
-        case MSYN: std::cout << "\tMSYN" << std::endl; break;
-        case SSYN: std::cout << "\tSSYN" << std::endl; break;
-        default: break;
-    }
-
-    if (t == MSYN || t == SSYN) {
+    if (t == BusMessage::MSYN || t == BusMessage::SSYN) {
         return;
     }
 
@@ -105,26 +84,26 @@ void Memory::dump()
     }
 }
 
-void Memory::process_message(enum BusMessageType t, uint32_t addr, uint16_t data)
+void Memory::process_message(enum BusMessage t, uint32_t addr, uint16_t data)
 {
     switch (t) {
-        case DATI:
-            send(SSYN, addr, read_word(addr));
+        case BusMessage::DATI:
+            send(BusMessage::SSYN, addr, read_word(addr));
             break;
-        case DATIP:
+        case BusMessage::DATIP:
             break;
-        case DATO:
+        case BusMessage::DATO:
             m_MAR = addr;
             m_MBR = data;
             m_MEMORY[m_MAR] = m_MBR & 0377;
             m_MEMORY[m_MAR + 1] = (m_MBR & 0177400) >> 8;
-            send(SSYN, m_MAR, m_MBR);
+            send(BusMessage::SSYN, m_MAR, m_MBR);
             break;
-        case DATOB:
+        case BusMessage::DATOB:
             m_MAR = addr;
             m_MBR = data;
             m_MEMORY[m_MAR] = m_MBR;
-            send(SSYN, m_MAR, m_MBR);
+            send(BusMessage::SSYN, m_MAR, m_MBR);
             break;
         default:
             break;

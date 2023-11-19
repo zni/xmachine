@@ -23,34 +23,13 @@ DiskController::~DiskController()
     }
 }
 
-void DiskController::send(enum BusMessageType t, uint32_t addr, uint16_t data)
+void DiskController::send(enum BusMessage t, uint32_t addr, uint16_t data)
 {
-    std::cout << "DiskController::send";
-    switch (t) {
-        case DATO: std::cout << "\tDATO" << std::endl; break;
-        case DATOB: std::cout << "\tDATOB" << std::endl; break;
-        case DATI: std::cout << "\tDATI" << std::endl; break;
-        case DATIP: std::cout << "\tDATIP" << std::endl; break;
-        case MSYN: std::cout << "\tMSYN" << std::endl; break;
-        case SSYN: std::cout << "\tSSYN" << std::endl; break;
-        default: break;
-    }
     m_bus_connection->send_bus_message(this, t, addr, data);
 }
 
-void DiskController::recv(enum BusMessageType t, uint32_t addr, uint16_t data)
+void DiskController::recv(enum BusMessage t, uint32_t addr, uint16_t data)
 {
-    std::cout << "DiskController::recv";
-    switch (t) {
-        case DATO: std::cout << "\tDATO" << std::endl; break;
-        case DATOB: std::cout << "\tDATOB" << std::endl; break;
-        case DATI: std::cout << "\tDATI" << std::endl; break;
-        case DATIP: std::cout << "\tDATIP" << std::endl; break;
-        case MSYN: std::cout << "\tMSYN" << std::endl; break;
-        case SSYN: std::cout << "\tSSYN" << std::endl; break;
-        default: break;
-    }
-
     if (addr == RXCS || addr == RXDB) {
         process_bus_message(t, addr, data);
     }
@@ -155,48 +134,57 @@ void DiskController::dump()
     putchar('\n');
 }
 
-void DiskController::process_bus_message(enum BusMessageType t, uint32_t addr, uint16_t data)
+void DiskController::process_bus_message(enum BusMessage t, uint32_t addr, uint16_t data)
 {
+    std::cout << "DiskController::process_bus_message" << std::endl;
+    std::cout << "\t" << static_cast<std::underlying_type<BusMessage>::type>(t) << std::endl;
+    printf("\taddr: %07o\n", addr);
+    printf("\tdata: %07o\n", data);
     switch (t) {
-        case DATO: {
+        case BusMessage::DATO: {
             if (addr == RXCS) {
-                this->send(SSYN, addr, m_RXCS);
+                send(BusMessage::SSYN, addr, m_RXCS);
             } else if (addr == RXDB) {
-                this->send(SSYN, addr, m_RXDB);
-                this->clear_transfer_flag();
-                this->clear_buffer_register();
+                send(BusMessage::SSYN, addr, m_RXDB);
+                clear_transfer_flag();
+                clear_buffer_register();
             }
-            break;
         }
-        case DATOB: {
+        break;
+
+        case BusMessage::DATOB: {
             if (addr == RXCS) {
-                this->send(SSYN, addr, m_RXCS & 0377);
+                send(BusMessage::SSYN, addr, m_RXCS & 0377);
             } else if (addr == RXDB) {
-                this->send(SSYN, addr, m_RXDB & 0377);
+                send(BusMessage::SSYN, addr, m_RXDB & 0377);
                 m_RXDB = 0;
             }
-            break;
         }
-        case DATI: {
+        break;
+
+        case BusMessage::DATI: {
             if (addr == RXCS) {
                 set_status_register(data);
             } else if (addr == RXDB) {
                 m_RXDB = data;
-                this->clear_transfer_flag();
+                clear_transfer_flag();
             }
+        }
+        break;
+        case BusMessage::DATIP: {
             break;
         }
-        case DATIP: {
+        case BusMessage::MSYN: {
             break;
         }
-        case MSYN: {
-            break;
-        }
-        case SSYN: {
+        case BusMessage::SSYN: {
             break;
         }
         default: break;
     }
+
+    printf("\tRXDB: %07o\n", m_RXDB);
+    printf("\tRXCS: %07o\n", m_RXCS);
 }
 
 void DiskController::fill_buffer()
