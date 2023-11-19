@@ -15,12 +15,12 @@ void handle_user_interrupt(int signo)
     std::cout << "USER HALT..." << std::endl;
     machine->dump_state();
     machine->halt();
-    exit(EXIT_FAILURE);
 }
 
 int main(int argc, char** argv)
 {
     bool step = false;
+    bool tty_enable = false;
     char *obj_file = NULL;
     char *disk_name = NULL;
     char opt;

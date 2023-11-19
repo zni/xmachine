@@ -32,12 +32,12 @@ CPU::~CPU()
 
 void CPU::send(enum BusMessage t, uint32_t addr, uint16_t data)
 {
-    printf("CPU::%s(%d, %07o, %07o)\n",
-        __FUNCTION__,
-        static_cast<std::underlying_type<BusMessage>::type>(t),
-        addr,
-        data
-    );
+    // printf("CPU::%s(%d, %07o, %07o)\n",
+    //     __FUNCTION__,
+    //     static_cast<std::underlying_type<BusMessage>::type>(t),
+    //     addr,
+    //     data
+    // );
     m_processed = false;
     m_bus_connection->send_bus_message(this, t, addr, data);
 }
@@ -101,12 +101,12 @@ void CPU::dump()
 
 void CPU::process_message(enum BusMessage t, uint32_t addr, uint16_t data)
 {
-    printf("CPU::%s(%d, %07o, %07o)\n",
-        __FUNCTION__,
-        static_cast<std::underlying_type<BusMessage>::type>(t),
-        addr,
-        data
-    );
+    // printf("CPU::%s(%d, %07o, %07o)\n",
+    //     __FUNCTION__,
+    //     static_cast<std::underlying_type<BusMessage>::type>(t),
+    //     addr,
+    //     data
+    // );
 
     m_recv_addr = addr;
     m_recv_data = data;
@@ -869,8 +869,6 @@ void CPU::NOP()
 void CPU::BR()
 {
     m_PC = m_PC + (2 * get_branch_offset());
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BNE()
@@ -879,8 +877,6 @@ void CPU::BNE()
     m_ALU = m_PSW & ZEROFLAG;
     if (m_ALU == 0)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BEQ()
@@ -889,8 +885,6 @@ void CPU::BEQ()
     m_ALU = m_PSW & ZEROFLAG;
     if (m_ALU == ZEROFLAG)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BGE()
@@ -900,8 +894,6 @@ void CPU::BGE()
     m_ALU ^= (m_PSW & OVERFLOWFLAG) >> 1;
     if (m_ALU == 0)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BLT()
@@ -911,8 +903,6 @@ void CPU::BLT()
     m_ALU ^= (m_PSW & OVERFLOWFLAG) >> 1;
     if (m_ALU)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BGT()
@@ -922,8 +912,6 @@ void CPU::BGT()
     m_ALU |= ((m_PSW & NEGATIVEFLAG) >> 3) ^ ((m_PSW & OVERFLOWFLAG) >> 1);
     if (m_ALU == 0)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BLE()
@@ -933,8 +921,6 @@ void CPU::BLE()
     m_ALU |= ((m_PSW & NEGATIVEFLAG) >> 3) ^ ((m_PSW & OVERFLOWFLAG) >> 1);
     if (m_ALU)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BPL()
@@ -943,8 +929,6 @@ void CPU::BPL()
     m_ALU = m_PSW & NEGATIVEFLAG;
     if (m_ALU == 0)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BMI()
@@ -953,8 +937,6 @@ void CPU::BMI()
     m_ALU = m_PSW & NEGATIVEFLAG;
     if (m_ALU)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BHI()
@@ -964,8 +946,6 @@ void CPU::BHI()
     m_ALU |= (m_PSW & ZEROFLAG) >> 2;
     if (m_ALU == 0)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BLOS()
@@ -975,8 +955,6 @@ void CPU::BLOS()
     m_ALU |= (m_PSW & ZEROFLAG) >> 2;
     if (m_ALU)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BVC()
@@ -985,8 +963,6 @@ void CPU::BVC()
     m_ALU = m_PSW & OVERFLOWFLAG;
     if (m_ALU == 0)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BVS()
@@ -995,8 +971,6 @@ void CPU::BVS()
     m_ALU = m_PSW & OVERFLOWFLAG;
     if (m_ALU)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BCC()
@@ -1005,8 +979,6 @@ void CPU::BCC()
     m_ALU = m_PSW & CARRYFLAG;
     if (m_ALU == 0)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BCS()
@@ -1015,8 +987,6 @@ void CPU::BCS()
     m_ALU = m_PSW & CARRYFLAG;
     if (m_ALU)
         m_PC = m_PC + (2 * offset);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::MOV()
@@ -1029,8 +999,6 @@ void CPU::MOV()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::MOVB()
@@ -1043,8 +1011,6 @@ void CPU::MOVB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::CMP()
@@ -1057,8 +1023,6 @@ void CPU::CMP()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::CMPB()
@@ -1071,8 +1035,6 @@ void CPU::CMPB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BIT()
@@ -1085,8 +1047,6 @@ void CPU::BIT()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BITB()
@@ -1099,8 +1059,6 @@ void CPU::BITB()
 
     set_negative_flag_b(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BIC()
@@ -1114,8 +1072,6 @@ void CPU::BIC()
 
     set_negative_flag_w(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BICB()
@@ -1129,8 +1085,6 @@ void CPU::BICB()
 
     set_negative_flag_b(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BIS()
@@ -1144,8 +1098,6 @@ void CPU::BIS()
 
     set_negative_flag_w(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::BISB()
@@ -1159,8 +1111,6 @@ void CPU::BISB()
 
     set_negative_flag_b(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ADD()
@@ -1174,8 +1124,6 @@ void CPU::ADD()
 
     set_negative_flag_w(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::SUB()
@@ -1189,8 +1137,6 @@ void CPU::SUB()
 
     set_negative_flag_w(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::JMP()
@@ -1198,8 +1144,6 @@ void CPU::JMP()
     setup_dest_addressing();
 
     m_PC = fetch_data(m_dest_address);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::SWAB()
@@ -1212,8 +1156,6 @@ void CPU::SWAB()
 
     set_negative_flag_w(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::CLR()
@@ -1224,8 +1166,6 @@ void CPU::CLR()
 
     set_negative_flag_w(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::CLRB()
@@ -1236,8 +1176,6 @@ void CPU::CLRB()
 
     set_negative_flag_b(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::COM()
@@ -1249,8 +1187,6 @@ void CPU::COM()
 
     set_negative_flag_w(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::COMB()
@@ -1262,8 +1198,6 @@ void CPU::COMB()
 
     set_negative_flag_b(m_ALU);
     set_zero_flag(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::INC()
@@ -1275,8 +1209,6 @@ void CPU::INC()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::INCB()
@@ -1288,8 +1220,6 @@ void CPU::INCB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::DEC()
@@ -1301,8 +1231,6 @@ void CPU::DEC()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::DECB()
@@ -1315,8 +1243,6 @@ void CPU::DECB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::NEG()
@@ -1329,8 +1255,6 @@ void CPU::NEG()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::NEGB()
@@ -1343,8 +1267,6 @@ void CPU::NEGB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ADC()
@@ -1357,8 +1279,6 @@ void CPU::ADC()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ADCB()
@@ -1371,8 +1291,6 @@ void CPU::ADCB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::SBC()
@@ -1385,8 +1303,6 @@ void CPU::SBC()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::SBCB()
@@ -1399,8 +1315,6 @@ void CPU::SBCB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::TST()
@@ -1411,8 +1325,6 @@ void CPU::TST()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::TSTB()
@@ -1423,8 +1335,6 @@ void CPU::TSTB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ROR()
@@ -1437,8 +1347,6 @@ void CPU::ROR()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::RORB()
@@ -1451,8 +1359,6 @@ void CPU::RORB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ROL()
@@ -1465,8 +1371,6 @@ void CPU::ROL()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ROLB()
@@ -1479,8 +1383,6 @@ void CPU::ROLB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ASR()
@@ -1493,8 +1395,6 @@ void CPU::ASR()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ASRB()
@@ -1507,8 +1407,6 @@ void CPU::ASRB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ASL()
@@ -1521,8 +1419,6 @@ void CPU::ASL()
 
     set_zero_flag(m_ALU);
     set_negative_flag_w(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ASLB()
@@ -1535,8 +1431,6 @@ void CPU::ASLB()
 
     set_zero_flag(m_ALU);
     set_negative_flag_b(m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::MTPS()
@@ -1544,39 +1438,31 @@ void CPU::MTPS()
     setup_dest_addressing();
     m_ALU = fetch_data(m_dest_address);
     m_PSW = m_ALU;
-
-    std::cout << __FUNCTION__ << std::endl;
-
 }
 
 void CPU::MFPI()
 {
     NOP();
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::MFPD()
 {
     NOP();
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::MTPI()
 {
     NOP();
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::MTPD()
 {
     NOP();
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::SXT()
 {
     NOP();
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::MFPS()
@@ -1584,38 +1470,31 @@ void CPU::MFPS()
     setup_dest_addressing();
     m_ALU = m_PSW;
     store_data(m_dest_address, m_ALU);
-
-    std::cout << __FUNCTION__ << std::endl;
-
 }
 
 void CPU::MUL()
 {
     NOP();
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::DIV()
 {
     NOP();
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ASH()
 {
     NOP();
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::ASHC()
 {
     NOP();
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::XOR()
 {
-    std::cout << __FUNCTION__ << std::endl;
+    NOP();
 }
 
 void CPU::JSR()
@@ -1632,8 +1511,6 @@ void CPU::JSR()
 
     store_data_register(register_to_bus_addr(reg), m_PC);
     m_PC = tmp;
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::RTS()
@@ -1645,12 +1522,9 @@ void CPU::RTS()
     inc_register(m_SP);
     uint16_t top_stack = fetch_data(m_SP);
     store_data_register(register_to_bus_addr(reg), top_stack);
-
-    std::cout << __FUNCTION__ << std::endl;
 }
 
 void CPU::HALT()
 {
     m_bus_connection->set_halt(true);
-    std::cout << __FUNCTION__ << std::endl;
 }

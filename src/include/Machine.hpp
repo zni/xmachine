@@ -7,6 +7,7 @@
 #include "CPU.hpp"
 #include "Memory.hpp"
 #include "DiskController.hpp"
+#include "TTY.hpp"
 
 class Machine
 {
@@ -25,10 +26,12 @@ class Machine
         CPU m_cpu;
         Memory m_memory;
         DiskController m_disk;
+        TTY m_tty;
 
         std::thread t_cpu;
         std::thread t_memory;
         std::thread t_disk;
+        std::thread t_tty;
 
         char *m_obj_file;
 };
