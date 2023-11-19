@@ -1,8 +1,8 @@
-#ifndef BUS_ELEMENT_H
-#define BUS_ELEMENT_H
+#ifndef BUS_ELEMENT_HPP
+#define BUS_ELEMENT_HPP
 
 #include <cstdint>
-#include "BusMessage.h"
+#include "BusMessage.hpp"
 
 class IBusElement
 {

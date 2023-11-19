@@ -1,5 +1,5 @@
 #include <iostream>
-#include "include/Bus.h"
+#include "include/Bus.hpp"
 
 Bus::Bus() {}
 Bus::~Bus() {}

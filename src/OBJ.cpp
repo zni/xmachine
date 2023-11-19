@@ -1,6 +1,6 @@
 #include <cstdint>
 #include <iostream>
-#include "include/OBJ.h"
+#include "include/OBJ.hpp"
 
 // Note to future self, "RT-11 Software Support Manual, File Formats"
 

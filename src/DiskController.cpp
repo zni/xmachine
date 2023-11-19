@@ -2,8 +2,8 @@
 #include <iostream>
 #include <thread>
 
-#include "include/DiskController.h"
-#include "include/BusMessage.h"
+#include "include/DiskController.hpp"
+#include "include/BusMessage.hpp"
 
 DiskController::DiskController()
 {

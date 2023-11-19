@@ -1,5 +1,5 @@
-#ifndef BUSMESSAGE_H
-#define BUSMESSAGE_H
+#ifndef BUSMESSAGE_HPP
+#define BUSMESSAGE_HPP
 
 enum class BusMessage {
     DATO,

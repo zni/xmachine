@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <iostream>
 #include <thread>
-#include "include/Memory.h"
+#include "include/Memory.hpp"
 
 Memory::Memory()
 {

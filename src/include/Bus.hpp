@@ -1,11 +1,11 @@
-#ifndef BUS_H
-#define BUS_H
+#ifndef BUS_HPP
+#define BUS_HPP
 
 #include <cstdint>
 #include <list>
 
-#include "BusMessage.h"
-#include "IBusElement.h"
+#include "BusMessage.hpp"
+#include "IBusElement.hpp"
 
 class Bus
 {

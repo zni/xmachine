@@ -4,7 +4,7 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
-#include "include/CPU.h"
+#include "include/CPU.hpp"
 
 std::condition_variable data_recv;
 std::mutex data_mtx;

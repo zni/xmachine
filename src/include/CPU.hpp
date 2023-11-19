@@ -1,11 +1,11 @@
-#ifndef CPU_H
-#define CPU_H
+#ifndef CPU_HPP
+#define CPU_HPP
 
 #include <cstdint>
 
-#include "Bus.h"
-#include "BusMessage.h"
-#include "IBusElement.h"
+#include "Bus.hpp"
+#include "BusMessage.hpp"
+#include "IBusElement.hpp"
 
 enum ProcessorStatusFlags {
     CARRYFLAG    = 0000001,

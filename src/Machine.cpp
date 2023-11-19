@@ -1,7 +1,7 @@
 #include <iostream>
 
-#include "include/Machine.h"
-#include "include/OBJ.h"
+#include "include/Machine.hpp"
+#include "include/OBJ.hpp"
 
 Machine::Machine(char *obj_file, bool single_step)
 {

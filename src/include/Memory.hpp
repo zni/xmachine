@@ -1,9 +1,9 @@
-#ifndef MEMORY_H
-#define MEMORY_H
+#ifndef MEMORY_HPP
+#define MEMORY_HPP
 
-#include "Bus.h"
-#include "BusMessage.h"
-#include "IBusElement.h"
+#include "Bus.hpp"
+#include "BusMessage.hpp"
+#include "IBusElement.hpp"
 
 #define MEMBYTES 65535
 #define MEMWORDS 32767

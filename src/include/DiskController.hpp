@@ -1,11 +1,11 @@
-#ifndef DISKCONTROLLER_H
-#define DISKCONTROLLER_H
+#ifndef DISKCONTROLLER_HPP
+#define DISKCONTROLLER_HPP
 
 #include <cstdint>
 #include <cstdio>
 
-#include "Bus.h"
-#include "IBusElement.h"
+#include "Bus.hpp"
+#include "IBusElement.hpp"
 
 #define SECTOR_SIZE 128
 #define BUFFER_SIZE 128

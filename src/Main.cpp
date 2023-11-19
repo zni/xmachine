@@ -5,7 +5,7 @@
 #include <getopt.h>
 #include <signal.h>
 
-#include "include/Machine.h"
+#include "include/Machine.hpp"
 
 Machine *machine = NULL;
 

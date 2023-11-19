@@ -1,12 +1,12 @@
-#ifndef MACHINE_H
-#define MACHINE_H
+#ifndef MACHINE_HPP
+#define MACHINE_HPP
 
 #include <thread>
 
-#include "Bus.h"
-#include "CPU.h"
-#include "Memory.h"
-#include "DiskController.h"
+#include "Bus.hpp"
+#include "CPU.hpp"
+#include "Memory.hpp"
+#include "DiskController.hpp"
 
 class Machine
 {

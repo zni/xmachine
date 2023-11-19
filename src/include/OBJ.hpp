@@ -1,8 +1,8 @@
-#ifndef OBJ_H
-#define OBJ_H
+#ifndef OBJ_HPP
+#define OBJ_HPP
 
 #include <cstdio>
-#include "Memory.h"
+#include "Memory.hpp"
 
 class OBJ
 {
