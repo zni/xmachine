@@ -11,6 +11,8 @@ TTY::TTY()
     m_TKS = 0;
     current_col = 0;
     current_row = 0;
+    max_rows = 0;
+    max_cols = 0;
 }
 
 TTY::~TTY()
@@ -23,7 +25,7 @@ void TTY::init_tty()
     initscr();
     cbreak();
     noecho();
-    getmaxyx(stdscr, max_cols, max_rows);
+    getmaxyx(stdscr, max_rows, max_cols);
 }
 
 void TTY::shutdown_tty()
@@ -65,8 +67,8 @@ void TTY::execute()
         if (!is_tps_ready()) {
             write_char();
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-
     shutdown_tty();
 }
 
@@ -174,6 +176,11 @@ void TTY::write_char()
         current_row++;
         current_col = 0;
         move(current_row, current_col);
+        refresh();
+        clear_tpb_buffer();
+        set_tps_ready_flag();
+        return;
+    } else if (c == '\0') {
         refresh();
         clear_tpb_buffer();
         set_tps_ready_flag();

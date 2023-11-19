@@ -2,6 +2,9 @@
 		MOV TTYPB, R2
 		MOV TTYPS, R3
 
+R1:		TSTB (R3)
+		BPL R1
+
 LOOP:	MOVB (R0)+, (R2)
 		BEQ H
 
