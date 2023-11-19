@@ -231,7 +231,7 @@ void DiskController::empty_buffer()
         if (m_buffer_index != SECTOR_SIZE) {
             set_transfer_flag();
         } else {
-            clear_all_flags()
+            clear_all_flags();
             set_done_flag();
             m_buffer_index = 0;
             m_state = DiskControllerState::DONE;
