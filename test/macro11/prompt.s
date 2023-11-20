@@ -14,8 +14,8 @@ ECHO:	BIT BUSY, (R0)		; Check if the keyboard is busy.
 
 		INC (R0)			; Flag RDRENB.
 
-BP:		BIT BUSY, (R0)		; Check if we're busy.
-		BNE BP
+BP:		TSTB (R0)			; Check if we're done reading.
+		BPL BP
 
 		MOVB (R1), INP		; Move input to last character input.
 		CMPB INP, #12		; Is last character a newline?

@@ -4,8 +4,8 @@
 		MOV TTYPS, R3
 ECHO:	INC (R0)			; Set RDRENB flag
 
-B:		BIT BUSY, (R0)		; Wait for BUSY flag to drop.
-		BNE B
+B:		TSTB (R0)			; Wait for DONE flag to raise.
+		BPL B
 
 R:		TSTB (R3)			; Wait for READY flag to raise.
 		BPL R
