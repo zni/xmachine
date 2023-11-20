@@ -220,7 +220,7 @@ uint16_t CPU::fetch_register_contents(uint16_t reg)
 // Convert a high address to a bus address.
 uint32_t CPU::translate_bus_addr(uint32_t addr)
 {
-    if (addr & 0170000) {
+    if (addr & 0177000) {
         addr |= 0700000;
     }
 
