@@ -2,6 +2,7 @@
 
 		MOV RXCS, R0		; Setup pointers.
 		MOV RXDB, R1
+		MOV TTYPB, R4
 
 		MOV FCMD, (R0)		; Issue FILL command.
 
@@ -16,6 +17,8 @@ H3:		BIT DONE, (R0)
 		INC R3
 		CMP #200, R3		; Check if we've written 128 bytes.
 		BEQ W				; If we have, write it to disk.
+
+		MOV DOT, (R4)
 
 		BR H3				; Else start all over again.
 
@@ -42,6 +45,7 @@ FCMD:	.WORD 1				; Fill command
 DONE:	.WORD 40			; DONE flag
 SEC:	.WORD 0				; Sector to write to.
 TRK:    .WORD 0				; Track to write to.
+DOT:	.WORD 52
 
 
 ; Begin data to write to the boot sector of the disk.
