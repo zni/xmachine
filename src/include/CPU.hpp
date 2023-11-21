@@ -107,7 +107,6 @@ class CPU : public IBusElement
         void recv(enum BusMessage, uint32_t, uint16_t);
         uint16_t bus_id();
         void set_bus(Bus *);
-        void set_step_mode(bool);
 
         void execute();
 
@@ -238,8 +237,6 @@ class CPU : public IBusElement
 
         uint32_t m_recv_addr;
         uint16_t m_recv_data;
-
-        bool m_single_step;
 
         bool m_processed;
 

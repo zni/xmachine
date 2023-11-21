@@ -19,12 +19,11 @@ void handle_user_interrupt(int signo)
 
 int main(int argc, char** argv)
 {
-    bool step = false;
     bool tty_enable = false;
     char *obj_file = NULL;
     char *disk_name = NULL;
     char opt;
-    while ((opt = getopt(argc, argv, "d:o:s")) != -1) {
+    while ((opt = getopt(argc, argv, "d:o:")) != -1) {
         switch (opt) {
             case 'd':
                 disk_name = optarg;
@@ -32,8 +31,6 @@ int main(int argc, char** argv)
             case 'o':
                 obj_file = optarg;
                 break;
-            case 's':
-                step = true;
             default:
                 break;
         }
@@ -42,11 +39,10 @@ int main(int argc, char** argv)
     if (obj_file == NULL) {
         std::cout << "usage: xmachine -o <OBJ file>" << std::endl;
         std::cout << "\t-d <disk image> : file to use with the disk controller" << std::endl;
-        std::cout << "\t-s : single step execution" << std::endl;
         exit(EXIT_FAILURE);
     }
 
-    Machine m(obj_file, step);
+    Machine m(obj_file);
     machine = &m;
 
     if (disk_name != NULL) {

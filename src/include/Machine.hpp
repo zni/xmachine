@@ -12,7 +12,7 @@
 class Machine
 {
     public:
-        Machine(char *, bool single_step = false);
+        Machine(char *);
         ~Machine();
 
         void init();

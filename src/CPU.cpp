@@ -59,11 +59,6 @@ void CPU::set_bus(Bus *b)
     m_bus_connection = b;
 }
 
-void CPU::set_step_mode(bool step_mode)
-{
-    m_single_step = step_mode;
-}
-
 void CPU::execute()
 {
 

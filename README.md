@@ -38,7 +38,6 @@ bin/xmachine -o <OBJ file>
 
 Options:
     -d <disk image>     : file to use with the disk controller
-    -s                  : single step execution
 ```
 
 ### Why?

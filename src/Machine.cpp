@@ -5,11 +5,10 @@
 #include "include/Machine.hpp"
 #include "include/OBJ.hpp"
 
-Machine::Machine(char *obj_file, bool single_step)
+Machine::Machine(char *obj_file)
 {
     m_obj_file = obj_file;
     m_cpu.set_bus(&m_bus);
-    m_cpu.set_step_mode(single_step);
     m_memory.set_bus(&m_bus);
     m_disk.set_bus(&m_bus);
     m_tty.set_bus(&m_bus);
