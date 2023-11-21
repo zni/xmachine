@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include <ncurses.h>
+
 #include "include/Machine.hpp"
 #include "include/OBJ.hpp"
 
@@ -32,6 +34,8 @@ void Machine::init()
 
 void Machine::run()
 {
+    init_ncurses();
+
     t_memory = std::thread(&Memory::execute, &m_memory);
     t_cpu = std::thread(&CPU::execute, &m_cpu);
     t_disk = std::thread(&DiskController::execute, &m_disk);
@@ -40,7 +44,9 @@ void Machine::run()
     t_cpu.join();
     t_disk.join();
     t_tty.join();
-    //dump_state();
+    dump_state();
+
+    shutdown_ncurses();
 }
 
 void Machine::halt()
@@ -58,4 +64,19 @@ void Machine::dump_state()
 void Machine::add_disk(char *disk)
 {
     m_disk.insert_disk_media(disk);
+}
+
+void Machine::init_ncurses()
+{
+    initscr();
+    cbreak();
+    noecho();
+    clear();
+    refresh();
+}
+
+void Machine::shutdown_ncurses()
+{
+    getch();
+    endwin();
 }

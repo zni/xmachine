@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <iostream>
 #include <thread>
+#include <ncurses.h>
 #include "include/Memory.hpp"
 
 Memory::Memory()
@@ -75,12 +76,13 @@ void Memory::dump()
             continue;
         }
 
-        printf("0o%05o: ", r);
+        printw("0o%05o: ", r);
         for (int i = 0; i < 16; i++) {
-            printf("0o%07o ", row[i]);
+            printw("0o%07o ", row[i]);
         }
-        printf("\n");
+        printw("\n");
         all_zero = true;
+        refresh();
     }
 }
 

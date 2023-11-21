@@ -22,15 +22,7 @@ TTY::~TTY()
 
 void TTY::init_tty()
 {
-    initscr();
-    cbreak();
-    noecho();
     getmaxyx(stdscr, max_rows, max_cols);
-}
-
-void TTY::shutdown_tty()
-{
-    endwin();
 }
 
 void TTY::send(enum BusMessage t, uint32_t addr, uint16_t data)
@@ -69,7 +61,6 @@ void TTY::execute()
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    shutdown_tty();
 }
 
 void TTY::process_bus_message(enum BusMessage t, uint32_t addr, uint16_t data)

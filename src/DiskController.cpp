@@ -2,6 +2,8 @@
 #include <iostream>
 #include <thread>
 
+#include <ncurses.h>
+
 #include "include/DiskController.hpp"
 #include "include/BusMessage.hpp"
 
@@ -59,7 +61,7 @@ void DiskController::execute()
         go_flag = static_cast<uint16_t>(RXCSFlag::GO) & m_RXCS;
         if (go_flag && ((m_state == DiskControllerState::BEGIN) ||
                         (m_state == DiskControllerState::DONE))) {
-            printf("go(%07o)\n", m_RXCS);
+
 
             enum DiskControllerFunction function =
                 static_cast<DiskControllerFunction>((static_cast<uint16_t>(RXCSFlag::FS) & m_RXCS) >> 1);
@@ -100,53 +102,47 @@ void DiskController::execute()
 
         } else if ((m_state == DiskControllerState::FILL) &&
                    (m_function == DiskControllerFunction::FILL_BUFFER)) {
-            printf("%s(S_FILL, %07o)\n", __FUNCTION__, m_RXCS);
+
             fill_buffer();
 
         } else if ((m_state == DiskControllerState::EMPTY) &&
                    (m_function == DiskControllerFunction::EMPTY_BUFFER)) {
-            printf("%s(S_EMPTY, %07o)\n", __FUNCTION__, m_RXCS);
+
             empty_buffer();
 
         } else if (m_function == DiskControllerFunction::READ_SECTOR) {
-            printf("%s(F_READ_SECTOR, %07o)\n", __FUNCTION__, m_RXCS);
+
             read_sector();
 
         } else if (m_function == DiskControllerFunction::WRITE_SECTOR) {
-            printf("%s(F_WRITE_SECTOR, %07o)\n", __FUNCTION__, m_RXCS);
+
             write_sector();
 
         } else if (m_state == DiskControllerState::DONE) {
             m_state = DiskControllerState::BEGIN;
-            printf("%s(S_DONE, flags: %07o)\n", __FUNCTION__, m_RXCS);
+
             set_done_flag();
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
 
 void DiskController::dump()
 {
-    printf("RXCS: %07o\n", m_RXCS);
-    printf("RXDB: %07o\n", m_RXDB);
+    printw("RXCS: %07o\n", m_RXCS);
+    printw("RXDB: %07o\n", m_RXDB);
     for (int i = 0; i < BUFFER_SIZE; i++) {
-        printf("%03o ", m_internal_buffer[i]);
+        printw("%03o ", m_internal_buffer[i]);
         if ((i + 1) % 16 == 0 && i != 0) {
-            putchar('\n');
+            printw("\n");
         }
     }
-    putchar('\n');
+    printw("\n");
+    refresh();
 }
 
 void DiskController::process_bus_message(enum BusMessage t, uint32_t addr, uint16_t data)
 {
-    printf("DiskController::%s(%d, %07o, %07o)\n",
-        __FUNCTION__,
-        static_cast<std::underlying_type<BusMessage>::type>(t),
-        addr,
-        data
-    );
-
     switch (t) {
         case BusMessage::DATI:
             if (addr == RXCS) {
@@ -198,10 +194,10 @@ void DiskController::fill_buffer()
         return;
     }
 
-    printf("\t%s(flags: %07o)\n", __FUNCTION__, m_RXCS);
+
     if (!is_transfer_flag_set()) {
         clear_transfer_flag();
-        printf("\tfetching data, %d: %04o\n", m_buffer_index, m_RXDB);
+
         m_internal_buffer[m_buffer_index] = m_RXDB & 0377;
         clear_buffer_register();
         m_buffer_index++;
@@ -215,7 +211,7 @@ void DiskController::fill_buffer()
             m_function = DiskControllerFunction::IDLE;
         }
     } else {
-        printf("\twaiting for write to register, %d\n", m_buffer_index);
+
     }
 }
 
@@ -246,26 +242,10 @@ void DiskController::read_sector()
         m_sector = m_RXDB;
         m_state = DiskControllerState::TRACK;
         set_transfer_flag();
-        printf("\t%s(SECTOR, sector: %04o, track: %04o)\n",
-            __FUNCTION__,
-            m_sector,
-            m_track
-        );
     } else if (m_state == DiskControllerState::TRACK && !is_transfer_flag_set()) {
         m_track = m_RXDB;
         m_state = DiskControllerState::WRITE_SECTOR;
-        printf("\t%s(TRACK, sector: %04o, track: %04o)\n",
-            __FUNCTION__,
-            m_sector,
-            m_track
-        );
     } else if (m_state == DiskControllerState::WRITE_SECTOR) {
-        printf("\t%s(WRITE, sector: %04o, track: %04o)\n",
-            __FUNCTION__,
-            m_sector,
-            m_track
-        );
-
         if (m_disk_media != NULL) {
             // 3328 bytes per track.
             uint32_t track_offset = 3328 * m_track;
@@ -287,26 +267,10 @@ void DiskController::write_sector()
         m_sector = m_RXDB;
         m_state = DiskControllerState::TRACK;
         set_transfer_flag();
-        printf("\t%s(SECTOR, sector: %04o, track: %04o)\n",
-            __FUNCTION__,
-            m_sector,
-            m_track
-        );
     } else if (m_state == DiskControllerState::TRACK && !is_transfer_flag_set()) {
         m_track = m_RXDB;
         m_state = DiskControllerState::WRITE_SECTOR;
-        printf("\t%s(TRACK, sector: %04o, track: %04o)\n",
-            __FUNCTION__,
-            m_sector,
-            m_track
-        );
     } else if (m_state == DiskControllerState::WRITE_SECTOR) {
-        printf("\t%s(WRITE, sector: %04o, track: %04o)\n",
-            __FUNCTION__,
-            m_sector,
-            m_track
-        );
-
         if (m_disk_media != NULL) {
             // 3328 bytes per track.
             uint32_t track_offset = 3328 * m_track;

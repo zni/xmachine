@@ -21,6 +21,9 @@ class Machine
         void dump_state();
         void add_disk(char *);
 
+        void init_ncurses();
+        void shutdown_ncurses();
+
     private:
         Bus m_bus;
         CPU m_cpu;

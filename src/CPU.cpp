@@ -4,6 +4,7 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
+#include <ncurses.h>
 #include "include/CPU.hpp"
 
 std::condition_variable data_recv;
@@ -76,27 +77,25 @@ void CPU::execute()
         lk.unlock();
         send(BusMessage::CLEAR, 0, 0);
         exec_instruction();
-        if (m_single_step) {
-            getchar();
-            dump();
-        }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
 
 void CPU::dump()
 {
-    printf("ALU: %07o\n", m_ALU);
-    printf("PSW: %07o\n", m_PSW);
-    printf("IR : %07o\n", m_IR);
-    printf("SP : %07o\n", m_SP);
-    printf("PC : %07o\n", m_PC);
-    printf("R0 : %07o\n", m_R0);
-    printf("R1 : %07o\n", m_R1);
-    printf("R2 : %07o\n", m_R2);
-    printf("R3 : %07o\n", m_R3);
-    printf("R4 : %07o\n", m_R4);
-    printf("R5 : %07o\n", m_R5);
+    clear();
+    printw("ALU: %07o\n", m_ALU);
+    printw("PSW: %07o\n", m_PSW);
+    printw("IR : %07o\n", m_IR);
+    printw("SP : %07o\n", m_SP);
+    printw("PC : %07o\n", m_PC);
+    printw("R0 : %07o\n", m_R0);
+    printw("R1 : %07o\n", m_R1);
+    printw("R2 : %07o\n", m_R2);
+    printw("R3 : %07o\n", m_R3);
+    printw("R4 : %07o\n", m_R4);
+    printw("R5 : %07o\n", m_R5);
+    refresh();
 }
 
 void CPU::process_message(enum BusMessage t, uint32_t addr, uint16_t data)

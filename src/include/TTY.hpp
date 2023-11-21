@@ -46,7 +46,6 @@ class TTY : public IBusElement
 
     private:
         void init_tty();
-        void shutdown_tty();
 
         void process_bus_message(enum BusMessage, uint32_t, uint16_t);
         bool is_internal_address(uint32_t);
