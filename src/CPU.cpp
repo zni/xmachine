@@ -1503,7 +1503,7 @@ void CPU::JSR()
     setup_dest_addressing();
 
 
-    uint16_t tmp = fetch_data(m_dest_address);
+    uint16_t tmp = m_dest_address;
     uint16_t reg_contents = fetch_register_contents(reg);
 
     store_data(m_SP, reg_contents);
