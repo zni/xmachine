@@ -72,25 +72,31 @@ void CPU::execute()
         lk.unlock();
         send(BusMessage::CLEAR, 0, 0);
         exec_instruction();
+        dump();
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
 
 void CPU::dump()
 {
-    clear();
-    printw("ALU: %07o\n", m_ALU);
-    printw("PSW: %07o\n", m_PSW);
-    printw("IR : %07o\n", m_IR);
-    printw("SP : %07o\n", m_SP);
-    printw("PC : %07o\n", m_PC);
-    printw("R0 : %07o\n", m_R0);
-    printw("R1 : %07o\n", m_R1);
-    printw("R2 : %07o\n", m_R2);
-    printw("R3 : %07o\n", m_R3);
-    printw("R4 : %07o\n", m_R4);
-    printw("R5 : %07o\n", m_R5);
-    refresh();
+    wclear(m_window);
+    wprintw(m_window, "ALU: %07o\n", m_ALU);
+    wprintw(m_window, "PSW: %07o\n", m_PSW);
+    wprintw(m_window, "IR : %07o\n", m_IR);
+    wprintw(m_window, "SP : %07o\n", m_SP);
+    wprintw(m_window, "PC : %07o\n", m_PC);
+    wprintw(m_window, "R0 : %07o\n", m_R0);
+    wprintw(m_window, "R1 : %07o\n", m_R1);
+    wprintw(m_window, "R2 : %07o\n", m_R2);
+    wprintw(m_window, "R3 : %07o\n", m_R3);
+    wprintw(m_window, "R4 : %07o\n", m_R4);
+    wprintw(m_window, "R5 : %07o\n", m_R5);
+    wrefresh(m_window);
+}
+
+void CPU::set_window(WINDOW *window)
+{
+    m_window = window;
 }
 
 void CPU::process_message(enum BusMessage t, uint32_t addr, uint16_t data)

@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <iostream>
 #include <thread>
-#include <ncurses.h>
 #include "include/Memory.hpp"
 
 Memory::Memory()
@@ -63,6 +62,11 @@ void Memory::execute()
     while (!m_bus_connection->halted());
 }
 
+void Memory::set_window(WINDOW *window)
+{
+    m_window = window;
+}
+
 void Memory::dump()
 {
     uint16_t row[16];
@@ -76,13 +80,13 @@ void Memory::dump()
             continue;
         }
 
-        printw("0o%05o: ", r);
+        wprintw(m_window, "0o%05o: ", r);
         for (int i = 0; i < 16; i++) {
-            printw("0o%07o ", row[i]);
+            wprintw(m_window, "0o%07o ", row[i]);
         }
-        printw("\n");
+        wprintw(m_window, "\n");
         all_zero = true;
-        refresh();
+        wrefresh(m_window);
     }
 }
 

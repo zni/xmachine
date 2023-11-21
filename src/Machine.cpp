@@ -1,7 +1,5 @@
 #include <iostream>
 
-#include <ncurses.h>
-
 #include "include/Machine.hpp"
 #include "include/OBJ.hpp"
 
@@ -34,6 +32,9 @@ void Machine::init()
 void Machine::run()
 {
     init_ncurses();
+    m_cpu.set_window(m_left);
+    m_tty.set_window(m_right);
+    m_memory.set_window(m_right);
 
     t_memory = std::thread(&Memory::execute, &m_memory);
     t_cpu = std::thread(&CPU::execute, &m_cpu);
@@ -56,8 +57,14 @@ void Machine::halt()
 void Machine::dump_state()
 {
     m_cpu.dump();
+
+    wclear(m_right_title);
+    wprintw(m_right_title, "MEMORY");
+    wrefresh(m_right_title);
+    wclear(m_right);
+    wrefresh(m_right);
     m_memory.dump();
-    m_disk.dump();
+    //m_disk.dump();
 }
 
 void Machine::add_disk(char *disk)
@@ -67,15 +74,31 @@ void Machine::add_disk(char *disk)
 
 void Machine::init_ncurses()
 {
+    int max_x, max_y;
     initscr();
     cbreak();
     noecho();
     clear();
     refresh();
+
+    getmaxyx(stdscr, max_y, max_x);
+    m_left_title = newwin(1, 25, 0, 0);
+    m_left = newwin(max_y-1, 25, 1, 0);
+    wprintw(m_left_title, "CPU");
+    wrefresh(m_left_title);
+
+    m_right_title = newwin(1, max_x - 25, 0, 25);
+    wprintw(m_right_title, "TTY");
+    wrefresh(m_right_title);
+    m_right = newwin(max_y-1, max_x - 25, 1, 25);
 }
 
 void Machine::shutdown_ncurses()
 {
     getch();
+    delwin(m_left);
+    delwin(m_left_title);
+    delwin(m_right);
+    delwin(m_right_title);
     endwin();
 }

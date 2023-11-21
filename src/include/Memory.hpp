@@ -1,6 +1,8 @@
 #ifndef MEMORY_HPP
 #define MEMORY_HPP
 
+#include <ncurses.h>
+
 #include "Bus.hpp"
 #include "BusMessage.hpp"
 #include "IBusElement.hpp"
@@ -24,6 +26,7 @@ class Memory : public IBusElement
 
         void execute();
 
+        void set_window(WINDOW *);
         void dump();
 
     private:
@@ -37,6 +40,7 @@ class Memory : public IBusElement
         uint32_t m_upper_addr;
 
         Bus* m_bus_connection;
+        WINDOW *m_window;
 };
 
 #endif

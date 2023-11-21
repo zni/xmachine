@@ -3,6 +3,8 @@
 
 #include <thread>
 
+#include <ncurses.h>
+
 #include "Bus.hpp"
 #include "CPU.hpp"
 #include "Memory.hpp"
@@ -35,6 +37,11 @@ class Machine
         std::thread t_memory;
         std::thread t_disk;
         std::thread t_tty;
+
+        WINDOW *m_left;
+        WINDOW *m_right;
+        WINDOW *m_left_title;
+        WINDOW *m_right_title;
 
         char *m_obj_file;
 };

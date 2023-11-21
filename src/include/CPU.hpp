@@ -111,6 +111,7 @@ class CPU : public IBusElement
         void execute();
 
         void dump();
+        void set_window(WINDOW *);
 
     private:
         void process_message(enum BusMessage, uint32_t, uint16_t);
@@ -241,6 +242,7 @@ class CPU : public IBusElement
         bool m_processed;
 
         Bus *m_bus_connection;
+        WINDOW *m_window;
 };
 
 #endif

@@ -1,6 +1,8 @@
 #ifndef TTY_HPP
 #define TTY_HPP
 
+#include <ncurses.h>
+
 #include "Bus.hpp"
 #include "IBusElement.hpp"
 
@@ -42,10 +44,11 @@ class TTY : public IBusElement
         uint16_t bus_id();
         void set_bus(Bus*);
 
+        void set_window(WINDOW *);
+
         void execute();
 
     private:
-        void init_tty();
 
         void process_bus_message(enum BusMessage, uint32_t, uint16_t);
         bool is_internal_address(uint32_t);
@@ -82,6 +85,8 @@ class TTY : public IBusElement
         uint32_t current_row;
 
         Bus *m_bus_connection;
+
+        WINDOW *m_window;
 };
 
 #endif

@@ -20,11 +20,6 @@ TTY::~TTY()
 
 }
 
-void TTY::init_tty()
-{
-    getmaxyx(stdscr, max_rows, max_cols);
-}
-
 void TTY::send(enum BusMessage t, uint32_t addr, uint16_t data)
 {
     m_bus_connection->send_bus_message(this, t, addr, data);
@@ -47,10 +42,14 @@ void TTY::set_bus(Bus *bus)
     m_bus_connection = bus;
 }
 
+void TTY::set_window(WINDOW *window)
+{
+    m_window = window;
+    getmaxyx(m_window, max_rows, max_cols);
+}
+
 void TTY::execute()
 {
-    init_tty();
-
     while (!m_bus_connection->halted()) {
         if (is_tks_busy()) {
             read_kb();
@@ -155,7 +154,7 @@ bool TTY::is_internal_address(uint32_t addr)
 
 void TTY::read_kb()
 {
-    m_TKB = getch();
+    m_TKB = wgetch(m_window);
     clear_tks_busy_flag();
     set_tks_done_flag();
 }
@@ -166,13 +165,13 @@ void TTY::write_char()
     if (c == '\n') {
         current_row++;
         current_col = 0;
-        move(current_row, current_col);
-        refresh();
+        wmove(m_window, current_row, current_col);
+        wrefresh(m_window);
         clear_tpb_buffer();
         set_tps_ready_flag();
         return;
     } else if (c == '\0') {
-        refresh();
+        wrefresh(m_window);
         clear_tpb_buffer();
         set_tps_ready_flag();
         return;
@@ -181,8 +180,8 @@ void TTY::write_char()
     if (current_row == max_rows) {
         current_row = 0;
         current_col = 0;
-        clear();
-        refresh();
+        wclear(m_window);
+        wrefresh(m_window);
     }
 
     if (current_col == max_cols) {
@@ -190,10 +189,10 @@ void TTY::write_char()
         current_col = 0;
     }
 
-    mvaddch(current_row, current_col, m_TPB & 0377);
+    mvwaddch(m_window, current_row, current_col, m_TPB & 0377);
     current_col++;
 
-    refresh();
+    wrefresh(m_window);
     clear_tpb_buffer();
     set_tps_ready_flag();
 }
