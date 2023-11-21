@@ -15,6 +15,8 @@ class OBJ
     private:
         bool is_text_block(FILE*);
         void load_text_block(FILE*, Memory*);
+
+        uint32_t m_loc;
 };
 
 #endif

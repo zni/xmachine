@@ -9,19 +9,21 @@
  * programs from RT-11 OBJ files.
  */
 
-OBJ::OBJ() { }
+OBJ::OBJ()
+{
+    m_loc = 0;
+}
 
 OBJ::~OBJ() { }
 
 void OBJ::read(char *filename, Memory *m)
 {
     FILE *obj_file = fopen(filename, "r");
-    this->is_text_block(obj_file);
 
-    while (!this->is_text_block(obj_file) && !feof(obj_file));
-
-    if (!feof(obj_file)) {
-        this->load_text_block(obj_file, m);
+    while (!feof(obj_file)) {
+        if (is_text_block(obj_file)) {
+            load_text_block(obj_file, m);
+        }
     }
 
     fclose(obj_file);
@@ -39,7 +41,7 @@ bool OBJ::is_text_block(FILE *obj)
     fread(&byte01, sizeof(uint8_t), 1, obj);
     if (byte01 != 3) {
         fseek(obj, len - 5, SEEK_CUR);
-        fread(&chksum, sizeof(uint8_t), 1, obj);
+        fread(&chksum, sizeof(int8_t), 1, obj);
         return false;
     } else {
         fseek(obj, -5, SEEK_CUR);
@@ -50,6 +52,7 @@ bool OBJ::is_text_block(FILE *obj)
 void OBJ::load_text_block(FILE *obj, Memory *m)
 {
     uint8_t byte01, byte02, tag, pad;
+    int8_t chksum;
     uint16_t word, len, load_offset, loc;
 
     fread(&byte01, sizeof(uint8_t), 1, obj);            // Read 01 00 data block tag.
@@ -74,16 +77,17 @@ void OBJ::load_text_block(FILE *obj, Memory *m)
     fread(&load_offset, sizeof(uint16_t), 1, obj);      // Read load address word.
     fread(&pad, sizeof(uint8_t), 1, obj);               // Skip past pad byte.
     len -= 8;                                           // Adjust the length.
-    loc = load_offset;
+    //m_loc = load_offset;
 
-    for (int i = 0; i < len; i += 2, loc += 2) {
+    for (int i = 0; i < len; i += 2, m_loc += 2) {
         fread(&byte01, sizeof(uint8_t), 1, obj);
         fread(&byte02, sizeof(uint8_t), 1, obj);
         word = (byte02 << 8) | byte01;
-        m->write_word(loc, word);
+        m->write_word(m_loc, word);
 
 #ifdef DEBUG_OBJ
-        printf("%07o: %07o: %03o %03o\n", loc, word, byte01, byte02);
+        printf("%07o: %07o: %03o %03o\n", m_loc, word, byte01, byte02);
 #endif
     }
+    fread(&chksum, sizeof(int8_t), 1, obj);
 }
