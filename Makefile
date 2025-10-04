@@ -35,8 +35,10 @@ clean:
 	rm bin/cpu
 	rm bin/disk
 	rm bin/tty
+	rm bin/bus
 	rm src/disk/disk.o
 	rm src/mem/mem.o
 	rm src/cpu/cpu.o
 	rm src/tty/tty.o
+	rm src/bus/bus.o
 
