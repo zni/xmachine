@@ -1,0 +1,352 @@
+#include "disk.h"
+
+void init_disk()
+{
+//    m_state = DiskControllerState::BEGIN;
+//    m_function = DiskControllerFunction::IDLE;
+//    m_track = 0;
+//    m_sector = 0;
+//    m_RXCS = 0;
+//    m_RXDB = 0;
+//    m_buffer_index = 0;
+//    m_disk_media = NULL;
+//    m_bus_connection = NULL;
+}
+
+void shutdown_disk()
+{
+//    if (m_disk_media != NULL) {
+//        fclose(m_disk_media);
+//    }
+}
+
+//void send(enum BusMessage t, uint32_t addr, uint16_t data)
+//{
+//    m_bus_connection->send_bus_message(this, t, addr, data);
+//}
+
+//void DiskController::recv(enum BusMessage t, uint32_t addr, uint16_t data)
+//{
+//    if (addr == RXCS || addr == RXDB) {
+//        process_bus_message(t, addr, data);
+//    }
+//}
+
+//uint16_t DiskController::bus_id()
+//{
+//    return 0000003;
+//}
+
+//void DiskController::set_bus(Bus *bus)
+//{
+//    m_bus_connection = bus;
+//}
+
+void insert_disk_media(char *disk)
+{
+//    m_disk_media = fopen(disk, "r+");
+}
+
+void execute()
+{
+//    uint16_t go_flag;
+//    while (!m_bus_connection->halted()) {
+//        go_flag = static_cast<uint16_t>(RXCSFlag::GO) & m_RXCS;
+//        if (go_flag && ((m_state == DiskControllerState::BEGIN) ||
+//                        (m_state == DiskControllerState::DONE))) {
+//
+//
+//            enum DiskControllerFunction function =
+//                static_cast<DiskControllerFunction>((static_cast<uint16_t>(RXCSFlag::FS) & m_RXCS) >> 1);
+//
+//            clear_all_flags();
+//
+//            switch (function) {
+//                case DiskControllerFunction::FILL_BUFFER:
+//                    m_state = DiskControllerState::FILL;
+//                    m_function = DiskControllerFunction::FILL_BUFFER;
+//                    set_transfer_flag();
+//                    break;
+//                case DiskControllerFunction::EMPTY_BUFFER:
+//                    m_state = DiskControllerState::EMPTY;
+//                    m_function = DiskControllerFunction::EMPTY_BUFFER;
+//                    break;
+//                case DiskControllerFunction::WRITE_SECTOR:
+//                    m_state = DiskControllerState::SECTOR;
+//                    m_function = DiskControllerFunction::WRITE_SECTOR;
+//                    set_transfer_flag();
+//                    break;
+//                case DiskControllerFunction::READ_SECTOR:
+//                    m_state = DiskControllerState::SECTOR;
+//                    m_function = DiskControllerFunction::READ_SECTOR;
+//                    set_transfer_flag();
+//                    break;
+//                case DiskControllerFunction::NOT_USED:
+//                    break;
+//                case DiskControllerFunction::READ_STATUS:
+//                    break;
+//                case DiskControllerFunction::WRITE_DEL:
+//                    break;
+//                case DiskControllerFunction::READ_ERR:
+//                    break;
+//                default:
+//                    break;
+//            }
+//
+//        } else if ((m_state == DiskControllerState::FILL) &&
+//                   (m_function == DiskControllerFunction::FILL_BUFFER)) {
+//
+//            fill_buffer();
+//
+//        } else if ((m_state == DiskControllerState::EMPTY) &&
+//                   (m_function == DiskControllerFunction::EMPTY_BUFFER)) {
+//
+//            empty_buffer();
+//
+//        } else if (m_function == DiskControllerFunction::READ_SECTOR) {
+//
+//            read_sector();
+//
+//        } else if (m_function == DiskControllerFunction::WRITE_SECTOR) {
+//
+//            write_sector();
+//
+//        } else if (m_state == DiskControllerState::DONE) {
+//            m_state = DiskControllerState::BEGIN;
+//
+//            set_done_flag();
+//        }
+//        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+//    }
+}
+
+void dump()
+{
+    //printw("RXCS: %07o\n", m_RXCS);
+    //printw("RXDB: %07o\n", m_RXDB);
+    //for (int i = 0; i < BUFFER_SIZE; i++) {
+    //    printw("%03o ", m_internal_buffer[i]);
+    //    if ((i + 1) % 16 == 0 && i != 0) {
+    //        printw("\n");
+    //    }
+    //}
+    //printw("\n");
+    //refresh();
+}
+
+//void DiskController::process_bus_message(enum BusMessage t, uint32_t addr, uint16_t data)
+//{
+//    switch (t) {
+//        case BusMessage::DATI:
+//            if (addr == RXCS) {
+//                send(BusMessage::SSYN, addr, m_RXCS);
+//            } else if (addr == RXDB) {
+//                send(BusMessage::SSYN, addr, m_RXDB);
+//                clear_transfer_flag();
+//                clear_buffer_register();
+//            }
+//            break;
+//
+//        case BusMessage::DATOB:
+//            if (addr == RXCS) {
+//                set_status_register(data);
+//                send(BusMessage::SSYN, addr, data);
+//            } else if (addr == RXDB) {
+//                m_RXDB = data;
+//                clear_transfer_flag();
+//                send(BusMessage::SSYN, addr, data);
+//            }
+//            break;
+//
+//        case BusMessage::DATO:
+//            if (addr == RXCS) {
+//                set_status_register(data);
+//                send(BusMessage::SSYN, addr, data);
+//            } else if (addr == RXDB) {
+//                m_RXDB = data;
+//                clear_transfer_flag();
+//                send(BusMessage::SSYN, addr, data);
+//            }
+//            break;
+//        case BusMessage::DATIP: {
+//            break;
+//        }
+//        case BusMessage::MSYN: {
+//            break;
+//        }
+//        case BusMessage::SSYN: {
+//            break;
+//        }
+//        default: break;
+//    }
+//}
+
+void fill_buffer()
+{
+//    if (m_buffer_index == SECTOR_SIZE) {
+//        return;
+//    }
+//
+//
+//    if (!is_transfer_flag_set()) {
+//        clear_transfer_flag();
+//
+//        m_internal_buffer[m_buffer_index] = m_RXDB & 0377;
+//        clear_buffer_register();
+//        m_buffer_index++;
+//        if (m_buffer_index != SECTOR_SIZE) {
+//            set_transfer_flag();
+//        } else {
+//            clear_all_flags();
+//            set_done_flag();
+//            m_buffer_index = 0;
+//            m_state = DiskControllerState::DONE;
+//            m_function = DiskControllerFunction::IDLE;
+//        }
+//    } else {
+//
+//    }
+}
+
+void empty_buffer()
+{
+//    if (m_buffer_index == SECTOR_SIZE) {
+//        return;
+//    }
+//
+//    if (!is_transfer_flag_set()) {
+//        m_RXDB = m_internal_buffer[m_buffer_index];
+//        m_buffer_index++;
+//        if (m_buffer_index != SECTOR_SIZE) {
+//            set_transfer_flag();
+//        } else {
+//            clear_all_flags();
+//            set_done_flag();
+//            m_buffer_index = 0;
+//            m_state = DiskControllerState::DONE;
+//            m_function = DiskControllerFunction::IDLE;
+//        }
+//    }
+}
+
+void read_sector()
+{
+//    if (m_state == DiskControllerState::SECTOR && !is_transfer_flag_set()) {
+//        m_sector = m_RXDB;
+//        m_state = DiskControllerState::TRACK;
+//        set_transfer_flag();
+//    } else if (m_state == DiskControllerState::TRACK && !is_transfer_flag_set()) {
+//        m_track = m_RXDB;
+//        m_state = DiskControllerState::WRITE_SECTOR;
+//    } else if (m_state == DiskControllerState::WRITE_SECTOR) {
+//        if (m_disk_media != NULL) {
+//            // 3328 bytes per track.
+//            uint32_t track_offset = 3328 * m_track;
+//            uint32_t disk_offset = track_offset + (128 * m_sector);
+//            fseek(m_disk_media, disk_offset, SEEK_SET);
+//            fread(m_internal_buffer, sizeof(uint8_t), 128, m_disk_media);
+//        }
+//
+//        m_state = DiskControllerState::DONE;
+//        m_function = DiskControllerFunction::IDLE;
+//        m_sector = 0;
+//        m_track = 0;
+//    }
+}
+
+void write_sector()
+{
+//    if (m_state == DiskControllerState::SECTOR && !is_transfer_flag_set()) {
+//        m_sector = m_RXDB;
+//        m_state = DiskControllerState::TRACK;
+//        set_transfer_flag();
+//    } else if (m_state == DiskControllerState::TRACK && !is_transfer_flag_set()) {
+//        m_track = m_RXDB;
+//        m_state = DiskControllerState::WRITE_SECTOR;
+//    } else if (m_state == DiskControllerState::WRITE_SECTOR) {
+//        if (m_disk_media != NULL) {
+//            // 3328 bytes per track.
+//            uint32_t track_offset = 3328 * m_track;
+//            uint32_t disk_offset = track_offset + (128 * m_sector);
+//            fseek(m_disk_media, disk_offset, SEEK_SET);
+//            fwrite(m_internal_buffer, sizeof(uint8_t), 128, m_disk_media);
+//        }
+//
+//        m_state = DiskControllerState::DONE;
+//        m_function = DiskControllerFunction::IDLE;
+//        m_sector = 0;
+//        m_track = 0;
+//    }
+}
+
+void clear_buffer_register()
+{
+//    m_RXDB = 0;
+}
+
+void set_status_register(uint16_t data)
+{
+//    // Only allow writeable fields to be set.
+//    data &= RXCS_WRITE_MASK;
+//    m_RXCS |= data;
+}
+
+void set_transfer_flag()
+{
+//    if ((m_RXCS & static_cast<uint16_t>(RXCSFlag::XFER)) == 0) {
+//        m_RXCS |= static_cast<uint16_t>(RXCSFlag::XFER);
+//    }
+}
+
+void clear_transfer_flag()
+{
+//    m_RXCS = m_RXCS & ~static_cast<uint16_t>(RXCSFlag::XFER);
+}
+
+uint8_t is_transfer_flag_set()
+{
+//    if (m_RXCS & static_cast<uint16_t>(RXCSFlag::XFER)) {
+//        return true;
+//    } else {
+//        return false;
+//    }
+}
+
+void set_done_flag()
+{
+//    if ((m_RXCS & static_cast<uint16_t>(RXCSFlag::DONE)) == 0) {
+//        m_RXCS |= static_cast<uint16_t>(RXCSFlag::DONE);
+//    }
+}
+
+void clear_done_flag()
+{
+//    if (m_RXCS & static_cast<uint16_t>(RXCSFlag::DONE)) {
+//        m_RXCS ^= static_cast<uint16_t>(RXCSFlag::DONE);
+//    }
+}
+
+uint8_t is_done_flag_set()
+{
+//    if (m_RXCS & static_cast<uint16_t>(RXCSFlag::DONE)) {
+//        return true;
+//    } else {
+//        return false;
+//    }
+}
+
+void clear_writeable_flags()
+{
+//    m_RXCS = m_RXCS & ~RXCS_WRITE_MASK;
+}
+
+void clear_all_flags()
+{
+//    m_RXCS = 0;
+}
+
+int main(int argc, char **argv)
+{
+    return 0;
+}
+

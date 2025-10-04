@@ -1,0 +1,286 @@
+#include "tty.h"
+
+void init_tty()
+{
+    //m_TPS = static_cast<uint16_t>(TPSFlag::READY);
+    //m_TPB = 0;
+    //m_TKB = 0;
+    //m_TKS = 0;
+    //current_col = 0;
+    //current_row = 0;
+    //max_rows = 0;
+    //max_cols = 0;
+}
+
+//void send(enum BusMessage t, uint32_t addr, uint16_t data)
+//{
+//    m_bus_connection->send_bus_message(this, t, addr, data);
+//}
+
+//void recv(enum BusMessage t, uint32_t addr, uint16_t data)
+//{
+//    if (is_internal_address(addr)) {
+//        process_bus_message(t, addr, data);
+//    }
+//}
+
+uint16_t bus_id()
+{
+//    return 0000004;
+}
+
+//void set_bus(Bus *bus)
+//{
+//    m_bus_connection = bus;
+//}
+
+//void set_window(WINDOW *window)
+//{
+//    m_window = window;
+//    getmaxyx(m_window, max_rows, max_cols);
+//}
+
+void execute()
+{
+//    while (!m_bus_connection->halted()) {
+//        if (is_tks_busy()) {
+//            read_kb();
+//        }
+//
+//        if (!is_tps_ready()) {
+//            write_char();
+//        }
+//        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+//    }
+}
+
+//void process_bus_message(enum BusMessage t, uint32_t addr, uint16_t data)
+//{
+//    switch (t) {
+//        // Read request
+//        case BusMessage::DATI: {
+//            switch (addr) {
+//                case TKS:
+//                    send(BusMessage::SSYN, addr, m_TKS);
+//                    break;
+//                case TKB:
+//                    send(BusMessage::SSYN, addr, read_tkb_buffer());
+//                    break;
+//                case TPS:
+//                    send(BusMessage::SSYN, addr, m_TPS);
+//                    break;
+//                case TPB:
+//                    send(BusMessage::SSYN, addr, m_TPB);
+//                    break;
+//            }
+//            break;
+//        }
+//
+//        // Not currently implemented.
+//        case BusMessage::DATIP:
+//            break;
+//
+//        // Write request.
+//        case BusMessage::DATO:{
+//            switch (addr) {
+//                case TKS:
+//                    set_tks_register(data);
+//                    send(BusMessage::SSYN, addr, m_TKS);
+//                    break;
+//                case TKB:
+//                    // Read-only
+//                    send(BusMessage::SSYN, addr, 0);
+//                    break;
+//                case TPS:
+//                    set_tps_register(data);
+//                    send(BusMessage::SSYN, addr, m_TPS);
+//                    break;
+//                case TPB:
+//                    set_tpb_buffer(data);
+//                    send(BusMessage::SSYN, addr, m_TPB);
+//                    break;
+//            }
+//            break;
+//        }
+//
+//        // Write byte request.
+//        case BusMessage::DATOB:{
+//            switch (addr) {
+//                case TKS:
+//                    set_tks_register(data);
+//                    send(BusMessage::SSYN, addr, m_TKS);
+//                    break;
+//                case TKB:
+//                    // Read-only
+//                    send(BusMessage::SSYN, addr, 0);
+//                    break;
+//                case TPS:
+//                    set_tps_register(data);
+//                    send(BusMessage::SSYN, addr, m_TPS);
+//                    break;
+//                case TPB:
+//                    set_tpb_buffer(data);
+//                    send(BusMessage::SSYN, addr, m_TPB);
+//                    break;
+//            }
+//            break;
+//        }
+//
+//        default:
+//            break;
+//    }
+//}
+
+uint8_t is_internal_address(uint32_t addr)
+{
+//    switch (addr) {
+//        case TKS:
+//        case TKB:
+//        case TPS:
+//        case TPB:
+//            return true;
+//        default:
+//            return false;
+//    }
+}
+
+void read_kb()
+{
+    //m_TKB = wgetch(m_window);
+    //clear_tks_busy_flag();
+    //set_tks_done_flag();
+}
+
+void write_char()
+{
+    //char c = m_TPB & 0377;
+    //if (c == '\n') {
+    //    current_row++;
+    //    current_col = 0;
+    //    //wmove(m_window, current_row, current_col);
+    //    //wrefresh(m_window);
+    //    clear_tpb_buffer();
+    //    set_tps_ready_flag();
+    //    return;
+    //} else if (c == '\0') {
+    //    //wrefresh(m_window);
+    //    clear_tpb_buffer();
+    //    set_tps_ready_flag();
+    //    return;
+    //}
+
+    //if (current_row == max_rows) {
+    //    current_row = 0;
+    //    current_col = 0;
+    //    //wclear(m_window);
+    //    //wrefresh(m_window);
+    //}
+
+    //if (current_col == max_cols) {
+    //    current_row++;
+    //    current_col = 0;
+    //}
+
+    ////mvwaddch(m_window, current_row, current_col, m_TPB & 0377);
+    //current_col++;
+
+    ////wrefresh(m_window);
+    //clear_tpb_buffer();
+    //set_tps_ready_flag();
+}
+
+void set_tks_register(uint16_t data)
+{
+    //m_TKS = data & TKS_WRITE_MASK;
+
+    //if (m_TKS & static_cast<uint16_t>(TKSFlag::RDRENB)) {
+    //    set_tks_busy_flag();
+    //    clear_tks_rdrenb_flag();
+    //}
+}
+
+uint8_t is_tks_busy()
+{
+    //if (m_TKS & static_cast<uint16_t>(TKSFlag::BUSY)) {
+    //    return true;
+    //} else {
+    //    return false;
+    //}
+}
+
+void set_tks_busy_flag()
+{
+    //m_TKS |= static_cast<uint16_t>(TKSFlag::BUSY);
+}
+
+void set_tks_done_flag()
+{
+    //m_TKS |= static_cast<uint16_t>(TKSFlag::DONE);
+}
+
+void clear_tks_rdrenb_flag()
+{
+    //m_TKS &= ~static_cast<uint16_t>(TKSFlag::RDRENB);
+}
+
+void clear_tks_busy_flag()
+{
+    //m_TKS &= ~static_cast<uint16_t>(TKSFlag::BUSY);
+}
+
+void clear_tks_done_flag()
+{
+    //m_TKS &= ~static_cast<uint16_t>(TKSFlag::DONE);
+}
+
+void clear_tks_mode_flags()
+{
+    //m_TKS &= ~TKS_MODE_MASK;
+}
+
+uint16_t read_tkb_buffer()
+{
+    //clear_tks_mode_flags();
+    //return m_TKB;
+}
+
+void set_tps_register(uint16_t data)
+{
+    //m_TPS = data & TPS_WRITE_MASK;
+}
+
+uint8_t is_tps_ready()
+{
+    //if (m_TPS & static_cast<uint16_t>(TPSFlag::READY)) {
+    //    return true;
+    //} else {
+    //    return false;
+    //}
+}
+
+void set_tps_ready_flag()
+{
+    //m_TPS |= static_cast<uint16_t>(TPSFlag::READY);
+}
+
+void clear_tps_ready_flag()
+{
+    //m_TPS &= ~static_cast<uint16_t>(TPSFlag::READY);
+}
+
+void set_tpb_buffer(uint16_t data)
+{
+    //m_TPB = data & 0377;
+    //clear_tps_ready_flag();
+}
+
+void clear_tpb_buffer()
+{
+    //m_TPB = 0;
+}
+
+int main(int argc, char **argv)
+{
+    return 0;
+}
+
