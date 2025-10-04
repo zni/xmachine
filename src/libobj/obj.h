@@ -1,22 +1,9 @@
-#ifndef OBJ_HPP
-#define OBJ_HPP
+#ifndef OBJ_H
+#define OBJ_H
 
-#include <cstdio>
-#include "Memory.hpp"
-
-class OBJ
-{
-    public:
-        OBJ();
-        ~OBJ();
-
-        void read(char *, Memory*);
-
-    private:
-        bool is_text_block(FILE*);
-        void load_text_block(FILE*, Memory*);
-
-        uint32_t m_loc;
-};
+void read(char *);
+int is_text_block(FILE *);
+void load_text_block(FILE *);
 
 #endif
+
