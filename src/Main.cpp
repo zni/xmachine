@@ -2,7 +2,7 @@
 #include <iostream>
 #include <thread>
 
-#include <getopt.h>
+#include <unistd.h>
 #include <signal.h>
 
 #include "include/Machine.hpp"
@@ -17,12 +17,19 @@ void handle_user_interrupt(int signo)
     machine->halt();
 }
 
+void usage()
+{
+    std::cout << "usage: xmachine -o <OBJ file>" << std::endl;
+    std::cout << "                -d <disk image> : file to use with the disk controller" << std::endl;
+    exit(EXIT_FAILURE);
+}
+
 int main(int argc, char** argv)
 {
     bool tty_enable = false;
     char *obj_file = NULL;
     char *disk_name = NULL;
-    char opt;
+    int opt;
     while ((opt = getopt(argc, argv, "d:o:")) != -1) {
         switch (opt) {
             case 'd':
@@ -31,15 +38,13 @@ int main(int argc, char** argv)
             case 'o':
                 obj_file = optarg;
                 break;
-            default:
-                break;
+            case '?':
+                usage();
         }
     }
 
     if (obj_file == NULL) {
-        std::cout << "usage: xmachine -o <OBJ file>" << std::endl;
-        std::cout << "\t-d <disk image> : file to use with the disk controller" << std::endl;
-        exit(EXIT_FAILURE);
+        usage();
     }
 
     Machine m(obj_file);
