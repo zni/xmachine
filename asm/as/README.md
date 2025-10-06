@@ -7,8 +7,10 @@ To assemble this stuff, just:
 - Grab a binutils release (I'm using GNU binutils 2.45 as of 2025-10-05).
 - Build it like this:
 
-    ./configure --target=pdp11-aout --prefix=$HOME/opt/pdp11-cross
-    make
-    make install
+```
+./configure --target=pdp11-aout --prefix=$HOME/opt/pdp11-cross
+make
+make install
+```
 
 - Use it, I guess.
