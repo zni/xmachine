@@ -2,7 +2,6 @@
 
 void register_bus_element()
 {
-//    this->m_bus_elements.push_back(element);
 }
 
 void send_bus_message(/* BusMessage t,*/ uint32_t addr, uint16_t data)
@@ -44,12 +43,12 @@ void send_bus_message(/* BusMessage t,*/ uint32_t addr, uint16_t data)
 
 void halt(uint8_t halt)
 {
-//    this->m_halted = halt;
+
 }
 
 uint8_t halted()
 {
-//    return this->m_halted;
+
 }
 
 int main(int argc, char **argv)
