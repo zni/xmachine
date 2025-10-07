@@ -78,6 +78,7 @@ aout_text_read(char *executable, exec_t *header)
     if (close(fd) != 0) {
         current_error = errno;
         printf("Failed to close file: %s\n", strerror(current_error));
+        free(buffer);
         return NULL;
     }
 
