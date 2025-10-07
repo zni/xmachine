@@ -30,6 +30,13 @@ bus: src/bus/bus.o
 bus.o: src/bus/bus.c src/bus/bus.h
 	gcc -c src/bus/bus.c -o src/bus/bus.o
 
+libload: src/libload/load.c src/libload/load.h
+	gcc -c src/libload/load.c -o src/libload/load.o
+	ar rcs src/libload/libload.a src/libload/load.o
+
+clean_libload: src/libload/libload.a
+	rm src/libload/libload.a
+
 clean:
 	rm bin/mem
 	rm bin/cpu
