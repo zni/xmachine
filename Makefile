@@ -1,4 +1,4 @@
-.PHONY: clean
+.PHONY: clean tags
 
 cpu: src/cpu/cpu.o
 	gcc -o bin/cpu src/cpu/cpu.o
@@ -36,6 +36,15 @@ libload: src/libload/load.c src/libload/load.h
 
 clean_libload: src/libload/libload.a
 	rm src/libload/libload.a
+
+loader: loader.c
+	gcc loader.c -L../src/libload -lload -o bin/loader
+
+clean_loader: bin/loader
+	rm bin/loader
+
+tags:
+	ctags -R src
 
 clean:
 	rm bin/mem
