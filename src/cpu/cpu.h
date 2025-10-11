@@ -93,5 +93,54 @@ enum OPCode {
     MFPS_op = 0106700
 };
 
+typedef struct cpu {
+    uint16_t r0;
+    uint16_t r1;
+    uint16_t r2;
+    uint16_t r3;
+    uint16_t r4;
+    uint16_t r5;
+    uint16_t sp;
+    uint16_t pc;
+    uint16_t psw;
+    uint16_t alu;
+    uint16_t ir;
+
+    uint32_t src_address;
+    uint32_t dest_address;
+
+    uint8_t halted;
+} cpu_t;
+
+void exec_instruction(cpu_t*);
+
+int8_t get_branch_offset(cpu_t*);
+void set_negative_flag_w(cpu_t *, uint16_t);
+
+// Branch OPS
+void BR(cpu_t*);
+void BNE(cpu_t*);
+void BEQ(cpu_t*);
+void BGE(cpu_t*);
+void BLT(cpu_t*);
+void BGT(cpu_t*);
+void BLE(cpu_t*);
+void BPL(cpu_t*);
+void BMI(cpu_t*);
+void BHI(cpu_t*);
+void BLOS(cpu_t*);
+void BVC(cpu_t*);
+void BVS(cpu_t*);
+void BCC(cpu_t*);
+void BCS(cpu_t*);
+
+// Double OP Register Source and JSR
+void MUL(cpu_t*);
+void DIV(cpu_t*);
+void ASH(cpu_t*);
+void ASHC(cpu_t*);
+void XOR(cpu_t*);
+void JSR(cpu_t*);
+
 #endif
 
