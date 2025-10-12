@@ -69,6 +69,8 @@ main(int argc, char **argv)
 
     dump_mem(mem);
 
+    free(mem);
+
     return 0;
 }
 
