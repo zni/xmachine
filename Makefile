@@ -37,7 +37,7 @@ libload: src/libload/load.c src/libload/load.h
 clean_libload: src/libload/libload.a
 	rm src/libload/libload.a
 
-loader: src/utilities/loader.c bin
+loader: libload src/utilities/loader.c bin
 	gcc src/utilities/loader.c -L../src/libload -lload -o bin/loader
 
 tags:
