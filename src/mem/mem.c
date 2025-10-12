@@ -1,123 +1,74 @@
-//#include <chrono>
-//#include <cstdint>
-//#include <iostream>
-//#include <thread>
-//#include "include/Memory.hpp"
-#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "mem.h"
+#include "../common/include/types.h"
 
-void init_mem()
+mem_t*
+init_mem()
 {
-    //m_MAR = 0;
-    //m_MBR = 0;
+    mem_t *mem = malloc(sizeof(mem_t));
+    if (mem == NULL) {
+        perror("mem malloc");
+        return NULL;
+    }
 
-    //m_lower_addr = 0;
-    //m_upper_addr = MEMBYTES;
+    return mem;
 }
 
-//void Memory::send(enum BusMessage t, uint32_t addr, uint16_t data)
-//{
-//    m_bus_connection->send_bus_message(this, t, addr, data);
-//}
-//
-//void Memory::recv(enum BusMessage t, uint32_t addr, uint16_t data)
-//{
-//    if (t == BusMessage::MSYN || t == BusMessage::SSYN) {
-//        return;
-//    }
-//
-//    if (addr >= m_lower_addr && addr <= m_upper_addr) {
-//        process_message(t, addr, data);
-//    }
-//}
-//
-//uint16_t Memory::bus_id()
-//{
-//    return 0000002;
-//}
-
-//void Memory::set_bus(Bus *b)
-//{
-//    m_bus_connection = b;
-//}
-//
-//void Memory::write_word(uint32_t addr, uint16_t word)
-//{
-//    m_MAR = addr;
-//    m_MBR = word;
-//    m_MEMORY[m_MAR] = m_MBR & 0377;
-//    m_MEMORY[m_MAR + 1] = (m_MBR & 0177400) >> 8;
-//}
-//
-//uint16_t Memory::read_word(uint32_t addr)
-//{
-//    uint16_t word = 0;
-//    word = m_MEMORY[addr];
-//    word |= m_MEMORY[addr + 1] << 8;
-//    return word;
-//}
-//
-//void Memory::execute()
-//{
-//    while (!m_bus_connection->halted());
-//}
-
-//void Memory::set_window(WINDOW *window)
-//{
-//    m_window = window;
-//}
-
-void dump_mem()
+void
+write_word(mem_t *mem, uint32_t addr, uint16_t word)
 {
-    //uint16_t row[16];
-    //bool all_zero = true;
-    //for (int r = 0; r < MEMWORDS; r += 32) {
-    //    for (int c = 0, i = 0; c < 32; c += 2, i++) {
-    //        if (read_word(r+c) != 0) { all_zero = false; }
-    //        row[i] = read_word(r+c);
-    //    }
-    //    if (all_zero && ((r + 16) < MEMWORDS) && (r != 0)) {
-    //        continue;
-    //    }
-
-    //    wprintw(m_window, "0o%05o: ", r);
-    //    for (int i = 0; i < 16; i++) {
-    //        wprintw(m_window, "0o%07o ", row[i]);
-    //    }
-    //    wprintw(m_window, "\n");
-    //    all_zero = true;
-    //    wrefresh(m_window);
-    //}
+    mem->mar = addr;
+    mem->mbr = word;
+    mem->store[mem->mar] = mem->mbr & 0377;
+    mem->store[mem->mar + 1] = (mem->mbr & 0177400) >> 8;
 }
 
-//void Memory::process_message(enum BusMessage t, uint32_t addr, uint16_t data)
-//{
-//    switch (t) {
-//        case BusMessage::DATI:
-//            send(BusMessage::SSYN, addr, read_word(addr));
-//            break;
-//        case BusMessage::DATIP:
-//            break;
-//        case BusMessage::DATO:
-//            m_MAR = addr;
-//            m_MBR = data;
-//            m_MEMORY[m_MAR] = m_MBR & 0377;
-//            m_MEMORY[m_MAR + 1] = (m_MBR & 0177400) >> 8;
-//            send(BusMessage::SSYN, m_MAR, m_MBR);
-//            break;
-//        case BusMessage::DATOB:
-//            m_MAR = addr;
-//            m_MBR = data;
-//            m_MEMORY[m_MAR] = m_MBR;
-//            send(BusMessage::SSYN, m_MAR, m_MBR);
-//            break;
-//        default:
-//            break;
-//    }
-//}
-
-int main(int argc, char **argv)
+uint16_t
+read_word(mem_t *mem, uint32_t addr)
 {
+    uint16_t word = 0;
+    word = mem->store[addr];
+    word |= mem->store[addr + 1] << 8;
+    return word;
+}
+
+void
+dump_mem(mem_t *mem)
+{
+    uint16_t row[16];
+    uint8_t all_zero = TRUE;
+    for (int r = 0; r < MEMWORDS; r += 32) {
+        for (int c = 0, i = 0; c < 32; c += 2, i++) {
+            if (read_word(mem, r + c) != 0) { all_zero = FALSE; }
+            row[i] = read_word(mem, r + c);
+        }
+        if (all_zero && ((r + 16) < MEMWORDS) && (r != 0)) {
+            continue;
+        }
+
+        printf("0o%05o: ", r);
+        for (int i = 0; i < 16; i++) {
+            printf("0o%07o ", row[i]);
+        }
+        putchar('\n');
+        all_zero = TRUE;
+    }
+}
+
+int
+main(int argc, char **argv)
+{
+    mem_t *mem = init_mem();
+    if (mem == NULL) {
+        fprintf(stderr, "Failed to initialize memory.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // TODO Become a daemon.
+
+    dump_mem(mem);
+
     return 0;
 }
 
