@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
-#define PRIORITY_SOCKET_NAME "/tmp/uni_priority.socket"
+#define PRIORITY_SOCKET_NAME "/tmp/unibus_priority.socket"
 
 typedef struct unibus {
     int data_socket;

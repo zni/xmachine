@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+#define ASSERTED 1
+#define NEGATED 0
+
 typedef enum signal {
     // Data Bus Signal Types
     A,

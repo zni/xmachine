@@ -70,26 +70,44 @@ setup_data_socket(unibus_t *uni)
 }
 
 void
+dump_req(bus_req_t *b)
+{
+    printf("REQ: ");
+    switch (b->sig) {
+    case BR:
+        printf("BR\n");
+        break;
+    case BG:
+        printf("BG\n");
+        break;
+    case NPR:
+        printf("NPR\n");
+        break;
+    case NPG:
+        printf("NPG\n");
+        break;
+    case SACK:
+        printf("SACK\n");
+        break;
+    case BBSY:
+        printf("BBSY\n");
+        break;
+    }
+
+    printf("ASSERTION: %s\n", b->assertion ? "ASSERTED" : "NEGATED");
+}
+
+void
 handle_priority_req(unibus_t *uni)
 {
-    if (listen(uni->priority_socket, 20) == -1) {
-        perror("priority listen");
-        exit(EXIT_FAILURE);
-    }
-
     bus_req_t inc_req;
-    uni->inc_priority_socket = accept(uni->priority_socket, NULL, NULL);
-    if (uni->inc_priority_socket == -1) {
-        perror("priority accept");
-        exit(EXIT_FAILURE);
-    }
-
-    if (read(uni->inc_priority_socket, &inc_req, sizeof(bus_req_t)) == -1) {
-        perror("priority read");
+    if (recv(uni->priority_socket, &inc_req, sizeof(bus_req_t), MSG_WAITALL) == -1) {
+        perror("priority recv");
         exit(EXIT_FAILURE);
     }
 
     printf("received priority req\n");
+    dump_req(&inc_req);
 
     close(uni->inc_priority_socket);
 }
