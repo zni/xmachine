@@ -8,16 +8,19 @@
 
 #define PRIORITY_SOCKET_NAME "/tmp/unibus_priority.socket"
 
-typedef struct unibus {
-    int data_socket;
-    int inc_data_socket;
-
+typedef struct arb_state {
     int priority_socket;
-    int inc_priority_socket;
+    int client_socket;
 
-    int init_socket;
-    int inc_init_socket;
-} unibus_t;
+    struct sockaddr_un current_client;
+    socklen_t client_addr_len;
+
+    uint8_t outstanding_bg;
+    uint8_t outstanding_npg;
+
+    uint8_t sack;
+    uint8_t bbsy;
+} arb_state_t;
 
 #endif
 
