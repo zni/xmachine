@@ -6,6 +6,10 @@
 #define ASSERTED 1
 #define NEGATED 0
 
+#define SOCK_NAME_LEN 100
+
+typedef uint8_t assert_t;
+
 typedef enum signal {
     // Data Bus Signal Types
     A,
@@ -33,8 +37,14 @@ typedef enum signal {
 } signal_t;
 
 typedef struct bus_req {
+    /*
+     * True Unibus wouldn't know this, but since I'm making my own Rube
+     * Goldberg version of it, I need to know.
+     */
+    char from[SOCK_NAME_LEN];
+
     signal_t sig;
-    uint8_t assertion;
+    assert_t assertion;
     uint32_t value;
 } bus_req_t;
 
