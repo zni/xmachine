@@ -44,8 +44,8 @@ typedef struct pr_state {
 
     bool_t npr_issued;
     bool_t br_issued;
-    bool_t bbsy;
-    bool_t sack;
+    bool_t sack_asserted;
+    bool_t bbsy_asserted;
 } pr_state_t;
 
 typedef struct bus_state {

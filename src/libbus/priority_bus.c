@@ -5,9 +5,16 @@
 #include "priority_bus.h"
 #include "signals.h"
 
+bus_state_t *STATE = NULL;
+
 // XXX This might be common to both pr and data buses.
 int get_fd_direction(pr_state_t*, bus_req_t*, bool_t);
 void update_from_addr(pr_state_t*, bus_req_t*);
+
+void assert_br(pr_state_t*);
+void assert_bbsy(pr_state_t*);
+
+void process_pr_events(pr_state_t *pr);
 
 void handle_br(pr_state_t*, bus_req_t*);
 void handle_bg(pr_state_t*, bus_req_t*);
@@ -36,8 +43,8 @@ init_pr_state()
 
     pr->npr_issued = FALSE;
     pr->br_issued = FALSE;
-    pr->bbsy = FALSE;
-    pr->sack = FALSE;
+    pr->bbsy_asserted = FALSE;
+    pr->sack_asserted = FALSE;
 
     return pr;
 }
@@ -53,23 +60,91 @@ priority_bus_mgr(bus_state_t *bus)
         return;
     }
 
+    if (bus == NULL) {
+        return;
+    } else {
+        STATE = bus;
+    }
+
     while (TRUE) {
-        pthread_mutex_lock(&(bus->state_mutex));
-        is_master = bus->is_master;
-        need_master = bus->need_master;
-        pthread_mutex_unlock(&(bus->state_mutex));
+        pthread_mutex_lock(&(STATE->state_mutex));
+        is_master = STATE->is_master;
+        need_master = STATE->need_master;
+        pthread_mutex_unlock(&(STATE->state_mutex));
 
         if (need_master && (is_master == FALSE)) {
+            if (pr->bbsy_asserted == FALSE) {
+                assert_br(pr);
+            }
         }
+
+        process_pr_events(pr);
     }
 }
 
 void
-send_br(pr_state_t *pr)
+assert_br(pr_state_t *pr)
 {
-    if (pr->bbsy && pr->sack) {
+    if (pr->bbsy_asserted) {
         return;
     }
+
+    int ret;
+    bus_req_t req;
+    req.sig = BR;
+    req.assertion = ASSERTED;
+    memset(req.from, 0, sizeof(req.from));
+
+    strncpy(req.from, pr->pr_in_addr.sun_path, sizeof(req.from));
+
+    ret = write(pr->pr_bus_out_l, &req, sizeof(req));
+    if (ret == -1) {
+        perror("assert_br_write_l");
+        return;
+    }
+
+    ret = write(pr->pr_bus_out_r, &req, sizeof(req));
+    if (ret == -1) {
+        perror("assert_br_write_r");
+        return;
+    }
+
+    pr->br_issued = TRUE;
+}
+
+void
+assert_bbsy(pr_state_t *pr)
+{
+    if (pr->bbsy_asserted) {
+        return;
+    }
+
+    int ret;
+    bus_req_t req;
+    req.sig = BBSY;
+    req.assertion = ASSERTED;
+    memset(req.from, 0, sizeof(req.from));
+
+    strncpy(req.from, pr->pr_in_addr.sun_path, sizeof(req.from));
+
+    ret = write(pr->pr_bus_out_l, &req, sizeof(req));
+    if (ret == -1) {
+        perror("assert_bbsy_write_l");
+        return;
+    }
+
+    ret = write(pr->pr_bus_out_r, &req, sizeof(req));
+    if (ret == -1) {
+        perror("assert_bbsy_write_r");
+        return;
+    }
+
+    pr->bbsy_asserted = TRUE;
+
+    pthread_mutex_lock(&(STATE->state_mutex));
+    STATE->is_master = TRUE;
+    STATE->need_master = FALSE;
+    pthread_mutex_unlock(&(STATE->state_mutex));
 }
 
 /*
@@ -150,7 +225,7 @@ handle_bg(pr_state_t *pr, bus_req_t *req)
     // If we issued a bus request:
     // - BLOCK the grant.
     // - Assert a SACK.
-    if (pr->br_issued) {
+    if (pr->br_issued && (req->assertion == ASSERTED)) {
         bus_req_t resp;
         resp.sig = SACK;
         resp.assertion = ASSERTED;
@@ -165,7 +240,10 @@ handle_bg(pr_state_t *pr, bus_req_t *req)
 
         // Revert br_issued, as we're no longer waiting for a BG.
         pr->br_issued = FALSE;
-        pr->sack = TRUE;
+        pr->sack_asserted = TRUE;
+
+    } else if (pr->sack_asserted && (req->assertion == NEGATED)) {
+        assert_bbsy(pr);
 
     // Else PASS the grant.
     } else {
@@ -216,7 +294,7 @@ handle_npg(pr_state_t *pr, bus_req_t *req)
 
         // Revert npr_issued, as we're no longer waiting for a NPG.
         pr->npr_issued = FALSE;
-        pr->sack = TRUE;
+        pr->sack_asserted = TRUE;
     } else {
         // Pass the grant on.
         out_fd = get_fd_direction(pr, req, FALSE);
