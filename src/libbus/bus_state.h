@@ -52,6 +52,10 @@ typedef struct bus_state {
     bool_t is_master;
     bool_t need_master;
 
+    char *l_sock;
+    char *sock;
+    char *r_sock;
+
     pthread_mutex_t state_mutex;
 } bus_state_t;
 

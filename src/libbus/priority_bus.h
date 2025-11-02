@@ -3,7 +3,7 @@
 
 #include "bus_state.h"
 
-void priority_bus_mgr(bus_state_t*);
+void priority_bus_mgr(void*);
 
 #endif
 
