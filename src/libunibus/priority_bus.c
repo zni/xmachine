@@ -35,12 +35,22 @@ init_pr_state(char *l_sock, char *sock, char *r_sock)
 
     if (l_sock != NULL) {
         memset(&(pr->pr_out_addr_l), 0, sizeof(struct sockaddr_un));
-        strncpy(pr->pr_out_addr_l.sun_path, l_sock, sizeof(pr->pr_out_addr_l.sun_path));
+        pr->pr_out_addr_l.sun_family = AF_UNIX;
+        strncpy(
+            pr->pr_out_addr_l.sun_path,
+            l_sock,
+            sizeof(pr->pr_out_addr_l.sun_path) - 1
+        );
     }
 
     if (r_sock != NULL) {
         memset(&(pr->pr_out_addr_r), 0, sizeof(struct sockaddr_un));
-        strncpy(pr->pr_out_addr_r.sun_path, r_sock, sizeof(pr->pr_out_addr_r.sun_path));
+        pr->pr_out_addr_r.sun_family = AF_UNIX;
+        strncpy(
+            pr->pr_out_addr_r.sun_path,
+            r_sock,
+            sizeof(pr->pr_out_addr_r.sun_path) - 1
+        );
     }
 
     memset(&(pr->pr_in_addr), 0, sizeof(struct sockaddr_un));
@@ -120,7 +130,7 @@ init_pr_state(char *l_sock, char *sock, char *r_sock)
     return pr;
 }
 
-void
+void*
 priority_bus_mgr(void *bus)
 {
     bool_t is_master;
@@ -132,7 +142,7 @@ priority_bus_mgr(void *bus)
     char *r_sock;
 
     if (bus == NULL) {
-        return;
+        return NULL;
     } else {
         STATE = bus;
     }
@@ -159,7 +169,7 @@ priority_bus_mgr(void *bus)
 
     pr_state_t *pr = init_pr_state(l_sock, sock, r_sock);
     if (pr == NULL) {
-        return;
+        return NULL;
     }
 
     while (TRUE) {
