@@ -30,7 +30,7 @@ handler(int signo, siginfo_t *info, void *context)
 }
 
 arb_state_t*
-init_arbitrator()
+init_arbitrator(char *n_sock)
 {
     arb_state_t *arb = malloc(sizeof(arb_state_t));
     if (arb == NULL) {
@@ -43,7 +43,7 @@ init_arbitrator()
     arb->current_client.sun_family = AF_UNIX;
     strncpy(
         arb->current_client.sun_path,
-        "/tmp/bus_dec.socket",
+        n_sock,
         sizeof(arb->current_client.sun_path) - 1
     );
     arb->client_addr_len = sizeof(arb->current_client);
@@ -306,6 +306,8 @@ listen_priority(arb_state_t *arb)
         default:
             break;
         }
+
+        memset(&req, 0, sizeof(req));
     }
 }
 
@@ -326,7 +328,7 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    arb_state_t *arb = init_arbitrator();
+    arb_state_t *arb = init_arbitrator("/tmp/xmachine/cpu.socket");
 
     setup_priority_socket(arb);
     listen_priority(arb);
