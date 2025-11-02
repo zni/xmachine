@@ -37,6 +37,20 @@ libload: src/libload/load.c src/libload/load.h
 clean_libload: src/libload/libload.a
 	rm src/libload/libload.a
 
+libbus_pr: src/libbus/priority_bus.c src/libbus/priority_bus.h
+	gcc -c src/libbus/priority_bus.c -o src/libbus/priority_bus.o
+
+libbus_d: src/libbus/data_bus.c src/libbus/data_bus.h
+	gcc -c src/libbus/data_bus.c -o src/libbus/data_bus.o
+
+libbus: libbus_pr libbus_d
+	ar rcs src/libbus/libbus.a src/libbus/data_bus.o src/libbus/priority_bus.o
+
+clean_libbus: src/libbus/libbus.a
+	rm -f src/libbus/priority_bus.o
+	rm -f src/libbus/data_bus.o
+	rm -f src/libbus/libbus.a
+
 loader: libload src/utilities/loader.c bin
 	gcc src/utilities/loader.c -L../src/libload -lload -o bin/loader
 
