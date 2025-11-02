@@ -1,9 +1,24 @@
 #include "cpu.h"
-#include "../common/include/types.h"
 
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+
+#include "../libbus/device_bus_mgr.h"
+
+cpu_t *STATE = NULL;
+bus_state_t *BUS_STATE = NULL;
+
+uint8_t is_internal_bus_addr(uint32_t);
+uint32_t translate_bus_addr(uint32_t);
+uint16_t* bus_addr_to_register(cpu_t*, uint32_t);
+uint16_t fetch_data(cpu_t*, uint32_t);
+uint16_t fetch_data_register(cpu_t*, uint32_t);
+void store_data_register(cpu_t*, uint32_t, uint16_t);
+void store_data(cpu_t*, uint32_t, uint16_t);
+void store_data_b(cpu_t*, uint32_t, uint8_t);
 
 cpu_t*
 init_cpu()
@@ -122,7 +137,6 @@ inc_register(cpu_t *cpu, uint16_t reg, uint8_t is_byte_addr)
     }
 }
 
-// FIXME
 void
 dec_register(cpu_t *cpu, uint16_t reg, uint8_t is_byte_addr)
 {
@@ -197,66 +211,65 @@ translate_bus_addr(uint32_t addr)
 }
 
 uint16_t
-fetch_data(uint32_t addr)
+fetch_data(cpu_t *cpu, uint32_t addr)
 {
-//    if (is_internal_bus_addr(addr)) {
-//        return fetch_data_register(addr);
-//    }
-//
-//    addr = translate_bus_addr(addr);
-//
-//    send(BusMessage::MSYN, 0, 0);
-//    send(BusMessage::DATI, addr, 0);
-//    send(BusMessage::CLEAR, 0, 0);
-//
-//    return m_recv_data;
+    if (is_internal_bus_addr(addr)) {
+        return fetch_data_register(cpu, addr);
+    }
+
+    addr = translate_bus_addr(addr);
+    req_bus_master(BUS_STATE);
+
+    //send(BusMessage::MSYN, 0, 0);
+    //send(BusMessage::DATI, addr, 0);
+    //send(BusMessage::CLEAR, 0, 0);
+
+    return 0;
 }
 
-// FIXME
 uint16_t
-fetch_data_register(uint32_t addr)
+fetch_data_register(cpu_t *cpu, uint32_t addr)
 {
-//    uint16_t *reg = bus_addr_to_register(addr);
-//    return *reg;
+    uint16_t *reg = bus_addr_to_register(cpu, addr);
+    return *reg;
 }
 
-// FIXME
 void
-store_data(uint32_t addr, uint16_t data)
+store_data(cpu_t *cpu, uint32_t addr, uint16_t data)
 {
-//    if (is_internal_bus_addr(addr)) {
-//        store_data_register(addr, data);
-//        return;
-//    }
-//
-//    addr = translate_bus_addr(addr);
-//
+    if (is_internal_bus_addr(addr)) {
+        store_data_register(cpu, addr, data);
+        return;
+    }
+
+    addr = translate_bus_addr(addr);
+
+// FIXME
 //    send(BusMessage::MSYN, 0, 0);
 //    send(BusMessage::DATO, addr, data);
 //    send(BusMessage::CLEAR, 0, 0);
 }
 
-// FIXME
 void
-store_data_b(uint32_t addr, uint8_t data)
+store_data_b(cpu_t *cpu, uint32_t addr, uint8_t data)
 {
-//    if (is_internal_bus_addr(addr)) {
-//        store_data_register(addr, data);
-//        return;
-//    }
-//
-//    addr = translate_bus_addr(addr);
-//
+    if (is_internal_bus_addr(addr)) {
+        store_data_register(cpu, addr, data);
+        return;
+    }
+
+    addr = translate_bus_addr(addr);
+
+// FIXME
 //    send(BusMessage::MSYN, 0, 0);
 //    send(BusMessage::DATOB, addr, data);
 //    send(BusMessage::CLEAR, 0, 0);
 }
 
-// FIXME
-void store_data_register(uint32_t addr, uint16_t data)
+void store_data_register(cpu_t *cpu, uint32_t addr, uint16_t data)
 {
-//    uint16_t *reg = bus_addr_to_register(addr);
-//    *reg = data;
+    uint16_t *reg = bus_addr_to_register(cpu, addr);
+    *reg = data;
 }
 
 void exec_instruction(cpu_t *cpu)
@@ -565,13 +578,13 @@ setup_pc_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
 
         // From absolute.
         case 3:
-            *loc = fetch_data(cpu->pc);
+            *loc = fetch_data(cpu, cpu->pc);
             cpu->pc += 2;
             break;
 
         // Relative
         case 6:
-            relative = fetch_data(cpu->pc);
+            relative = fetch_data(cpu, cpu->pc);
             cpu->pc += 2;
             *loc = cpu->pc + relative;
             break;
@@ -604,7 +617,7 @@ setup_sp_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
         // Deferred autoincrement: @(SP)+, top of stack is a pointer to a value,
         // then pop it.
         case 3:
-            *loc = fetch_data(cpu->sp);
+            *loc = fetch_data(cpu, cpu->sp);
             cpu->sp += 2;
             break;
 
@@ -616,16 +629,16 @@ setup_sp_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
 
         // Indexed: X(SP), access item X on the stack
         case 6:
-            index = fetch_data(cpu->pc);
+            index = fetch_data(cpu, cpu->pc);
             cpu->pc += 2;
             *loc = cpu->sp + index;
             break;
 
         // Deferred index: @X(SP), access item pointed to by item X on the stack
         case 7:
-            index = fetch_data(cpu->pc);
+            index = fetch_data(cpu, cpu->pc);
             cpu->pc += 2;
-            *loc = fetch_data(index + cpu->sp);
+            *loc = fetch_data(cpu, index + cpu->sp);
             break;
     }
 }
@@ -658,9 +671,9 @@ setup_general_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
         // Deferred autoincrement: @(Rn)+
         case 3:
             deferred = fetch_register_contents(cpu, reg);
-            index = fetch_data(deferred);
+            index = fetch_data(cpu, deferred);
             inc_register(cpu, reg, FALSE);
-            *loc = fetch_data(index);
+            *loc = fetch_data(cpu, index);
             break;
 
         // Autodecrement: -(Rn)
@@ -675,27 +688,27 @@ setup_general_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
         // Deferred autodecrement: @-(Rn)
         case 5:
             deferred = fetch_register_contents(cpu, reg);
-            index = fetch_data(deferred);
-            *loc = fetch_data(index);
+            index = fetch_data(cpu, deferred);
+            *loc = fetch_data(cpu, index);
             index -= 2;
-            store_data(deferred, index);
+            store_data(cpu, deferred, index);
             break;
 
         // Indexed: X(Rn)
         case 6:
-            index = fetch_data(cpu->pc);
+            index = fetch_data(cpu, cpu->pc);
             cpu->pc += 2;
             deferred = fetch_register_contents(cpu, reg);
-            *loc = fetch_data(index + deferred);
+            *loc = fetch_data(cpu, index + deferred);
             break;
 
         // Deferred indexed: @X(Rn)
         case 7:
-            index = fetch_data(cpu->pc);
+            index = fetch_data(cpu, cpu->pc);
             cpu->pc += 2;
             deferred = fetch_register_contents(cpu, reg);
-            deferred = fetch_data(deferred);
-            *loc = fetch_data(deferred + index);
+            deferred = fetch_data(cpu, deferred);
+            *loc = fetch_data(cpu, deferred + index);
             break;
     }
 }
@@ -728,9 +741,9 @@ setup_general_byte_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t
         // Deferred autoincrement: @(Rn)+
         case 3:
             deferred = fetch_register_contents(cpu, reg);
-            index = fetch_data(deferred);
+            index = fetch_data(cpu, deferred);
             inc_register(cpu, reg, TRUE);
-            *loc = fetch_data(index);
+            *loc = fetch_data(cpu, index);
             break;
 
         // Autodecrement: -(Rn)
@@ -745,27 +758,27 @@ setup_general_byte_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t
         // Deferred autodecrement: @-(Rn)
         case 5:
             deferred = fetch_register_contents(cpu, reg);
-            index = fetch_data(deferred);
-            *loc = fetch_data(index);
+            index = fetch_data(cpu, deferred);
+            *loc = fetch_data(cpu, index);
             index -= 1;
-            store_data(deferred, index);
+            store_data(cpu, deferred, index);
             break;
 
         // Indexed: X(Rn)
         case 6:
-            index = fetch_data(cpu->pc);
+            index = fetch_data(cpu, cpu->pc);
             cpu->pc += 2;
             deferred = fetch_register_contents(cpu, reg);
-            *loc = fetch_data(index + deferred);
+            *loc = fetch_data(cpu, index + deferred);
             break;
 
         // Deferred indexed: @X(Rn)
         case 7:
-            index = fetch_data(cpu->pc);
+            index = fetch_data(cpu, cpu->pc);
             cpu->pc += 2;
             deferred = fetch_register_contents(cpu, reg);
-            deferred = fetch_data(deferred);
-            *loc = fetch_data(deferred + index);
+            deferred = fetch_data(cpu, deferred);
+            *loc = fetch_data(cpu, deferred + index);
             break;
     }
 }
@@ -990,8 +1003,8 @@ MOV(cpu_t *cpu)
     setup_src_addressing(cpu, FALSE);
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->src_address);
-    store_data(cpu->dest_address, cpu->alu);
+    cpu->alu = fetch_data(cpu, cpu->src_address);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1003,8 +1016,8 @@ MOVB(cpu_t *cpu)
     setup_src_addressing(cpu, TRUE);
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->src_address) & 0377;
-    store_data_b(cpu->dest_address, cpu->alu);
+    cpu->alu = fetch_data(cpu, cpu->src_address) & 0377;
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1016,8 +1029,8 @@ CMP(cpu_t *cpu)
     setup_src_addressing(cpu, FALSE);
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
-    cpu->alu -= fetch_data(cpu->src_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
+    cpu->alu -= fetch_data(cpu, cpu->src_address);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1029,8 +1042,8 @@ CMPB(cpu_t *cpu)
     setup_src_addressing(cpu, TRUE);
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
-    cpu->alu -= fetch_data(cpu->src_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
+    cpu->alu -= fetch_data(cpu, cpu->src_address) & 0377;
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1042,8 +1055,8 @@ BIT(cpu_t *cpu)
     setup_src_addressing(cpu, FALSE);
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->src_address);
-    cpu->alu &= fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->src_address);
+    cpu->alu &= fetch_data(cpu, cpu->dest_address);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1055,8 +1068,8 @@ BITB(cpu_t *cpu)
     setup_src_addressing(cpu, TRUE);
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->src_address) & 0377;
-    cpu->alu &= fetch_data(cpu->dest_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->src_address) & 0377;
+    cpu->alu &= fetch_data(cpu, cpu->dest_address) & 0377;
 
     set_negative_flag_b(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1068,9 +1081,9 @@ BIC(cpu_t *cpu)
     setup_src_addressing(cpu, FALSE);
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
-    cpu->alu &= ~(fetch_data(cpu->src_address));
-    store_data(cpu->dest_address, cpu->alu);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
+    cpu->alu &= ~(fetch_data(cpu, cpu->src_address));
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_negative_flag_w(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1082,9 +1095,9 @@ BICB(cpu_t *cpu)
     setup_src_addressing(cpu, TRUE);
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
-    cpu->alu &= ~(fetch_data(cpu->src_address) & 0377);
-    store_data_b(cpu->dest_address, cpu->alu);
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
+    cpu->alu &= ~(fetch_data(cpu, cpu->src_address) & 0377);
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_negative_flag_b(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1096,9 +1109,9 @@ BIS(cpu_t *cpu)
     setup_src_addressing(cpu, FALSE);
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
-    cpu->alu |= fetch_data(cpu->src_address);
-    store_data(cpu->dest_address, cpu->alu);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
+    cpu->alu |= fetch_data(cpu, cpu->src_address);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_negative_flag_w(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1110,9 +1123,9 @@ BISB(cpu_t *cpu)
     setup_src_addressing(cpu, TRUE);
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
-    cpu->alu |= fetch_data(cpu->src_address) & 0377;
-    store_data_b(cpu->dest_address, cpu->alu);
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
+    cpu->alu |= fetch_data(cpu, cpu->src_address) & 0377;
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_negative_flag_b(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1124,9 +1137,9 @@ ADD(cpu_t *cpu)
     setup_src_addressing(cpu, FALSE);
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->src_address);
-    cpu->alu += fetch_data(cpu->dest_address);
-    store_data(cpu->dest_address, cpu->alu);
+    cpu->alu = fetch_data(cpu, cpu->src_address);
+    cpu->alu += fetch_data(cpu, cpu->dest_address);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_negative_flag_w(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1138,9 +1151,9 @@ SUB(cpu_t *cpu)
     setup_src_addressing(cpu, FALSE);
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->src_address);
-    cpu->alu -= fetch_data(cpu->dest_address);
-    store_data(cpu->dest_address, cpu->alu);
+    cpu->alu = fetch_data(cpu, cpu->src_address);
+    cpu->alu -= fetch_data(cpu, cpu->dest_address);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_negative_flag_w(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1150,7 +1163,7 @@ void
 JMP(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
-    cpu->pc = fetch_data(cpu->dest_address);
+    cpu->pc = fetch_data(cpu, cpu->dest_address);
 }
 
 void
@@ -1158,9 +1171,9 @@ SWAB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
     cpu->alu = ((cpu->alu & 0177400) >> 8) | ((cpu->alu & 000377) << 8);
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_negative_flag_w(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1171,7 +1184,7 @@ CLR(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
     cpu->alu = 0;
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_negative_flag_w(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1182,7 +1195,7 @@ CLRB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, TRUE);
     cpu->alu = 0;
-    store_data_b(cpu->dest_address, cpu->alu);
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_negative_flag_b(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1193,8 +1206,8 @@ COM(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = ~fetch_data(cpu->dest_address);
-    store_data(cpu->dest_address, cpu->alu);
+    cpu->alu = ~fetch_data(cpu, cpu->dest_address);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_negative_flag_w(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1205,8 +1218,8 @@ COMB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = ~(fetch_data(cpu->dest_address) & 0377);
-    store_data_b(cpu->dest_address, cpu->alu);
+    cpu->alu = ~(fetch_data(cpu, cpu->dest_address) & 0377);
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_negative_flag_b(cpu, cpu->alu);
     set_zero_flag(cpu, cpu->alu);
@@ -1216,9 +1229,9 @@ void
 INC(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
     cpu->alu++;
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1228,9 +1241,9 @@ void
 INCB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, TRUE);
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
     cpu->alu++;
-    store_data_b(cpu->dest_address, cpu->alu);
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1240,9 +1253,9 @@ void
 DEC(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
     cpu->alu--;
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1253,9 +1266,9 @@ DECB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
     cpu->alu--;
-    store_data_b(cpu->dest_address, cpu->alu);
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1266,9 +1279,9 @@ NEG(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
     cpu->alu = ~cpu->alu + 1;
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1279,9 +1292,9 @@ NEGB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
     cpu->alu = (~cpu->alu + 1) & 0377;
-    store_data_b(cpu->dest_address, cpu->alu);
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1292,9 +1305,9 @@ ADC(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
     cpu->alu += cpu->psw & CARRYFLAG;
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1305,9 +1318,9 @@ ADCB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
     cpu->alu += cpu->psw & CARRYFLAG;
-    store_data_b(cpu->dest_address, cpu->alu);
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1318,9 +1331,9 @@ SBC(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
     cpu->alu -= (cpu->psw & CARRYFLAG);
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1331,9 +1344,9 @@ SBCB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
     cpu->alu -= (cpu->psw & CARRYFLAG);
-    store_data_b(cpu->dest_address, cpu->alu);
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1344,7 +1357,7 @@ TST(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1355,7 +1368,7 @@ TSTB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1366,9 +1379,9 @@ ROR(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
     cpu->alu = (cpu->alu << 1) | (cpu->alu >> 15);
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1379,9 +1392,9 @@ RORB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
     cpu->alu = (cpu->alu << 1) | (cpu->alu >> 7);
-    store_data_b(cpu->dest_address, cpu->alu);
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1392,9 +1405,9 @@ ROL(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
     cpu->alu = (cpu->alu << 15) | (cpu->alu >> 1);
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1405,9 +1418,9 @@ ROLB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
     cpu->alu = (cpu->alu << 7) | (cpu->alu >> 1);
-    store_data_b(cpu->dest_address, cpu->alu);
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1418,9 +1431,9 @@ ASR(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
     cpu->alu >>= 1;
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1432,9 +1445,9 @@ ASRB(cpu_t *cpu)
     setup_dest_addressing(cpu, TRUE);
 
     // FIXME? fetch_data_b?
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
     cpu->alu >>= 1;
-    store_data_b(cpu->dest_address, cpu->alu);
+    store_data_b(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1445,9 +1458,9 @@ ASL(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
 
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
     cpu->alu <<= 1;
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_w(cpu, cpu->alu);
@@ -1458,9 +1471,9 @@ ASLB(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, TRUE);
 
-    cpu->alu = fetch_data(cpu->dest_address) & 0377;
+    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
     cpu->alu <<= 1;
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 
     set_zero_flag(cpu, cpu->alu);
     set_negative_flag_b(cpu, cpu->alu);
@@ -1470,7 +1483,7 @@ void
 MTPS(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
-    cpu->alu = fetch_data(cpu->dest_address);
+    cpu->alu = fetch_data(cpu, cpu->dest_address);
     cpu->psw = cpu->alu;
 }
 
@@ -1509,7 +1522,7 @@ MFPS(cpu_t *cpu)
 {
     setup_dest_addressing(cpu, FALSE);
     cpu->alu = cpu->psw;
-    store_data(cpu->dest_address, cpu->alu);
+    store_data(cpu, cpu->dest_address, cpu->alu);
 }
 
 void
@@ -1551,11 +1564,10 @@ JSR(cpu_t *cpu)
     uint16_t tmp = cpu->dest_address;
     uint16_t reg_contents = fetch_register_contents(cpu, reg);
 
-    store_data(cpu->sp, reg_contents);
+    store_data(cpu, cpu->sp, reg_contents);
     dec_register(cpu, cpu->sp, FALSE);
 
-    // FIXME
-    //store_data_register(register_to_bus_addr(reg), m_PC);
+    store_data_register(cpu, register_to_bus_addr(reg), cpu->pc);
     cpu->pc = tmp;
 }
 
@@ -1567,8 +1579,8 @@ RTS(cpu_t *cpu)
     cpu->pc = reg_contents;
 
     inc_register(cpu, cpu->sp, FALSE);
-    uint16_t top_stack = fetch_data(cpu->sp);
-    store_data_register(register_to_bus_addr(reg), top_stack);
+    uint16_t top_stack = fetch_data(cpu, cpu->sp);
+    store_data_register(cpu, register_to_bus_addr(reg), top_stack);
 }
 
 void
@@ -1577,8 +1589,64 @@ HALT(cpu_t *cpu)
     cpu->halted = TRUE;
 }
 
+void
+handler(int signo, siginfo_t *info, void *context)
+{
+    if (STATE != NULL) {
+        free(STATE);
+    }
+
+    /* Signal and join bus threads. */
+
+    exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char **argv)
 {
+    bus_state_t *bus;
+    cpu_t *cpu;
+    int ret;
+    struct sigaction act = { 0 };
+    char sock_l[] = "/tmp/xmachine/ba.socket";
+    char sock_name[] = "/tmp/xmachine/cpu.socket";
+    char sock_r[] = "/tmp/xmachine/mem.socket";
+
+    /* Setup signal handler. */
+    act.sa_flags = SA_SIGINFO;
+    act.sa_sigaction = &handler;
+    if (sigaction(SIGHUP, &act, NULL) == -1) {
+        perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Initialize CPU. */
+    cpu = init_cpu();
+    if (cpu == NULL) {
+        fprintf(stderr, "failed to initialize CPU\n");
+        exit(EXIT_FAILURE);
+    }
+    STATE = cpu;
+
+    /* Initialize bus connections. */
+    bus = init_bus(NULL, sock_name, NULL);
+    if (bus == NULL) {
+        free(cpu);
+        fprintf(stderr, "failed to initialize bus\n");
+        exit(EXIT_FAILURE);
+    }
+    BUS_STATE = bus;
+
+    /* Attempt to connect to pr bus. */
+    ret = init_pr_bus(bus);
+    if (ret != 0) {
+        free(cpu);
+        free(bus);
+        fprintf(stderr, "failed to initialize pr bus connection\n");
+        exit(EXIT_FAILURE);
+    }
+
+    execute(cpu);
+
     return 0;
 }
 

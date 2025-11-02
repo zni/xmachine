@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "../common/include/types.h"
+
 enum ProcessorStatusFlags {
     CARRYFLAG    = 0000001,
     OVERFLOWFLAG = 0000002,
@@ -109,7 +111,7 @@ typedef struct cpu {
     uint32_t src_address;
     uint32_t dest_address;
 
-    uint8_t halted;
+    bool_t halted;
 } cpu_t;
 
 void exec_instruction(cpu_t*);
