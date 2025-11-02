@@ -7,7 +7,6 @@
 
 bus_state_t *STATE = NULL;
 
-// XXX This might be common to both pr and data buses.
 int get_fd_direction(pr_state_t*, bus_req_t*, bool_t);
 void update_from_addr(pr_state_t*, bus_req_t*);
 
@@ -36,10 +35,26 @@ init_pr_state()
     memset(&(pr->pr_out_addr_r), 0, sizeof(struct sockaddr_un));
     memset(&(pr->pr_in_addr), 0, sizeof(struct sockaddr_un));
 
-    // TODO FIXME Error check all of these.
     pr->pr_bus_in = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (pr->pr_bus_in == -1) {
+        perror("pr_bus_in");
+        free(pr);
+        return NULL;
+    }
+
     pr->pr_bus_out_l = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (pr->pr_bus_out_l == -1) {
+        perror("pr_bus_out_l");
+        free(pr);
+        return NULL;
+    }
+
     pr->pr_bus_out_r = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (pr->pr_bus_out_r == -1) {
+        perror("pr_bus_out_r");
+        free(pr);
+        return NULL;
+    }
 
     pr->npr_issued = FALSE;
     pr->br_issued = FALSE;
@@ -317,9 +332,30 @@ handle_sack(pr_state_t *pr, bus_req_t *req)
     update_from_addr(pr, req);
     ret = write(out_fd, req, sizeof(bus_req_t));
     if (ret == -1) {
-        perror("handle_npg_pass_write");
+        perror("handle_sack_write");
         return;
     }
 }
 
+void
+handle_bbsy(pr_state_t *pr, bus_req_t *req)
+{
+    int ret;
+    int out_fd;
+
+    out_fd = get_fd_direction(pr, req, FALSE);
+    update_from_addr(pr, req);
+
+    if (req->assertion == ASSERTED) {
+        pr->bbsy_asserted = TRUE;
+    } else {
+        pr->bbsy_asserted = FALSE;
+    }
+
+    ret = write(out_fd, req, sizeof(bus_req_t));
+    if (ret == -1) {
+        perror("handle_bbsy_write");
+        return;
+    }
+}
 
