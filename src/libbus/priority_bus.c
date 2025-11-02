@@ -25,6 +25,8 @@ void handle_bbsy(pr_state_t*, bus_req_t*);
 pr_state_t*
 init_pr_state()
 {
+    int ret;
+
     pr_state_t *pr = malloc(sizeof(pr_state_t));
     if (pr == NULL) {
         perror("pr_malloc");
@@ -52,6 +54,39 @@ init_pr_state()
     pr->pr_bus_out_r = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (pr->pr_bus_out_r == -1) {
         perror("pr_bus_out_r");
+        free(pr);
+        return NULL;
+    }
+
+    ret = bind(
+        pr->pr_bus_in,
+        (const struct sockaddr *) &(pr->pr_in_addr),
+        sizeof(pr->pr_in_addr)
+    );
+    if (ret == -1) {
+        perror("pr_bus_in_bind");
+        free(pr);
+        return NULL;
+    }
+
+    ret = connect(
+        pr->pr_bus_out_l,
+        (const struct sockaddr *) &(pr->pr_out_addr_l),
+        sizeof(pr->pr_out_addr_l)
+    );
+    if (ret == -1) {
+        perror("pr_bus_out_l_connect");
+        free(pr);
+        return NULL;
+    }
+
+    ret = connect(
+        pr->pr_bus_out_r,
+        (const struct sockaddr *) &(pr->pr_out_addr_r),
+        sizeof(pr->pr_out_addr_r)
+    );
+    if (ret == -1) {
+        perror("pr_bus_out_r_connect");
         free(pr);
         return NULL;
     }
