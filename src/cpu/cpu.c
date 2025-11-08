@@ -6,9 +6,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "../libbus/device_bus_mgr.h"
+#include "../libunibus/device_bus_mgr.h"
 
-cpu_t *STATE = NULL;
+cpu_t *CPU_STATE = NULL;
 bus_state_t *BUS_STATE = NULL;
 
 uint8_t is_internal_bus_addr(uint32_t);
@@ -53,11 +53,8 @@ void
 execute(cpu_t *cpu)
 {
     while (!cpu->halted) {
-        //send(BusMessage::MSYN, 0, 0);
-        //send(BusMessage::DATI, PC, 0);
-        cpu->ir = 0; // Fetch instruction from memory.
-        cpu->pc += 2;
-        //send(BusMessage::CLEAR, 0, 0);
+        cpu->ir = fetch_data(cpu, cpu->pc);
+        cpu->pc += 2; // advance by word.
         exec_instruction(cpu);
     }
 }
@@ -191,9 +188,9 @@ fetch_register_contents(cpu_t *cpu, uint16_t reg)
         case 3: return cpu->r3;
         case 4: return cpu->r4;
         case 5: return cpu->r5;
-        case 6: return cpu->sp; // SP
-        case 7: return cpu->pc; // PC
-        case 8: return cpu->psw; // PSW
+        case 6: return cpu->sp;
+        case 7: return cpu->pc;
+        case 8: return cpu->psw;
 
         default: return 0xffff;
     }
@@ -217,9 +214,19 @@ fetch_data(cpu_t *cpu, uint32_t addr)
         return fetch_data_register(cpu, addr);
     }
 
+    // TODO Provide this to the data bus.
     addr = translate_bus_addr(addr);
+
+    // Request bus master, if necessary.
     req_bus_master(BUS_STATE);
 
+    // Block for read.
+    block_data_in(BUS_STATE);
+
+    // TODO Should we release here?
+    // release_bus_master(BUS_STATE);
+
+    // XXX REMOVE
     //send(BusMessage::MSYN, 0, 0);
     //send(BusMessage::DATI, addr, 0);
     //send(BusMessage::CLEAR, 0, 0);
@@ -242,9 +249,19 @@ store_data(cpu_t *cpu, uint32_t addr, uint16_t data)
         return;
     }
 
+    // TODO Provide this (and the data) to the data bus.
     addr = translate_bus_addr(addr);
 
-// FIXME
+    // Request bus master, if necessary.
+    req_bus_master(BUS_STATE);
+
+    // Block for write.
+    block_data_out(BUS_STATE);
+
+    // TODO Should we release here?
+    // release_bus_master(BUS_STATE);
+
+// XXX REMOVE
 //    send(BusMessage::MSYN, 0, 0);
 //    send(BusMessage::DATO, addr, data);
 //    send(BusMessage::CLEAR, 0, 0);
@@ -1592,8 +1609,8 @@ HALT(cpu_t *cpu)
 void
 handler(int signo, siginfo_t *info, void *context)
 {
-    if (STATE != NULL) {
-        free(STATE);
+    if (CPU_STATE != NULL) {
+        free(CPU_STATE);
     }
 
     /* Signal and join bus threads. */
@@ -1625,7 +1642,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "failed to initialize CPU\n");
         exit(EXIT_FAILURE);
     }
-    STATE = cpu;
+    CPU_STATE = cpu;
 
     /* Initialize bus connections. */
     bus = init_bus(NULL, sock_name, NULL);
