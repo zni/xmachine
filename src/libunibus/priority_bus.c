@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -12,6 +13,8 @@ void update_from_addr(pr_state_t*, bus_req_t*);
 
 void assert_br(pr_state_t*);
 void assert_bbsy(pr_state_t*);
+void negate_sack(pr_state_t*);
+void negate_bbsy(pr_state_t*);
 
 void process_pr_events(pr_state_t *pr);
 
@@ -21,6 +24,9 @@ void handle_npr(pr_state_t*, bus_req_t*);
 void handle_npg(pr_state_t*, bus_req_t*);
 void handle_sack(pr_state_t*, bus_req_t*);
 void handle_bbsy(pr_state_t*, bus_req_t*);
+
+void request_master(pr_state_t*);
+void release_master(pr_state_t*);
 
 pr_state_t*
 init_pr_state(char *l_sock, char *sock, char *r_sock)
@@ -134,7 +140,10 @@ void*
 priority_bus_mgr(void *bus)
 {
     bool_t is_master;
-    bool_t need_master;
+    bool_t req_master;
+    bool_t rel_master;
+    bool_t shutdown;
+
     char l_sock_buf[100];
     char sock[100];
     char r_sock_buf[100];
@@ -172,20 +181,25 @@ priority_bus_mgr(void *bus)
         return NULL;
     }
 
-    while (TRUE) {
+    do {
         pthread_mutex_lock(&(STATE->state_mutex));
         is_master = STATE->is_master;
-        need_master = STATE->need_master;
+        req_master = STATE->req_master;
+        rel_master = STATE->rel_master;
+        shutdown = STATE->shutdown;
         pthread_mutex_unlock(&(STATE->state_mutex));
 
-        if (need_master && (is_master == FALSE)) {
-            if (pr->bbsy_asserted == FALSE) {
-                assert_br(pr);
-            }
+        if (req_master && (is_master == FALSE)) {
+            request_master(pr);
+        } else if (rel_master && (is_master == TRUE)) {
+            release_master(pr);
         }
 
         process_pr_events(pr);
-    }
+    } while (!shutdown);
+
+    // TODO Actually clean up.
+    // cleanup(pr);
 }
 
 void
@@ -196,6 +210,7 @@ assert_br(pr_state_t *pr)
     }
 
     int ret;
+
     bus_req_t req;
     req.sig = BR;
     req.assertion = ASSERTED;
@@ -249,23 +264,99 @@ assert_bbsy(pr_state_t *pr)
 
     pthread_mutex_lock(&(STATE->state_mutex));
     STATE->is_master = TRUE;
-    STATE->need_master = FALSE;
+    STATE->req_master = FALSE;
+    pthread_mutex_unlock(&(STATE->state_mutex));
+}
+
+void
+negate_sack(pr_state_t *pr)
+{
+    if (!pr->sack_asserted) {
+        return;
+    }
+
+    int ret;
+    bus_req_t req;
+    req.sig = SACK;
+    req.assertion = NEGATED;
+    memset(req.from, 0, sizeof(req.from));
+
+    strncpy(req.from, pr->pr_in_addr.sun_path, sizeof(req.from));
+
+    ret = write(pr->pr_bus_out_l, &req, sizeof(req));
+    if (ret == -1) {
+        perror("negate_sack_write_l");
+        return;
+    }
+
+    ret = write(pr->pr_bus_out_r, &req, sizeof(req));
+    if (ret == -1) {
+        perror("negate_sack_write_r");
+        return;
+    }
+
+    pr->sack_asserted = FALSE;
+
+    pthread_mutex_lock(&(STATE->state_mutex));
+    STATE->is_master = TRUE;
+    STATE->req_master = FALSE;
+    pthread_mutex_unlock(&(STATE->state_mutex));
+}
+
+void
+negate_bbsy(pr_state_t *pr)
+{
+    if (!pr->bbsy_asserted) {
+        return;
+    }
+
+    int ret;
+    bus_req_t req;
+    req.sig = BBSY;
+    req.assertion = NEGATED;
+    memset(req.from, 0, sizeof(req.from));
+
+    strncpy(req.from, pr->pr_in_addr.sun_path, sizeof(req.from));
+
+    ret = write(pr->pr_bus_out_l, &req, sizeof(req));
+    if (ret == -1) {
+        perror("negate_bbsy_write_l");
+        return;
+    }
+
+    ret = write(pr->pr_bus_out_r, &req, sizeof(req));
+    if (ret == -1) {
+        perror("negate_bbsy_write_r");
+        return;
+    }
+
+    pr->sack_asserted = FALSE;
+
+    pthread_mutex_lock(&(STATE->state_mutex));
+    STATE->is_master = FALSE;
+    STATE->req_master = FALSE;
     pthread_mutex_unlock(&(STATE->state_mutex));
 }
 
 /*
- * Process a single cycle on the Unibus (one read and one write).
+ * Process a single cycle on the Unibus priority bus (one read and one write).
  */
 void
 process_pr_events(pr_state_t *pr)
 {
     int ret;
+    int err;
     bus_req_t event;
 
-    ret = read(pr->pr_bus_in, &event, sizeof(bus_req_t));
+    ret = recv(pr->pr_bus_in, &event, sizeof(bus_req_t), MSG_DONTWAIT);
     if (ret == -1) {
-        perror("pr_event_read");
-        return;
+        err = errno;
+        if (err == EAGAIN || err ==  EWOULDBLOCK) {
+            return;
+        } else {
+            perror("pr_event_read");
+            return;
+        }
     }
 
     switch (event.sig) {
@@ -495,5 +586,27 @@ handle_bbsy(pr_state_t *pr, bus_req_t *req)
         perror("handle_bbsy_write");
         return;
     }
+}
+
+void
+request_master(pr_state_t *pr)
+{
+    if (pr->bbsy_asserted) {
+        return;
+    }
+
+    assert_br(pr);
+}
+
+void
+release_master(pr_state_t *pr)
+{
+    negate_sack(pr);
+    negate_bbsy(pr);
+
+    pthread_mutex_lock(&(STATE->state_mutex));
+    STATE->is_master = FALSE;
+    STATE->rel_master = FALSE;
+    pthread_mutex_unlock(&(STATE->state_mutex));
 }
 

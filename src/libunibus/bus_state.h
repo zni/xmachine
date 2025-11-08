@@ -50,13 +50,20 @@ typedef struct pr_state {
 
 typedef struct bus_state {
     bool_t is_master;
-    bool_t need_master;
+    bool_t req_master;
+    bool_t rel_master;
+    bool_t shutdown;
 
     char *l_sock;
     char *sock;
     char *r_sock;
 
     pthread_mutex_t state_mutex;
+    pthread_mutex_t data_in_mutex;
+    pthread_mutex_t data_out_mutex;
+
+    pthread_cond_t cond_data_in;
+    pthread_cond_t cond_data_out;
 } bus_state_t;
 
 #endif
