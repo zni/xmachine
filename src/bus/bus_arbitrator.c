@@ -126,7 +126,7 @@ destroy_priority_socket(arb_state_t *arb)
 }
 
 void
-dump_req(bus_req_t *b)
+dump_req(pr_bus_req_t *b)
 {
     printf("REQ: ");
     switch (b->sig) {
@@ -157,7 +157,7 @@ void
 assert_bus_grant(arb_state_t *arb)
 {
     int rv;
-    bus_req_t resp;
+    pr_bus_req_t resp;
 
     if (arb->sack == ASSERTED)
         return;
@@ -183,7 +183,7 @@ negate_bus_grant(arb_state_t *arb)
 {
     printf("negate_bus_grant\n");
     int rv;
-    bus_req_t resp;
+    pr_bus_req_t resp;
 
     arb->outstanding_bg = FALSE;
 
@@ -205,7 +205,7 @@ void
 assert_np_grant(arb_state_t *arb)
 {
     int rv;
-    bus_req_t resp;
+    pr_bus_req_t resp;
 
     if (arb->sack == ASSERTED)
         return;
@@ -230,7 +230,7 @@ void
 negate_np_grant(arb_state_t *arb)
 {
     int rv;
-    bus_req_t resp;
+    pr_bus_req_t resp;
 
     arb->outstanding_npg = FALSE;
 
@@ -249,7 +249,7 @@ negate_np_grant(arb_state_t *arb)
 }
 
 void
-handle_sack(arb_state_t *arb, bus_req_t *req)
+handle_sack(arb_state_t *arb, pr_bus_req_t *req)
 {
     if (arb->sack == NEGATED && req->assertion == ASSERTED) {
         arb->sack = req->assertion;
@@ -264,7 +264,7 @@ handle_sack(arb_state_t *arb, bus_req_t *req)
 }
 
 void
-handle_bbsy(arb_state_t *arb, bus_req_t *req)
+handle_bbsy(arb_state_t *arb, pr_bus_req_t *req)
 {
     if (arb->bbsy == ASSERTED && req->assertion == NEGATED) {
         arb->bbsy = NEGATED;
@@ -276,12 +276,12 @@ handle_bbsy(arb_state_t *arb, bus_req_t *req)
 void
 listen_priority(arb_state_t *arb)
 {
-    bus_req_t req;
+    pr_bus_req_t req;
     int ret;
 
     printf("listening...\n");
     while (TRUE) {
-        ret = recv(arb->priority_socket, &req, sizeof(bus_req_t), MSG_WAITALL);
+        ret = recv(arb->priority_socket, &req, sizeof(pr_bus_req_t), MSG_WAITALL);
         if (ret == -1) {
             perror("priority recv");
             exit(EXIT_FAILURE);
