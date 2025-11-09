@@ -1,7 +1,7 @@
-.PHONY: clean tags bin clean_libunibus clean_libload
+.PHONY: tags bin clean_libunibus clean_libload
 
 cpu: libunibus cpu.o bin
-	gcc -o bin/cpu src/cpu/cpu.o -Llib/ -lunibus
+	gcc -o bin/cpu src/cpu/cpu.o -Llib/ -lunibus -lpthread
 
 cpu.o: src/cpu/cpu.c src/cpu/cpu.h
 	gcc -o src/cpu/cpu.o -c src/cpu/cpu.c
@@ -59,8 +59,9 @@ bin:
 lib:
 	mkdir -p lib
 
-clean:
+clean: clean_libload clean_libunibus
 	rm -rf bin
+	rm -f src/cpu/cpu.o
 	rm -f src/disk/disk.o
 	rm -f src/mem/mem.o
 	rm -f src/tty/tty.o
