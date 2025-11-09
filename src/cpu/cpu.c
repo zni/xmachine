@@ -210,28 +210,23 @@ translate_bus_addr(uint32_t addr)
 uint16_t
 fetch_data(cpu_t *cpu, uint32_t addr)
 {
+    uint16_t data;
     if (is_internal_bus_addr(addr)) {
-        return fetch_data_register(cpu, addr);
+        data = fetch_data_register(cpu, addr);
+        return data;
     }
 
-    // TODO Provide this to the data bus.
     addr = translate_bus_addr(addr);
 
     // Request bus master, if necessary.
     req_bus_master(BUS_STATE);
 
     // Block for read.
-    block_data_in(BUS_STATE);
+    data = read_data_in(BUS_STATE, addr);
 
-    // TODO Should we release here?
-    // release_bus_master(BUS_STATE);
+    release_bus_master(BUS_STATE);
 
-    // XXX REMOVE
-    //send(BusMessage::MSYN, 0, 0);
-    //send(BusMessage::DATI, addr, 0);
-    //send(BusMessage::CLEAR, 0, 0);
-
-    return 0;
+    return data;
 }
 
 uint16_t
@@ -249,17 +244,15 @@ store_data(cpu_t *cpu, uint32_t addr, uint16_t data)
         return;
     }
 
-    // TODO Provide this (and the data) to the data bus.
     addr = translate_bus_addr(addr);
 
     // Request bus master, if necessary.
     req_bus_master(BUS_STATE);
 
     // Block for write.
-    block_data_out(BUS_STATE);
+    write_data_out(BUS_STATE, addr, data);
 
-    // TODO Should we release here?
-    // release_bus_master(BUS_STATE);
+    release_bus_master(BUS_STATE);
 
 // XXX REMOVE
 //    send(BusMessage::MSYN, 0, 0);
@@ -1614,6 +1607,7 @@ handler(int signo, siginfo_t *info, void *context)
     }
 
     /* Signal and join bus threads. */
+    cleanup_bus(BUS_STATE);
 
     exit(EXIT_SUCCESS);
 }
@@ -1645,7 +1639,7 @@ int main(int argc, char **argv)
     CPU_STATE = cpu;
 
     /* Initialize bus connections. */
-    bus = init_bus(NULL, sock_name, NULL);
+    bus = init_bus(sock_l, sock_name, NULL);
     if (bus == NULL) {
         free(cpu);
         fprintf(stderr, "failed to initialize bus\n");
@@ -1653,12 +1647,12 @@ int main(int argc, char **argv)
     }
     BUS_STATE = bus;
 
-    /* Attempt to connect to pr bus. */
-    ret = init_pr_bus(bus);
+    /* Attempt to connect to bus. */
+    ret = connect_bus(bus);
     if (ret != 0) {
         free(cpu);
         free(bus);
-        fprintf(stderr, "failed to initialize pr bus connection\n");
+        fprintf(stderr, "failed to initialize bus connections\n");
         exit(EXIT_FAILURE);
     }
 

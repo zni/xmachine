@@ -6,7 +6,7 @@
 #include "priority_bus.h"
 #include "signals.h"
 
-bus_state_t *STATE = NULL;
+static bus_state_t *STATE = NULL;
 
 int get_fd_direction(pr_state_t*, bus_req_t*, bool_t);
 void update_from_addr(pr_state_t*, bus_req_t*);

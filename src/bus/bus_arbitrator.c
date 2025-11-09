@@ -1,5 +1,5 @@
 #include "bus_arbitrator.h"
-#include "../libbus/signals.h"
+#include "../libunibus/signals.h"
 #include "../common/include/types.h"
 
 #include <signal.h>

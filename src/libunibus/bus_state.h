@@ -14,7 +14,8 @@ typedef enum req {
     IN,
     INB,
     OUT,
-    OUTB
+    OUTB,
+    NONE
 } req_t;
 
 typedef struct data_op {
@@ -24,13 +25,18 @@ typedef struct data_op {
 } data_op_t;
 
 typedef struct data_state {
-    struct sockaddr_un data_out_addr;
-    struct sockaddr_un data_in_addr;
+    struct sockaddr_un d_out_addr_l;
+    struct sockaddr_un d_out_addr_r;
+    struct sockaddr_un d_in_addr;
 
-    int data_bus_in;
-    int data_bus_out;
+    int d_bus_in;
+    int d_bus_out_l;
+    int d_bus_out_r;
 
     data_op_t buffer;
+
+    bool_t req_issued;
+    bool_t ack_received;
 } data_state_t;
 
 typedef struct pr_state {
@@ -57,6 +63,11 @@ typedef struct bus_state {
     char *l_sock;
     char *sock;
     char *r_sock;
+
+    req_t op;
+    uint16_t data_in;
+    uint16_t data_out;
+    uint32_t addr;
 
     pthread_mutex_t state_mutex;
     pthread_mutex_t data_in_mutex;
