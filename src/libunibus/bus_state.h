@@ -10,6 +10,7 @@
 
 #include "../common/include/types.h"
 
+/* Type of data bus request to make. */
 typedef enum req {
     IN,
     INB,
@@ -18,12 +19,21 @@ typedef enum req {
     NONE
 } req_t;
 
+/* Direction to send a message on the bus. */
+typedef enum direction {
+    D_LEFT,
+    D_RIGHT,
+    D_NONE
+} direction_t;
+
+/* (Unnecessary?) struct to hold info on data bus request to make. */
 typedef struct data_op {
     req_t op;
     uint32_t addr;
     uint16_t value;
 } data_op_t;
 
+/* State for the data bus processor. */
 typedef struct data_state {
     struct sockaddr_un d_out_addr_l;
     struct sockaddr_un d_out_addr_r;
@@ -39,6 +49,7 @@ typedef struct data_state {
     bool_t ack_received;
 } data_state_t;
 
+/* State for the priority bus processor. */
 typedef struct pr_state {
     struct sockaddr_un pr_out_addr_l;
     struct sockaddr_un pr_out_addr_r;
@@ -54,6 +65,10 @@ typedef struct pr_state {
     bool_t bbsy_asserted;
 } pr_state_t;
 
+/*
+ * Shared state between bus processors and main device.
+ * Grab state_mutex before using.
+ */
 typedef struct bus_state {
     bool_t is_master;
     bool_t req_master;
