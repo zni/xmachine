@@ -8,9 +8,9 @@
 
 static bus_state_t *STATE = NULL;
 
-direction_t get_fd_direction(pr_state_t*, pr_bus_req_t*, bool_t);
-int get_fd(pr_state_t*, direction_t);
-void update_from_addr(pr_state_t*, pr_bus_req_t*);
+static direction_t get_fd_direction(pr_state_t*, pr_bus_req_t*, bool_t);
+static int get_fd(pr_state_t*, direction_t);
+static void update_from_addr(pr_state_t*, pr_bus_req_t*);
 
 void assert_br(pr_state_t*);
 void assert_bbsy(pr_state_t*);

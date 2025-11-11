@@ -45,12 +45,20 @@ typedef enum data_bus_msg {
     DBM_RESP
 } data_bus_msg_t;
 
+/* I'm lazy, so the control lines (C0, C1) are just mnemonics now. */
+typedef enum d_signal {
+    D_DATI,
+    D_DATIP,
+    D_DATO,
+    D_DATOB,
+    D_EMPTY
+} d_signal_t;
+
 typedef struct data_bus_req {
     char from[SOCK_NAME_LEN];
     data_bus_msg_t msg_type;
 
-    uint8_t c0;
-    uint8_t c1;
+    d_signal_t c;
     uint32_t addr;
     uint16_t data;
 

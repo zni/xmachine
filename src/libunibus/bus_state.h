@@ -11,13 +11,18 @@
 #include "../common/include/types.h"
 
 /* Type of data bus request to make. */
-typedef enum req {
-    IN,
-    INB,
-    OUT,
-    OUTB,
-    NONE
-} req_t;
+typedef enum d_req {
+    R_IN,
+    R_INB,
+    R_OUT,
+    R_OUTB,
+    R_BLOCK_IN,
+    R_BLOCK_INB,
+    R_BLOCK_OUT,
+    R_BLOCK_OUTB,
+    R_DONE,
+    R_NONE
+} d_req_t;
 
 /* Direction to send a message on the bus. */
 typedef enum direction {
@@ -28,7 +33,7 @@ typedef enum direction {
 
 /* (Unnecessary?) struct to hold info on data bus request to make. */
 typedef struct data_op {
-    req_t op;
+    d_req_t op;
     uint32_t addr;
     uint16_t value;
 } data_op_t;
@@ -67,29 +72,42 @@ typedef struct pr_state {
 
 /*
  * Shared state between bus processors and main device.
- * Grab state_mutex before using.
+ * Grab state_mutex before using, if touching:
+ * - is_master
+ * - req_master
+ * - rel_master
+ * - shutdown
+ * - l_sock
+ * - sock
+ * - r_sock
+ *
+ * data_in_mutex is for cond_data_in.
+ * data_out_mutex is for cond_data_out.
  */
 typedef struct bus_state {
+    // Shared state between buses.
+    pthread_mutex_t state_mutex;
     bool_t is_master;
     bool_t req_master;
     bool_t rel_master;
     bool_t shutdown;
-
     char *l_sock;
     char *sock;
     char *r_sock;
 
-    req_t op;
-    uint16_t data_in;
-    uint16_t data_out;
-    uint32_t addr;
+    // Data bus operations.
+    pthread_mutex_t master_op_mutex;
+    data_op_t master;
 
-    pthread_mutex_t state_mutex;
-    pthread_mutex_t data_in_mutex;
-    pthread_mutex_t data_out_mutex;
+    pthread_mutex_t slave_op_mutex;
+    data_op_t slave;
 
-    pthread_cond_t cond_data_in;
-    pthread_cond_t cond_data_out;
+    // Data bus conditions.
+    pthread_mutex_t master_data_mutex;
+    pthread_cond_t cond_master_data;
+
+    pthread_mutex_t slave_data_mutex;
+    pthread_cond_t cond_slave_data;
 } bus_state_t;
 
 #endif
