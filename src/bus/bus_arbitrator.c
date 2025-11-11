@@ -328,6 +328,9 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    pid_t pid = getpid();
+    fprintf(stderr, "bus arbitrator starting [%d]\n", pid);
+
     arb_state_t *arb = init_arbitrator("/tmp/xmachine/cpu.socket");
 
     setup_priority_socket(arb);

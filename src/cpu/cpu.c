@@ -1630,6 +1630,9 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    pid_t pid = getpid();
+    fprintf(stderr, "cpu is starting [%d]\n", pid);
+
     /* Initialize CPU. */
     cpu = init_cpu();
     if (cpu == NULL) {
