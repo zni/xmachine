@@ -80,9 +80,6 @@ typedef struct pr_state {
  * - l_sock
  * - sock
  * - r_sock
- *
- * data_in_mutex is for cond_data_in.
- * data_out_mutex is for cond_data_out.
  */
 typedef struct bus_state {
     // Shared state between buses.
@@ -95,14 +92,25 @@ typedef struct bus_state {
     char *sock;
     char *r_sock;
 
-    // Data bus operations.
+    /*
+     * Data bus operations.
+     * - master_op_mutex protects master.
+     * - slave_op_mutex protects slave.
+     */
     pthread_mutex_t master_op_mutex;
     data_op_t master;
 
     pthread_mutex_t slave_op_mutex;
     data_op_t slave;
 
-    // Data bus conditions.
+    /*
+     * Data bus conditions.
+     * - grab master_data_mutex
+     *   -> signal/wait cond_master_data
+     *
+     * - grab slave_data_mutex
+     *   -> signal/wait cond_slave_data
+     */
     pthread_mutex_t master_data_mutex;
     pthread_cond_t cond_master_data;
 

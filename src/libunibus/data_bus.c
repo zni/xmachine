@@ -33,6 +33,9 @@ int d_close(data_state_t*, direction_t);
 int d_close_l(data_state_t*);
 int d_close_r(data_state_t*);
 
+int send_msg(data_state_t*, data_bus_req_t*);
+int wait_reply(data_state_t*, data_bus_req_t*);
+
 static int
 get_fd(data_state_t *d, direction_t dir)
 {
@@ -80,7 +83,7 @@ update_from_addr(data_state_t *d, data_bus_req_t *req)
 }
 
 data_state_t*
-init_data_state()
+init_data_state(char *l_sock, char *sock, char *r_sock)
 {
     data_state_t *d = malloc(sizeof(data_state_t));
     if (d == NULL) {
@@ -98,6 +101,14 @@ init_data_state()
     return d;
 }
 
+void
+d_cleanup(data_state_t *d)
+{
+    close(d->d_bus_in);
+    unlink(d->d_in_addr.sun_path);
+    free(d);
+}
+
 void*
 data_bus_mgr(void *bus)
 {
@@ -112,7 +123,7 @@ data_bus_mgr(void *bus)
         return NULL;
     }
 
-    d = init_data_state();
+    d = init_data_state(NULL, NULL, NULL);
     if (d == NULL) {
         return NULL;
     }
@@ -154,34 +165,141 @@ data_bus_mgr(void *bus)
 
 
     } while (!shutdown);
+
+    d_cleanup(d);
+
+    return NULL;
 }
 
 void
 in_word(data_state_t *d)
 {
-    // send_msg();
-    // wait_reply();
-}
+    int ret;
+    data_bus_req_t resp;
+    data_bus_req_t req;
+    req.msg_type = DBM_REQ;
+    req.c = D_DATI;
+    req.addr = d->buffer.addr;
 
-void
-in_byte(data_state_t *d)
-{
-    // send_msg();
-    // wait_reply();
+    update_from_addr(d, &req);
+    ret = send_msg(d, &req);
+    if (ret != 0) {
+        /* I made this realization in reverse. Read below. */
+        fprintf(stderr, "DATI: failed to send data bus message\n");
+        fprintf(stderr, "DATI: this means the main thread will block forever\n");
+        fprintf(stderr, "DATI: goodbye\n");
+        return;
+    }
+    ret = wait_reply(d, &resp);
+    if (ret != 0) {
+        /*
+         * This is the worst case Ontario.
+         * What happens now?
+         * - If we return, the main thread blocks forever.
+         * - If we signal the main thread, we've fed it lies.
+         *
+         * I should probably return for now and figure out a better solution.
+         */
+        fprintf(stderr, "DATI: failed to get reply from data bus\n");
+        fprintf(stderr, "DATI: this means the main thread will block forever\n");
+        fprintf(stderr, "DATI: goodbye\n");
+        return;
+    }
+
+    /* Put the response in the master data buffer. */
+    pthread_mutex_lock(&(STATE->master_op_mutex));
+    STATE->master.value = resp.data;
+    STATE->master.op = R_DONE;
+    pthread_mutex_unlock(&(STATE->master_op_mutex));
+
+    /* Assuming we miraculously got this far, signal the main thread. */
+    pthread_mutex_lock(&(STATE->master_data_mutex));
+    pthread_cond_signal(&(STATE->cond_master_data));
+    pthread_mutex_unlock(&(STATE->master_data_mutex));
 }
 
 void
 out_word(data_state_t *d)
 {
-    // send_msg();
-    // wait_reply();
+    /*
+     * FIXME See in_word for details on just returning below.
+     */
+
+    int ret;
+    data_bus_req_t resp;
+    data_bus_req_t req;
+    req.msg_type = DBM_REQ;
+    req.c = D_DATO;
+    req.addr = d->buffer.addr;
+    req.data = d->buffer.value;
+
+    update_from_addr(d, &req);
+    ret = send_msg(d, &req);
+    if (ret != 0) {
+        fprintf(stderr, "DATO: failed to send data bus message\n");
+        fprintf(stderr, "DATO: blocking forever, goodbye.\n");
+        return;
+    }
+    ret = wait_reply(d, &resp);
+    if (ret != 0) {
+        fprintf(stderr, "DATO: failed to get reply from data bus\n");
+        fprintf(stderr, "DATO: blocking forever, goodbye.\n");
+        return;
+    }
+
+    /* Put the response in the master data buffer. */
+    pthread_mutex_lock(&(STATE->master_op_mutex));
+    STATE->master.addr = 0;
+    STATE->master.value = 0;
+    STATE->master.op = R_DONE;
+    pthread_mutex_unlock(&(STATE->master_op_mutex));
+
+    /* Assuming we miraculously got this far, signal the main thread. */
+    pthread_mutex_lock(&(STATE->master_data_mutex));
+    pthread_cond_signal(&(STATE->cond_master_data));
+    pthread_mutex_unlock(&(STATE->master_data_mutex));
 }
 
 void
 out_byte(data_state_t *d)
 {
-    // send_msg();
-    // wait_reply();
+    /*
+     * FIXME See in_word for details on just returning below.
+     */
+
+    int ret;
+    data_bus_req_t resp;
+    data_bus_req_t req;
+    req.msg_type = DBM_REQ;
+    req.c = D_DATOB;
+    req.addr = d->buffer.addr;
+    req.data = d->buffer.value;
+
+    update_from_addr(d, &req);
+    ret = send_msg(d, &req);
+    if (ret != 0) {
+        fprintf(stderr, "DATOB: failed to send data bus message\n");
+        fprintf(stderr, "DATOB: blocking forever, goodbye.\n");
+        return;
+    }
+    ret = wait_reply(d, &resp);
+    if (ret != 0) {
+        fprintf(stderr, "DATOB: failed to get reply from data bus\n");
+        fprintf(stderr, "DATOB: blocking forever, goodbye.\n");
+        return;
+    }
+
+    /* Put the response in the master data buffer. */
+    pthread_mutex_lock(&(STATE->master_op_mutex));
+    STATE->master.addr = 0;
+    STATE->master.value = 0;
+    STATE->master.op = R_DONE;
+    pthread_mutex_unlock(&(STATE->master_op_mutex));
+
+    /* Assuming we miraculously got this far, signal the main thread. */
+    pthread_mutex_lock(&(STATE->master_data_mutex));
+    pthread_cond_signal(&(STATE->cond_master_data));
+    pthread_mutex_unlock(&(STATE->master_data_mutex));
 }
 
 void
@@ -527,3 +645,47 @@ d_close_r(data_state_t *d)
     return ret;
 }
 
+int
+send_msg(data_state_t *d, data_bus_req_t *req)
+{
+    int ret;
+    ret = d_connect_l(d);
+    if (ret != -1) {
+        ret = write(d->d_bus_out_l, req, sizeof(data_bus_req_t));
+        if (ret == -1) {
+            perror("send_msg_l");
+            return ret;
+        }
+        d_close_l(d);
+    }
+
+    ret = d_connect_r(d);
+    if (ret != -1) {
+        ret = write(d->d_bus_out_r, req, sizeof(data_bus_req_t));
+        if (ret == -1) {
+            perror("send_msg_r");
+            return ret;
+        }
+        d_close_r(d);
+    }
+
+    return 0;
+}
+
+int
+wait_reply(data_state_t *d, data_bus_req_t *resp)
+{
+    int ret;
+    /*
+     * This blocks (obviously), but:
+     * - We're the master (go us!).
+     * - The main thread is blocking too.
+     */
+    ret = recv(d->d_bus_in, resp, sizeof(data_bus_req_t), NULL);
+    if (ret != -1) {
+        perror("wait_reply");
+        return ret;
+    }
+
+    return 0;
+}

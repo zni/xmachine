@@ -42,38 +42,41 @@ init_bus(char *l_sock, char *sock, char *r_sock)
         return NULL;
     }
 
-    ret = pthread_mutex_init(&(bus->data_in_mutex), NULL);
+    ret = pthread_mutex_init(&(bus->master_op_mutex), NULL);
     if (ret != 0) {
-        perror("data_in_mutex");
+        perror("master_op_mutex");
         free(bus);
         return NULL;
     }
 
-    ret = pthread_mutex_init(&(bus->data_out_mutex), NULL);
+    ret = pthread_mutex_init(&(bus->slave_op_mutex), NULL);
     if (ret != 0) {
-        perror("data_out_mutex");
+        perror("slave_op_mutex");
         free(bus);
         return NULL;
     }
 
-    ret = pthread_cond_init(&(bus->cond_data_in), NULL);
+    ret = pthread_cond_init(&(bus->cond_slave_data), NULL);
     if (ret != 0) {
-        perror("cond_data_in");
+        perror("cond_slave_data");
         free(bus);
         return NULL;
     }
 
-    ret = pthread_cond_init(&(bus->cond_data_out), NULL);
+    ret = pthread_cond_init(&(bus->cond_master_data), NULL);
     if (ret != 0) {
-        perror("cond_data_out");
+        perror("cond_master_data");
         free(bus);
         return NULL;
     }
 
-    bus->op = NONE;
-    bus->data_in = 0;
-    bus->data_out = 0;
-    bus->addr = 0;
+    bus->master.op = R_NONE;
+    bus->master.addr = 0;
+    bus->master.value = 0;
+
+    bus->slave.op = R_NONE;
+    bus->slave.addr = 0;
+    bus->slave.value = 0;
 
     return bus;
 }
@@ -101,23 +104,30 @@ release_bus_master(bus_state_t *bus)
 uint16_t
 read_data_in(bus_state_t *bus, uint32_t addr)
 {
+    d_req_t status;
     uint16_t data;
 
-    pthread_mutex_lock(&(bus->state_mutex));
-    bus->op = IN;
-    bus->addr = addr;
-    pthread_mutex_unlock(&(bus->state_mutex));
+    pthread_mutex_lock(&(bus->master_op_mutex));
+    bus->master.op = R_IN;
+    bus->master.addr = addr;
+    pthread_mutex_unlock(&(bus->master_op_mutex));
 
-    pthread_mutex_lock(&(bus->data_in_mutex));
+    pthread_mutex_lock(&(bus->master_data_mutex));
     pthread_cond_wait(
-        &(bus->cond_data_in),
-        &(bus->data_in_mutex)
+        &(bus->cond_master_data),
+        &(bus->master_data_mutex)
     );
-    pthread_mutex_unlock(&(bus->data_in_mutex));
+    pthread_mutex_unlock(&(bus->master_data_mutex));
 
-    pthread_mutex_lock(&(bus->state_mutex));
-    data = bus->data_in;
-    pthread_mutex_unlock(&(bus->state_mutex));
+    pthread_mutex_lock(&(bus->master_op_mutex));
+    data = bus->master.value;
+    status = bus->master.op;
+    bus->master.op = R_NONE;
+    pthread_mutex_unlock(&(bus->master_op_mutex));
+
+    if (status != R_DONE) {
+        fprintf(stderr, "read failed\n");
+    }
 
     return data;
 }
@@ -125,18 +135,29 @@ read_data_in(bus_state_t *bus, uint32_t addr)
 void
 write_data_out(bus_state_t *bus, uint32_t addr, uint16_t data)
 {
-    pthread_mutex_lock(&(bus->state_mutex));
-    bus->op = OUT;
-    bus->addr = addr;
-    bus->data_out = data;
-    pthread_mutex_unlock(&(bus->state_mutex));
+    d_req_t status;
 
-    pthread_mutex_lock(&(bus->data_out_mutex));
+    pthread_mutex_lock(&(bus->master_op_mutex));
+    bus->master.op = R_OUT;
+    bus->master.addr = addr;
+    bus->master.value = data;
+    pthread_mutex_unlock(&(bus->master_op_mutex));
+
+    pthread_mutex_lock(&(bus->master_data_mutex));
     pthread_cond_wait(
-        &(bus->cond_data_out),
-        &(bus->data_out_mutex)
+        &(bus->cond_master_data),
+        &(bus->master_data_mutex)
     );
-    pthread_mutex_unlock(&(bus->data_out_mutex));
+    pthread_mutex_unlock(&(bus->master_data_mutex));
+
+    pthread_mutex_lock(&(bus->master_op_mutex));
+    status = bus->master.op;
+    bus->master.op = R_NONE;
+    pthread_mutex_unlock(&(bus->master_op_mutex));
+
+    if (status != R_DONE) {
+        fprintf(stderr, "write failed\n");
+    }
 }
 
 void
