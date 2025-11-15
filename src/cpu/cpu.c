@@ -1618,9 +1618,9 @@ int main(int argc, char **argv)
     cpu_t *cpu;
     int ret;
     struct sigaction act = { 0 };
-    char sock_l[] = "/tmp/xmachine/ba.socket";
-    char sock_name[] = "/tmp/xmachine/cpu.socket";
-    char sock_r[] = "/tmp/xmachine/mem.socket";
+    char sock_l[] = "ba";
+    char sock_name[] = "cpu";
+    char sock_r[] = "mem";
 
     /* Setup signal handler. */
     act.sa_flags = SA_SIGINFO;
@@ -1642,7 +1642,7 @@ int main(int argc, char **argv)
     CPU_STATE = cpu;
 
     /* Initialize bus connections. */
-    bus = init_bus(sock_l, sock_name, NULL);
+    bus = init_bus(sock_l, sock_name, sock_r);
     if (bus == NULL) {
         free(cpu);
         fprintf(stderr, "failed to initialize bus\n");

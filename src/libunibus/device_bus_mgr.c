@@ -5,17 +5,44 @@
 
 #include "device_bus_mgr.h"
 
+#include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
 
 pthread_t PR_BUS;
 pthread_t D_BUS;
+
+int
+setup_socket_dir()
+{
+    int ret, err;
+    struct stat dir_stat;
+    ret = stat(SOCKET_DIR, &dir_stat);
+    if (ret == 0) {
+        return 0;
+    }
+
+    err = errno;
+    if (err != ENOENT) {
+        perror("setup_socket_dir-stat");
+        return -1;
+    }
+
+    ret = mkdir(SOCKET_DIR, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+    if (ret != 0) {
+        perror("setup_socket_dir-mkdir");
+        return -1;
+    }
+
+    return 0;
+}
 
 bus_state_t*
 init_bus(char *l_sock, char *sock, char *r_sock)
@@ -24,6 +51,13 @@ init_bus(char *l_sock, char *sock, char *r_sock)
     bus_state_t *bus = malloc(sizeof(bus_state_t));
     if (bus == NULL) {
         perror("init_bus_malloc");
+        return NULL;
+    }
+
+    ret = setup_socket_dir();
+    if (ret != 0) {
+        fprintf(stderr, "Failed to setup socket directory\n");
+        free(bus);
         return NULL;
     }
 
@@ -224,11 +258,41 @@ connect_bus(bus_state_t *bus)
         return ret;
     }
 
-    //ret = init_d_bus(bus);
-    //if (ret != 0) {
-    //    return ret;
-    //}
+    ret = init_d_bus(bus);
+    if (ret != 0) {
+        return ret;
+    }
 
     return 0;
+}
+
+void
+data_bus_check(bus_state_t *bus, data_op_t *d_op)
+{
+    // Get slave request.
+    pthread_mutex_lock(&(bus->slave_op_mutex));
+    d_op->op = bus->slave.op;
+    d_op->addr = bus->slave.addr;
+    d_op->value = bus->slave.value;
+    pthread_mutex_unlock(&(bus->slave_op_mutex));
+}
+
+void
+data_bus_cont(bus_state_t *bus, data_op_t *d_op)
+{
+    // Update slave request.
+    pthread_mutex_lock(&(bus->slave_op_mutex));
+    bus->slave.op = R_DONE;
+    bus->slave.addr = d_op->addr;
+    bus->slave.value = d_op->value;
+    d_op->op = R_NONE;
+    d_op->addr = 0;
+    d_op->value = 0;
+    pthread_mutex_unlock(&(bus->slave_op_mutex));
+
+    // Signal data bus.
+    pthread_mutex_lock(&(bus->slave_data_mutex));
+    pthread_cond_signal(&(bus->cond_slave_data));
+    pthread_mutex_unlock(&(bus->slave_data_mutex));
 }
 

@@ -62,25 +62,28 @@ init_pr_state(char *l_sock, char *sock, char *r_sock)
     if (l_sock != NULL) {
         memset(&(pr->pr_out_addr_l), 0, sizeof(struct sockaddr_un));
         pr->pr_out_addr_l.sun_family = AF_UNIX;
-        strncpy(
-            pr->pr_out_addr_l.sun_path,
-            l_sock,
-            sizeof(pr->pr_out_addr_l.sun_path) - 1
-        );
+        //strncpy(
+        //    pr->pr_out_addr_l.sun_path,
+        //    l_sock,
+        //    sizeof(pr->pr_out_addr_l.sun_path) - 1
+        //);
+        sprintf(pr->pr_out_addr_l.sun_path, "/tmp/xmachine/%s_pr.socket", l_sock);
     }
 
     if (r_sock != NULL) {
         memset(&(pr->pr_out_addr_r), 0, sizeof(struct sockaddr_un));
         pr->pr_out_addr_r.sun_family = AF_UNIX;
-        strncpy(
-            pr->pr_out_addr_r.sun_path,
-            r_sock,
-            sizeof(pr->pr_out_addr_r.sun_path) - 1
-        );
+        //strncpy(
+        //    pr->pr_out_addr_r.sun_path,
+        //    r_sock,
+        //    sizeof(pr->pr_out_addr_r.sun_path) - 1
+        //);
+        sprintf(pr->pr_out_addr_r.sun_path, "/tmp/xmachine/%s_pr.socket", r_sock);
     }
 
     memset(&(pr->pr_in_addr), 0, sizeof(struct sockaddr_un));
-    strncpy(pr->pr_in_addr.sun_path, sock, sizeof(pr->pr_in_addr.sun_path));
+    //strncpy(pr->pr_in_addr.sun_path, sock, sizeof(pr->pr_in_addr.sun_path));
+    sprintf(pr->pr_in_addr.sun_path, "/tmp/xmachine/%s_pr.socket", sock);
     pr->pr_in_addr.sun_family = AF_UNIX;
 
     pr->pr_bus_in = socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -740,6 +743,7 @@ pr_connect_r(pr_state_t *pr)
     );
     if (ret == -1) {
         perror("pr_connect_r-connect");
+        printf("r_sock: %s\n", pr->pr_out_addr_r.sun_path);
         return ret;
     }
 

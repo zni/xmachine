@@ -85,6 +85,8 @@ update_from_addr(data_state_t *d, data_bus_req_t *req)
 data_state_t*
 init_data_state(char *l_sock, char *sock, char *r_sock)
 {
+    int ret;
+
     data_state_t *d = malloc(sizeof(data_state_t));
     if (d == NULL) {
         perror("init_data");
@@ -97,6 +99,48 @@ init_data_state(char *l_sock, char *sock, char *r_sock)
     d->buffer.op = R_NONE;
     d->buffer.addr = 0;
     d->buffer.value = 0;
+
+    if (l_sock != NULL) {
+        memset(&(d->d_out_addr_l), 0, sizeof(struct sockaddr_un));
+        d->d_out_addr_l.sun_family = AF_UNIX;
+        sprintf(d->d_out_addr_l.sun_path, "/tmp/xmachine/%s_d.socket", l_sock);
+    }
+
+    if (r_sock != NULL) {
+        memset(&(d->d_out_addr_r), 0, sizeof(struct sockaddr_un));
+        d->d_out_addr_r.sun_family = AF_UNIX;
+        sprintf(d->d_out_addr_r.sun_path, "/tmp/xmachine/%s_d.socket", l_sock);
+    }
+
+    memset(&(d->d_in_addr), 0, sizeof(struct sockaddr_un));
+    sprintf(d->d_in_addr.sun_path, "/tmp/xmachine/%s_d.socket", sock);
+    d->d_in_addr.sun_family = AF_UNIX;
+
+    d->d_bus_in = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (d->d_bus_in == -1) {
+        perror("d_bus_in");
+        free(d);
+        return NULL;
+    }
+
+    if (l_sock == NULL) {
+        d->d_bus_out_l = -1;
+    }
+
+    if (r_sock == NULL) {
+        d->d_bus_out_r = -1;
+    }
+
+    ret = bind(
+        d->d_bus_in,
+        (const struct sockaddr *) &(d->d_in_addr),
+        sizeof(d->d_in_addr)
+    );
+    if (ret == -1) {
+        perror("d_bus_in_bind");
+        free(d);
+        return NULL;
+    }
 
     return d;
 }
@@ -117,13 +161,39 @@ data_bus_mgr(void *bus)
     bool_t shutdown;
     d_req_t master_op;
 
+    char l_sock_buf[100];
+    char sock[100];
+    char r_sock_buf[100];
+    char *l_sock;
+    char *r_sock;
+
     if (bus != NULL) {
         STATE = bus;
     } else {
         return NULL;
     }
 
-    d = init_data_state(NULL, NULL, NULL);
+    pthread_mutex_lock(&(STATE->state_mutex));
+
+    if (STATE->l_sock != NULL) {
+        strncpy(l_sock_buf, STATE->l_sock, sizeof(l_sock_buf));
+        l_sock = l_sock_buf;
+    } else {
+        l_sock = NULL;
+    }
+
+    strncpy(sock, STATE->sock, sizeof(sock));
+
+    if (STATE->r_sock != NULL) {
+        strncpy(r_sock_buf, STATE->r_sock, sizeof(r_sock_buf));
+        r_sock = r_sock_buf;
+    } else {
+        r_sock = NULL;
+    }
+
+    pthread_mutex_unlock(&(STATE->state_mutex));
+
+    d = init_data_state(l_sock, sock, r_sock);
     if (d == NULL) {
         return NULL;
     }
@@ -308,9 +378,6 @@ process_op(data_state_t *d)
         switch (d->buffer.op) {
         case R_IN:
             in_word(d);
-            break;
-        case R_INB:
-            in_byte(d);
             break;
         case R_OUT:
             out_word(d);
@@ -681,7 +748,7 @@ wait_reply(data_state_t *d, data_bus_req_t *resp)
      * - We're the master (go us!).
      * - The main thread is blocking too.
      */
-    ret = recv(d->d_bus_in, resp, sizeof(data_bus_req_t), NULL);
+    ret = recv(d->d_bus_in, resp, sizeof(data_bus_req_t), 0);
     if (ret != -1) {
         perror("wait_reply");
         return ret;

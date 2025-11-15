@@ -105,7 +105,7 @@ setup_priority_socket(arb_state_t *uni)
     memset(&p_sock, 0, sizeof(p_sock));
 
     p_sock.sun_family = AF_UNIX;
-    strncpy(p_sock.sun_path, PRIORITY_SOCKET_NAME, sizeof(p_sock.sun_path) - 1);
+    sprintf(p_sock.sun_path, "/tmp/xmachine/%s_pr.socket", NAME);
 
     ret = bind(
         uni->priority_socket,
@@ -122,7 +122,7 @@ void
 destroy_priority_socket(arb_state_t *arb)
 {
     close(arb->priority_socket);
-    unlink(PRIORITY_SOCKET_NAME);
+    unlink("/tmp/xmachine/ba_pr.socket");
 }
 
 void
@@ -331,7 +331,7 @@ main(int argc, char **argv)
     pid_t pid = getpid();
     fprintf(stderr, "bus arbitrator starting [%d]\n", pid);
 
-    arb_state_t *arb = init_arbitrator("/tmp/xmachine/cpu.socket");
+    arb_state_t *arb = init_arbitrator("/tmp/xmachine/cpu_pr.socket");
 
     setup_priority_socket(arb);
     listen_priority(arb);

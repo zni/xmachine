@@ -6,8 +6,8 @@ cpu: libunibus cpu.o bin
 cpu.o: src/cpu/cpu.c src/cpu/cpu.h
 	gcc -o src/cpu/cpu.o -c src/cpu/cpu.c
 
-mem: mem.o bin
-	gcc -o bin/mem src/mem/mem.o
+mem: libunibus mem.o bin
+	gcc -o bin/mem src/mem/mem.o -Llib/ -lunibus -lpthread
 
 mem.o: src/mem/mem.c src/mem/mem.h
 	gcc -c src/mem/mem.c -o src/mem/mem.o
@@ -66,4 +66,7 @@ clean: clean_libload clean_libunibus
 	rm -f src/mem/mem.o
 	rm -f src/tty/tty.o
 	rm -f src/bus/bus.o
+
+all: cpu bus mem
+
 

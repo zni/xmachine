@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
-#define PRIORITY_SOCKET_NAME "/tmp/xmachine/ba.socket"
+#define NAME "ba"
 
 typedef struct arb_state {
     int priority_socket;
