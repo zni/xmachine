@@ -52,6 +52,8 @@ typedef struct data_state {
 
     bool_t req_issued;
     bool_t ack_received;
+
+    bool_t (*is_addr_internal)(uint32_t);
 } data_state_t;
 
 /* State for the priority bus processor. */
@@ -116,6 +118,12 @@ typedef struct bus_state {
 
     pthread_mutex_t slave_data_mutex;
     pthread_cond_t cond_slave_data;
+
+    /* Only really valid for the memory device. */
+    pthread_mutex_t perma_slave_mutex;
+    pthread_cond_t cond_perma_slave;
+
+    bool_t (*addr_internal_to_device)(uint32_t);
 } bus_state_t;
 
 #endif

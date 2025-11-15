@@ -13,6 +13,13 @@ arb_state_t *GLOBAL_STATE = NULL;
 void destroy_priority_socket(arb_state_t*);
 
 void
+update_from_addr(arb_state_t *a, pr_bus_req_t *req)
+{
+    memset(req->from, 0, sizeof(req->from));
+    strncpy(req->from, a->socket.sun_path, sizeof(req->from));
+}
+
+void
 handler(int signo, siginfo_t *info, void *context)
 {
     if (GLOBAL_STATE != NULL) {
@@ -94,7 +101,6 @@ void
 setup_priority_socket(arb_state_t *uni)
 {
     int ret;
-    struct sockaddr_un p_sock;
 
     uni->priority_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (uni->priority_socket == -1) {
@@ -102,15 +108,15 @@ setup_priority_socket(arb_state_t *uni)
         exit(EXIT_FAILURE);
     }
 
-    memset(&p_sock, 0, sizeof(p_sock));
+    memset(&uni->socket, 0, sizeof(uni->socket));
 
-    p_sock.sun_family = AF_UNIX;
-    sprintf(p_sock.sun_path, "/tmp/xmachine/%s_pr.socket", NAME);
+    uni->socket.sun_family = AF_UNIX;
+    sprintf(uni->socket.sun_path, "/tmp/xmachine/%s_pr.socket", NAME);
 
     ret = bind(
         uni->priority_socket,
-        (const struct sockaddr *) &p_sock,
-        sizeof(p_sock)
+        (const struct sockaddr *) &uni->socket,
+        sizeof(uni->socket)
     );
     if (ret == -1) {
         perror("priority bind");
@@ -163,6 +169,7 @@ assert_bus_grant(arb_state_t *arb)
         return;
 
     arb->outstanding_bg = TRUE;
+    update_from_addr(arb, &resp);
 
     client_connect(arb);
 
@@ -184,6 +191,7 @@ negate_bus_grant(arb_state_t *arb)
     printf("negate_bus_grant\n");
     int rv;
     pr_bus_req_t resp;
+    update_from_addr(arb, &resp);
 
     arb->outstanding_bg = FALSE;
 
@@ -210,6 +218,7 @@ assert_np_grant(arb_state_t *arb)
     if (arb->sack == ASSERTED)
         return;
 
+    update_from_addr(arb, &resp);
     arb->outstanding_npg = TRUE;
 
     client_connect(arb);
@@ -233,6 +242,7 @@ negate_np_grant(arb_state_t *arb)
     pr_bus_req_t resp;
 
     arb->outstanding_npg = FALSE;
+    update_from_addr(arb, &resp);
 
     client_connect(arb);
 
@@ -322,7 +332,6 @@ main(int argc, char **argv)
         perror("sigaction");
         exit(EXIT_FAILURE);
     }
-
     if (sigaction(SIGINT, &act, NULL) == -1) {
         perror("sigaction");
         exit(EXIT_FAILURE);

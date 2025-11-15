@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include "signals.h"
 #include "data_bus.h"
 
@@ -156,6 +157,10 @@ d_cleanup(data_state_t *d)
 void*
 data_bus_mgr(void *bus)
 {
+    struct timespec wait;
+    wait.tv_sec = 5;
+    wait.tv_nsec = 0;
+
     data_state_t *d;
     bool_t is_master;
     bool_t shutdown;
@@ -167,6 +172,8 @@ data_bus_mgr(void *bus)
     char *l_sock;
     char *r_sock;
 
+    bool_t (*addr_ptr)(uint32_t) = NULL;
+
     if (bus != NULL) {
         STATE = bus;
     } else {
@@ -174,6 +181,10 @@ data_bus_mgr(void *bus)
     }
 
     pthread_mutex_lock(&(STATE->state_mutex));
+
+    if (STATE->addr_internal_to_device != NULL) {
+        addr_ptr = STATE->addr_internal_to_device;
+    }
 
     if (STATE->l_sock != NULL) {
         strncpy(l_sock_buf, STATE->l_sock, sizeof(l_sock_buf));
@@ -197,6 +208,8 @@ data_bus_mgr(void *bus)
     if (d == NULL) {
         return NULL;
     }
+
+    d->is_addr_internal = addr_ptr;
 
     do {
         pthread_mutex_lock(&(STATE->state_mutex));
@@ -233,7 +246,8 @@ data_bus_mgr(void *bus)
             check_bus(d);
         }
 
-
+        printf("sleeping\n");
+        nanosleep(&wait, NULL);
     } while (!shutdown);
 
     d_cleanup(d);
@@ -423,8 +437,11 @@ check_bus(data_state_t *d)
 bool_t
 examine_address(data_state_t *d, data_bus_req_t *event)
 {
-    /* TODO Actually check the address. */
-    return FALSE;
+    if (d->is_addr_internal == NULL) {
+        return FALSE;
+    }
+
+    return d->is_addr_internal(event->addr);
 }
 
 void
@@ -448,7 +465,7 @@ bus_reply(data_state_t *d, data_bus_req_t *event)
 void
 bus_forward(data_state_t *d, data_bus_req_t *event)
 {
-    // pass it on
+    fprintf(stderr, "bus_forward has been left unimplemented. sorry.\n");
 }
 
 void
@@ -598,6 +615,10 @@ handle_datob(data_state_t *d, data_bus_req_t *event)
 void
 slave_wait()
 {
+    pthread_mutex_lock(&(STATE->perma_slave_mutex));
+    pthread_cond_signal(&(STATE->cond_perma_slave));
+    pthread_mutex_unlock(&(STATE->perma_slave_mutex));
+
     pthread_mutex_lock(&(STATE->slave_data_mutex));
     pthread_cond_wait(
         &(STATE->cond_slave_data),

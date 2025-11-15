@@ -14,6 +14,16 @@ void write_word(mem_t*, uint32_t, uint16_t);
 void write_byte(mem_t*, uint32_t, uint16_t);
 void dump_mem(mem_t*);
 
+bool_t
+is_local_addr(uint32_t addr)
+{
+    if (addr >= MEMLOW && addr <= MEMHIGH) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 void
 handler(int signo, siginfo_t *info, void *context)
 {
@@ -111,18 +121,27 @@ execute()
 {
     data_op_t slave_req;
     while(TRUE) {
+        printf("blocking...\n");
+        pthread_mutex_lock(&(BUS_STATE->perma_slave_mutex));
+        pthread_cond_wait(&(BUS_STATE->cond_perma_slave), &(BUS_STATE->perma_slave_mutex));
+        pthread_mutex_unlock(&(BUS_STATE->perma_slave_mutex));
+
         // Check for bus requests.
         data_bus_check(BUS_STATE, &slave_req);
         switch (slave_req.op) {
         case R_NONE:
+            printf("NONE\n");
             continue;
         case R_BLOCK_IN:
+            printf("perform_read\n");
             perform_read(&slave_req);
             break;
         case R_BLOCK_OUT:
+            printf("perform_write\n");
             perform_write(&slave_req);
             break;
         case R_BLOCK_OUTB:
+            printf("perform_writeb\n");
             perform_writeb(&slave_req);
             break;
         default:
@@ -149,6 +168,11 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    if (sigaction(SIGINT, &act, NULL) == -1) {
+        perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
+
     pid_t pid = getpid();
     fprintf(stderr, "mem is starting [%d]\n", pid);
 
@@ -163,6 +187,7 @@ main(int argc, char **argv)
         fprintf(stderr, "Failed to initialize bus.\n");
         exit(EXIT_FAILURE);
     }
+    bus->addr_internal_to_device = &is_local_addr;
 
     BUS_STATE = bus;
     MEM_STATE = mem;

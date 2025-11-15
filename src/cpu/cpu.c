@@ -11,7 +11,7 @@
 cpu_t *CPU_STATE = NULL;
 bus_state_t *BUS_STATE = NULL;
 
-uint8_t is_internal_bus_addr(uint32_t);
+bool_t is_internal_bus_addr(uint32_t);
 uint32_t translate_bus_addr(uint32_t);
 uint16_t* bus_addr_to_register(cpu_t*, uint32_t);
 uint16_t fetch_data(cpu_t*, uint32_t);
@@ -516,7 +516,7 @@ get_branch_offset(cpu_t *cpu)
  * Addressing
  *******************************/
 
-uint8_t
+bool_t
 is_internal_bus_addr(uint32_t addr)
 {
     switch (addr) {
@@ -1626,6 +1626,10 @@ int main(int argc, char **argv)
     act.sa_flags = SA_SIGINFO;
     act.sa_sigaction = &handler;
     if (sigaction(SIGHUP, &act, NULL) == -1) {
+        perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
+    if (sigaction(SIGINT, &act, NULL) == -1) {
         perror("sigaction");
         exit(EXIT_FAILURE);
     }

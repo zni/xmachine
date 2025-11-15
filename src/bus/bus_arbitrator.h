@@ -12,6 +12,8 @@ typedef struct arb_state {
     int priority_socket;
     int client_socket;
 
+    struct sockaddr_un socket;
+
     struct sockaddr_un current_client;
     socklen_t client_addr_len;
 

@@ -90,6 +90,13 @@ init_bus(char *l_sock, char *sock, char *r_sock)
         return NULL;
     }
 
+    ret = pthread_mutex_init(&(bus->perma_slave_mutex), NULL);
+    if (ret != 0) {
+        perror("perma_slave_mutex");
+        free(bus);
+        return NULL;
+    }
+
     ret = pthread_cond_init(&(bus->cond_slave_data), NULL);
     if (ret != 0) {
         perror("cond_slave_data");
@@ -100,6 +107,13 @@ init_bus(char *l_sock, char *sock, char *r_sock)
     ret = pthread_cond_init(&(bus->cond_master_data), NULL);
     if (ret != 0) {
         perror("cond_master_data");
+        free(bus);
+        return NULL;
+    }
+
+    ret = pthread_cond_init(&(bus->cond_perma_slave), NULL);
+    if (ret != 0) {
+        perror("cond_perma_slave");
         free(bus);
         return NULL;
     }

@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "../common/include/types.h"
 #include "priority_bus.h"
@@ -123,6 +124,10 @@ init_pr_state(char *l_sock, char *sock, char *r_sock)
 void*
 priority_bus_mgr(void *bus)
 {
+    struct timespec wait;
+    wait.tv_sec = 5;
+    wait.tv_nsec = 0;
+
     bool_t is_master;
     bool_t req_master;
     bool_t rel_master;
@@ -180,6 +185,8 @@ priority_bus_mgr(void *bus)
         }
 
         process_pr_events(pr);
+
+        nanosleep(&wait, NULL);
     } while (!shutdown);
 
     pr_cleanup(pr);
