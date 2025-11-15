@@ -1,7 +1,7 @@
 .*
-*.exe
-*.dSYM
+*.o
+*.a
 bin/*
 testbin/*
-.vscode/*
+local
 *.disk
