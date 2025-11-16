@@ -6,8 +6,8 @@ cpu: libunibus cpu.o bin
 cpu.o: src/cpu/cpu.c src/cpu/cpu.h
 	gcc -o src/cpu/cpu.o -c src/cpu/cpu.c
 
-mem: libunibus mem.o bin
-	gcc -o bin/mem src/mem/mem.o -Llib/ -lunibus -lpthread
+mem: libunibus libload mem.o bin
+	gcc -o bin/mem src/mem/mem.o -Llib/ -lunibus -lload -lpthread
 
 mem.o: src/mem/mem.c src/mem/mem.h
 	gcc -c src/mem/mem.c -o src/mem/mem.o
@@ -30,12 +30,12 @@ bus: bus.o bin
 bus.o: src/bus/bus_arbitrator.c src/bus/bus_arbitrator.h
 	gcc -c src/bus/bus_arbitrator.c -o src/bus/bus.o
 
-libload: src/libload/load.c src/libload/load.h
+libload: lib src/libload/load.c src/libload/load.h
 	gcc -c src/libload/load.c -o src/libload/load.o
-	ar rcs src/libload/libload.a src/libload/load.o
+	ar rcs lib/libload.a src/libload/load.o
 
 clean_libload:
-	rm -f src/libload/libload.a
+	rm -f lib/libload.a
 	rm -f src/libload/load.o
 
 libunibus: lib src/libunibus/priority_bus.c src/libunibus/priority_bus.h src/libunibus/data_bus.c src/libunibus/data_bus.h src/libunibus/device_bus_mgr.c src/libunibus/device_bus_mgr.h

@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include "mem.h"
 #include "../common/include/types.h"
+#include "../libload/load.h"
 #include "../libunibus/device_bus_mgr.h"
 
 mem_t *MEM_STATE = NULL;
@@ -13,6 +14,12 @@ uint16_t read_word(mem_t*, uint32_t);
 void write_word(mem_t*, uint32_t, uint16_t);
 void write_byte(mem_t*, uint32_t, uint16_t);
 void dump_mem(mem_t*);
+
+void
+usage()
+{
+    fprintf(stderr, "mem -f <a.out file> -o <load offset>\n");
+}
 
 bool_t
 is_local_addr(uint32_t addr)
@@ -36,6 +43,15 @@ handler(int signo, siginfo_t *info, void *context)
     cleanup_bus(BUS_STATE);
 
     exit(EXIT_SUCCESS);
+}
+
+void
+load_aout(uint8_t *buffer, exec_t *header, uint32_t offset)
+{
+    int n, m;
+    for (n = 0, m = offset; n < header->a_text; n++, m++) {
+        MEM_STATE->store[m] = buffer[n];
+    }
 }
 
 mem_t*
@@ -155,9 +171,13 @@ execute()
 int
 main(int argc, char **argv)
 {
-    int ret;
+    int ret, opt;
+    uint32_t load_offset = 0;
     char sock_l[] = "cpu";
     char sock_name[] = "mem";
+    char *aout_file = NULL;
+    exec_t *aout_header = NULL;
+    uint8_t *aout_buffer = NULL;
 
     /* Setup signal handler. */
     struct sigaction act = { 0 };
@@ -181,6 +201,43 @@ main(int argc, char **argv)
         fprintf(stderr, "Failed to initialize memory.\n");
         exit(EXIT_FAILURE);
     }
+    MEM_STATE = mem;
+
+    while ((opt = getopt(argc, argv, "f:o:")) != -1) {
+        switch (opt) {
+        case 'f':
+            aout_file = optarg;
+            break;
+        case 'o':
+            load_offset = strtoul(optarg, NULL, 10);
+            break;
+        default:
+            usage();
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    if (aout_file == NULL) {
+        usage();
+        printf("must specify an a.out file\n");
+        free(mem);
+        exit(EXIT_FAILURE);
+    }
+
+    aout_header = aout_header_read(aout_file);
+    if (aout_header == NULL) {
+        printf("failed to read a.out header\n");
+        free(mem);
+        exit(EXIT_FAILURE);
+    }
+
+    aout_buffer = aout_text_read(aout_file, aout_header);
+    if (aout_buffer == NULL) {
+        printf("failed to load TEXT from a.out\n");
+        free(mem);
+        exit(EXIT_FAILURE);
+    }
+    load_aout(aout_buffer, aout_header, load_offset);
 
     bus_state_t *bus = init_bus(sock_l, sock_name, NULL);
     if (bus == NULL) {
@@ -190,7 +247,6 @@ main(int argc, char **argv)
     bus->addr_internal_to_device = &is_local_addr;
 
     BUS_STATE = bus;
-    MEM_STATE = mem;
     ret = connect_bus(BUS_STATE);
     if (ret != 0) {
         fprintf(stderr, "Failed to connect to bus.\n");

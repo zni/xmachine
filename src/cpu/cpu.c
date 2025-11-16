@@ -20,6 +20,12 @@ void store_data_register(cpu_t*, uint32_t, uint16_t);
 void store_data(cpu_t*, uint32_t, uint16_t);
 void store_data_b(cpu_t*, uint32_t, uint8_t);
 
+void
+usage()
+{
+    fprintf(stderr, "cpu -p <offset>\n");
+}
+
 cpu_t*
 init_cpu()
 {
@@ -1616,7 +1622,7 @@ int main(int argc, char **argv)
 {
     bus_state_t *bus;
     cpu_t *cpu;
-    int ret;
+    int ret, opt;
     struct sigaction act = { 0 };
     char sock_l[] = "ba";
     char sock_name[] = "cpu";
@@ -1644,6 +1650,18 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
     CPU_STATE = cpu;
+
+    while ((opt = getopt(argc, argv, "p:")) != -1) {
+        switch (opt) {
+        case 'p':
+            cpu->pc = strtoul(optarg, NULL, 10);
+            break;
+        default:
+            usage();
+            free(cpu);
+            exit(EXIT_FAILURE);
+        }
+    }
 
     /* Initialize bus connections. */
     bus = init_bus(sock_l, sock_name, sock_r);

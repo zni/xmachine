@@ -13,4 +13,8 @@ make
 make install
 ```
 
-- Use it, I guess.
+Then:
+
+```
+$ pdp11-aout-as <asm> -o <output file>
+```

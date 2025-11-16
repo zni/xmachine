@@ -32,7 +32,7 @@ typedef struct nlist {
     unsigned long n_value;
 } nlist_t;
 
-extern exec_t* aout_header_read(char *);
-extern uint8_t* aout_text_read(char *, exec_t *);
+exec_t* aout_header_read(char *);
+uint8_t* aout_text_read(char *, exec_t *);
 
 #endif
