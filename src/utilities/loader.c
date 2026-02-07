@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "../src/libload/load.h"
+#include "../libload/load.h"
 
 void usage()
 {
