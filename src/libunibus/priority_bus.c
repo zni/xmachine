@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include "../common/include/types.h"
+#include "debug.h"
 #include "priority_bus.h"
 #include "signals.h"
 
@@ -170,6 +171,10 @@ priority_bus_mgr(void *bus)
         return NULL;
     }
 
+    pthread_mutex_lock(&(STATE->pr_ready_mutex));
+    pthread_cond_signal(&(STATE->cond_pr_ready));
+    pthread_mutex_unlock(&(STATE->pr_ready_mutex));
+
     do {
         pthread_mutex_lock(&(STATE->state_mutex));
         is_master = STATE->is_master;
@@ -311,7 +316,7 @@ negate_sack(pr_state_t *pr)
     pr->sack_asserted = FALSE;
 
     pthread_mutex_lock(&(STATE->state_mutex));
-    STATE->is_master = TRUE;
+    STATE->is_master = FALSE;
     STATE->req_master = FALSE;
     pthread_mutex_unlock(&(STATE->state_mutex));
 }
@@ -351,11 +356,12 @@ negate_bbsy(pr_state_t *pr)
         pr_close_r(pr);
     }
 
-    pr->sack_asserted = FALSE;
+    pr->bbsy_asserted = FALSE;
 
     pthread_mutex_lock(&(STATE->state_mutex));
     STATE->is_master = FALSE;
     STATE->req_master = FALSE;
+    STATE->rel_master = FALSE;
     pthread_mutex_unlock(&(STATE->state_mutex));
 }
 
@@ -479,9 +485,11 @@ handle_bg(pr_state_t *pr, pr_bus_req_t *req)
     int out_fd;
     direction_t dir;
 
-    // If we issued a bus request:
-    // - BLOCK the grant.
-    // - Assert a SACK.
+    /*
+     * If we issued a bus request:
+     * - BLOCK the grant.
+     * - Assert a SACK.
+     */
     if (pr->br_issued && (req->assertion == ASSERTED)) {
         pr_bus_req_t resp;
         resp.sig = SACK;
@@ -495,7 +503,12 @@ handle_bg(pr_state_t *pr, pr_bus_req_t *req)
 
         out_fd = get_fd(pr, dir);
 
-        pr_connect(pr, dir);
+        ret = pr_connect(pr, dir);
+        if (ret != 0) {
+            dbg_bus(STATE, "pr_connect failed");
+        }
+        fprintf(stderr, "%s: %s: dir %s\n", "handle_bg", STATE->sock, DIRC(dir));
+
         ret = write(out_fd, &resp, sizeof(pr_bus_req_t));
         if (ret == -1) {
             perror("handle_bg_block_write");
@@ -503,13 +516,19 @@ handle_bg(pr_state_t *pr, pr_bus_req_t *req)
         }
         pr_close(pr, dir);
 
-        // Revert br_issued, as we're no longer waiting for a BG.
+        /* Revert br_issued, as we're no longer waiting for a BG. */
         pr->br_issued = FALSE;
         pr->sack_asserted = TRUE;
     } else if (pr->sack_asserted && (req->assertion == NEGATED)) {
         assert_bbsy(pr);
 
-    // Else PASS the grant.
+        /* Unblock the main thread waiting on bus privs. */
+        pthread_mutex_lock(&(STATE->pr_master_mutex));
+        pthread_cond_signal(&(STATE->cond_pr_master));
+        pthread_mutex_unlock(&(STATE->pr_master_mutex));
+        dbg_bus(STATE, "handle_bg: asserted BBSY, unblocked main");
+
+    /* Else PASS the grant. */
     } else {
         dir = get_fd_direction(pr, req, FALSE);
         if (dir == D_NONE) {
@@ -560,8 +579,8 @@ handle_npg(pr_state_t *pr, pr_bus_req_t *req)
     int out_fd;
     direction_t dir;
 
-    // Second verse, same as the first.
-    // Block grant and SACK.
+    /* Second verse, same as the first. */
+    /* Block grant and SACK. */
     if (pr->npr_issued) {
         pr_bus_req_t resp;
         resp.sig = SACK;
@@ -583,11 +602,11 @@ handle_npg(pr_state_t *pr, pr_bus_req_t *req)
         }
         pr_close(pr, dir);
 
-        // Revert npr_issued, as we're no longer waiting for a NPG.
+        /* Revert npr_issued, as we're no longer waiting for a NPG. */
         pr->npr_issued = FALSE;
         pr->sack_asserted = TRUE;
     } else {
-        // Pass the grant on.
+        /* Pass the grant on. */
         dir = get_fd_direction(pr, req, FALSE);
         if (dir == D_NONE) {
             return;
@@ -682,9 +701,20 @@ release_master(pr_state_t *pr)
     negate_bbsy(pr);
 
     pthread_mutex_lock(&(STATE->state_mutex));
-    STATE->is_master = FALSE;
-    STATE->rel_master = FALSE;
+    printf("%s: release_master: current state:\n", STATE->sock);
+    printf("%s: release_master: is_master: %d\n", STATE->sock, STATE->is_master);
+    printf("%s: release_master: rel_master: %d\n", STATE->sock, STATE->rel_master);
+    printf("%s: release_master: req_master: %d\n", STATE->sock, STATE->req_master);
+    printf("%s: release_master: npr_issued: %d\n", STATE->sock, pr->npr_issued);
+    printf("%s: release_master: br_issued: %d\n", STATE->sock, pr->br_issued);
+    printf("%s: release_master: sack_asserted: %d\n", STATE->sock, pr->sack_asserted);
+    printf("%s: release_master: bbsy_asserted: %d\n", STATE->sock, pr->bbsy_asserted);
     pthread_mutex_unlock(&(STATE->state_mutex));
+
+    /* Signal that we are no longer master. */
+    pthread_mutex_lock(&(STATE->pr_rel_master_mutex));
+    pthread_cond_signal(&(STATE->cond_pr_rel_master));
+    pthread_mutex_unlock(&(STATE->pr_rel_master_mutex));
 }
 
 int

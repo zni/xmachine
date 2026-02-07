@@ -39,7 +39,9 @@ clean_libload:
 	rm -f src/libload/load.o
 
 libunibus: lib src/libunibus/priority_bus.c src/libunibus/priority_bus.h src/libunibus/data_bus.c src/libunibus/data_bus.h src/libunibus/device_bus_mgr.c src/libunibus/device_bus_mgr.h
-	(cd src/libunibus && gcc -c device_bus_mgr.c priority_bus.c data_bus.c && ar rcs ../../lib/libunibus.a device_bus_mgr.o data_bus.o priority_bus.o)
+	(cd src/libunibus && \
+	gcc -c debug.c device_bus_mgr.c priority_bus.c data_bus.c && \
+	ar rcs ../../lib/libunibus.a debug.o device_bus_mgr.o data_bus.o priority_bus.o)
 
 clean_libunibus:
 	rm -f src/libunibus/device_bus_mgr.o
@@ -48,7 +50,7 @@ clean_libunibus:
 	rm -f lib/libunibus.a
 
 loader: libload src/utilities/loader.c bin
-	gcc src/utilities/loader.c -L../src/libload -lload -o bin/loader
+	gcc src/utilities/loader.c -L./lib -lload -o bin/loader
 
 tags:
 	ctags -R src

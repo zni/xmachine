@@ -119,7 +119,10 @@ void exec_instruction(cpu_t*);
 int8_t get_branch_offset(cpu_t*);
 void set_negative_flag_w(cpu_t *, uint16_t);
 
-// Branch OPS
+/* Normal OPs */
+void HALT(cpu_t*);
+
+/* Branch OPs */
 void BR(cpu_t*);
 void BNE(cpu_t*);
 void BEQ(cpu_t*);
@@ -136,7 +139,7 @@ void BVS(cpu_t*);
 void BCC(cpu_t*);
 void BCS(cpu_t*);
 
-// Double OP Register Source and JSR
+/* Double OP Register Source and JSR */
 void MUL(cpu_t*);
 void DIV(cpu_t*);
 void ASH(cpu_t*);

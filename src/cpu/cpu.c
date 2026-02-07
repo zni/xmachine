@@ -79,6 +79,7 @@ dump_cpu(cpu_t *cpu)
     printf("R3 : %07o\n", cpu->r3);
     printf("R4 : %07o\n", cpu->r4);
     printf("R5 : %07o\n", cpu->r5);
+    printf("\n");
 }
 
 void
@@ -290,6 +291,12 @@ void store_data_register(cpu_t *cpu, uint32_t addr, uint16_t data)
 
 void exec_instruction(cpu_t *cpu)
 {
+    dump_cpu(cpu);
+    if (cpu->ir == 0) {
+        HALT(cpu);
+        return;
+    }
+
     switch (cpu->ir & 0177400) {
     // Branch OPS
     case BR_op:
@@ -1606,17 +1613,26 @@ HALT(cpu_t *cpu)
 }
 
 void
-handler(int signo, siginfo_t *info, void *context)
+cleanup(cpu_t *cpu, bus_state_t *bus)
 {
-    if (CPU_STATE != NULL) {
-        free(CPU_STATE);
+    printf("FINAL STATE\n");
+    printf("-----------\n");
+    dump_cpu(cpu);
+
+    if (cpu != NULL) {
+        free(cpu);
     }
 
     /* Signal and join bus threads. */
-    cleanup_bus(BUS_STATE);
-
-    exit(EXIT_SUCCESS);
+    cleanup_bus(bus);
 }
+
+void
+handler(int signo, siginfo_t *info, void *context)
+{
+    cleanup(CPU_STATE, BUS_STATE);
+}
+
 
 int main(int argc, char **argv)
 {
@@ -1651,7 +1667,7 @@ int main(int argc, char **argv)
     }
     CPU_STATE = cpu;
 
-    while ((opt = getopt(argc, argv, "p:")) != -1) {
+    while ((opt = getopt(argc, argv, "p:l:r:")) != -1) {
         switch (opt) {
         case 'p':
             cpu->pc = strtoul(optarg, NULL, 10);
@@ -1673,6 +1689,7 @@ int main(int argc, char **argv)
     BUS_STATE = bus;
 
     /* Attempt to connect to bus. */
+    fprintf(stderr, "cpu connecting to bus...\n");
     ret = connect_bus(bus);
     if (ret != 0) {
         free(cpu);
@@ -1681,7 +1698,10 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    fprintf(stderr, "cpu connected\n");
     execute(cpu);
+
+    cleanup(cpu, bus);
 
     return 0;
 }

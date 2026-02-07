@@ -3,8 +3,6 @@
  * with the device's bus processes.
  */
 
-#include "device_bus_mgr.h"
-
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -15,6 +13,10 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
+
+#include "debug.h"
+#include "device_bus_mgr.h"
+
 
 pthread_t PR_BUS;
 pthread_t D_BUS;
@@ -97,6 +99,48 @@ init_bus(char *l_sock, char *sock, char *r_sock)
         return NULL;
     }
 
+    ret = pthread_mutex_init(&(bus->pr_master_mutex), NULL);
+    if (ret != 0) {
+        perror("pr_master_mutex");
+        free(bus);
+        return NULL;
+    }
+
+    ret = pthread_mutex_init(&(bus->pr_ready_mutex), NULL);
+    if (ret != 0) {
+        perror("pr_ready_mutex");
+        free(bus);
+        return NULL;
+    }
+
+    ret = pthread_mutex_init(&(bus->data_ready_mutex), NULL);
+    if (ret != 0) {
+        perror("data_ready_mutex");
+        free(bus);
+        return NULL;
+    }
+
+    ret = pthread_cond_init(&(bus->cond_pr_ready), NULL);
+    if (ret != 0) {
+        perror("cond_pr_ready");
+        free(bus);
+        return NULL;
+    }
+
+    ret = pthread_cond_init(&(bus->cond_data_ready), NULL);
+    if (ret != 0) {
+        perror("cond_data_ready");
+        free(bus);
+        return NULL;
+    }
+
+    ret = pthread_cond_init(&(bus->cond_pr_master), NULL);
+    if (ret != 0) {
+        perror("cond_pr_master");
+        free(bus);
+        return NULL;
+    }
+
     ret = pthread_cond_init(&(bus->cond_slave_data), NULL);
     if (ret != 0) {
         perror("cond_slave_data");
@@ -132,26 +176,52 @@ init_bus(char *l_sock, char *sock, char *r_sock)
 void
 req_bus_master(bus_state_t *bus)
 {
+    dbg_bus(bus, "req_bus_master: waiting to lock...");
     pthread_mutex_lock(&(bus->state_mutex));
+    dbg_bus(bus, "req_bus_master: in critical section...");
     if (bus->is_master == FALSE) {
         bus->req_master = TRUE;
     }
     pthread_mutex_unlock(&(bus->state_mutex));
+    dbg_bus(bus, "req_bus_master: unlocked");
+
+    dbg_bus(bus, "req_bus_master: waiting for master signal");
+    pthread_mutex_lock(&(bus->pr_master_mutex));
+    pthread_cond_wait(
+        &(bus->cond_pr_master),
+        &(bus->pr_master_mutex)
+    );
+    pthread_mutex_unlock(&(bus->pr_master_mutex));
+    dbg_bus(bus, "req_bus_master: got master signal");
 }
 
 void
 release_bus_master(bus_state_t *bus)
 {
+    dbg_bus(bus, "release_bus_master: waiting to lock...");
     pthread_mutex_lock(&(bus->state_mutex));
+    dbg_bus(bus, "release_bus_master: in critical section...");
     if (bus->is_master == TRUE) {
+        dbg_bus(bus, "release_bus_master: flagging release");
         bus->rel_master = TRUE;
     }
     pthread_mutex_unlock(&(bus->state_mutex));
+    dbg_bus(bus, "release_bus_master: unlocked and leaving...");
+
+    dbg_bus(bus, "release_bus_master: waiting for release signal");
+    pthread_mutex_lock(&(bus->pr_rel_master_mutex));
+    pthread_cond_wait(
+        &(bus->cond_pr_rel_master),
+        &(bus->pr_rel_master_mutex)
+    );
+    pthread_mutex_unlock(&(bus->pr_rel_master_mutex));
+    dbg_bus(bus, "release_bus_master: got release signal");
 }
 
 uint16_t
 read_data_in(bus_state_t *bus, uint32_t addr)
 {
+    dbg_bus(bus, "read_data_in");
     d_req_t status;
     uint16_t data;
 
@@ -160,12 +230,16 @@ read_data_in(bus_state_t *bus, uint32_t addr)
     bus->master.addr = addr;
     pthread_mutex_unlock(&(bus->master_op_mutex));
 
+    dbg_bus(bus, "read_data_in: R_IN set, waiting");
+
     pthread_mutex_lock(&(bus->master_data_mutex));
     pthread_cond_wait(
         &(bus->cond_master_data),
         &(bus->master_data_mutex)
     );
     pthread_mutex_unlock(&(bus->master_data_mutex));
+
+    dbg_bus(bus, "read_data_in: got signal");
 
     pthread_mutex_lock(&(bus->master_op_mutex));
     data = bus->master.value;
@@ -221,10 +295,10 @@ cleanup_bus(bus_state_t *bus)
         perror("cleanup_bus_join_pr");
     }
 
-    //ret = pthread_join(D_BUS, NULL);
-    //if (ret != 0) {
-    //    perror("cleanup_bus_join_d");
-    //}
+    ret = pthread_join(D_BUS, NULL);
+    if (ret != 0) {
+        perror("cleanup_bus_join_d");
+    }
 }
 
 int
@@ -271,11 +345,23 @@ connect_bus(bus_state_t *bus)
     if (ret != 0) {
         return ret;
     }
+    pthread_mutex_lock(&(bus->pr_ready_mutex));
+    pthread_cond_wait(
+        &(bus->cond_pr_ready),
+        &(bus->pr_ready_mutex)
+    );
+    pthread_mutex_unlock(&(bus->pr_ready_mutex));
 
     ret = init_d_bus(bus);
     if (ret != 0) {
         return ret;
     }
+    pthread_mutex_lock(&(bus->data_ready_mutex));
+    pthread_cond_wait(
+        &(bus->cond_data_ready),
+        &(bus->data_ready_mutex)
+    );
+    pthread_mutex_unlock(&(bus->data_ready_mutex));
 
     return 0;
 }

@@ -137,34 +137,38 @@ execute()
 {
     data_op_t slave_req;
     while(TRUE) {
-        printf("blocking...\n");
+        printf("mem: execute: blocking...\n");
         pthread_mutex_lock(&(BUS_STATE->perma_slave_mutex));
         pthread_cond_wait(&(BUS_STATE->cond_perma_slave), &(BUS_STATE->perma_slave_mutex));
         pthread_mutex_unlock(&(BUS_STATE->perma_slave_mutex));
+        printf("mem: execute: unblocked\n");
 
         // Check for bus requests.
+        printf("mem: execute: checking requests\n");
         data_bus_check(BUS_STATE, &slave_req);
         switch (slave_req.op) {
         case R_NONE:
-            printf("NONE\n");
+            printf("mem: execute: got R_NONE\n");
             continue;
         case R_BLOCK_IN:
-            printf("perform_read\n");
+            printf("mem: execute: got R_BLOCK_IN\n");
             perform_read(&slave_req);
             break;
         case R_BLOCK_OUT:
-            printf("perform_write\n");
+            printf("mem: execute: got R_BLOCK_OUT\n");
             perform_write(&slave_req);
             break;
         case R_BLOCK_OUTB:
-            printf("perform_writeb\n");
+            printf("mem: execute: got R_BLOCK_OUTB\n");
             perform_writeb(&slave_req);
             break;
         default:
-            fprintf(stderr, "invalid op\n");
+            printf("mem: execute: base case, err\n");
             continue;
         }
+        printf("mem: execute: calling data_bus_cont\n");
         data_bus_cont(BUS_STATE, &slave_req);
+        printf("mem: execute: done calling data_bus_cont\n");
     }
 }
 

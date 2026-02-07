@@ -1,12 +1,17 @@
-#include "bus_arbitrator.h"
-#include "../libunibus/signals.h"
-#include "../common/include/types.h"
-
+#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
+
+#include "bus_arbitrator.h"
+#include "../libunibus/signals.h"
+#include "../common/include/types.h"
+
+#define SOCK_DIR "/tmp/xmachine"
+
 
 arb_state_t *GLOBAL_STATE = NULL;
 
@@ -39,6 +44,20 @@ handler(int signo, siginfo_t *info, void *context)
 arb_state_t*
 init_arbitrator(char *n_sock)
 {
+    struct stat statbuf;
+    int ret = 0;
+    int err = 0;
+
+    ret = stat(SOCK_DIR, &statbuf);
+    if (ret != 0 && errno == ENOENT) {
+        /* TODO Allow tmp dir to be configurable. */
+        ret = mkdir(SOCK_DIR, 0755);
+        if (ret != 0) {
+            perror("Failed to create tmp dir.");
+            return NULL;
+        }
+    }
+
     arb_state_t *arb = malloc(sizeof(arb_state_t));
     if (arb == NULL) {
         return NULL;
@@ -329,18 +348,22 @@ main(int argc, char **argv)
     act.sa_flags = SA_SIGINFO;
     act.sa_sigaction = &handler;
     if (sigaction(SIGHUP, &act, NULL) == -1) {
-        perror("sigaction");
+        perror("registering sigaction for SIGHUP");
         exit(EXIT_FAILURE);
     }
     if (sigaction(SIGINT, &act, NULL) == -1) {
-        perror("sigaction");
+        perror("registering sigaction for SIGINT");
         exit(EXIT_FAILURE);
     }
 
     pid_t pid = getpid();
-    fprintf(stderr, "bus arbitrator starting [%d]\n", pid);
+    fprintf(stderr, "bus arbitrator is starting [%d]\n", pid);
 
     arb_state_t *arb = init_arbitrator("/tmp/xmachine/cpu_pr.socket");
+    if (arb == NULL) {
+        fprintf(stderr, "Failed to initialize arbitrator.\n");
+        exit(EXIT_FAILURE);
+    }
 
     setup_priority_socket(arb);
     listen_priority(arb);

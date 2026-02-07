@@ -25,11 +25,14 @@ typedef enum d_req {
 } d_req_t;
 
 /* Direction to send a message on the bus. */
+/* XXX Why did I even add in directionality? */
 typedef enum direction {
     D_LEFT,
     D_RIGHT,
     D_NONE
 } direction_t;
+
+#define DIRC(x) (x == D_LEFT ? "L" : (x == D_RIGHT ? "R" : "NONE"))
 
 /* (Unnecessary?) struct to hold info on data bus request to make. */
 typedef struct data_op {
@@ -74,7 +77,7 @@ typedef struct pr_state {
 
 /*
  * Shared state between bus processors and main device.
- * Grab state_mutex before using, if touching:
+ * Grab state_mutex before using if touching:
  * - is_master
  * - req_master
  * - rel_master
@@ -84,7 +87,7 @@ typedef struct pr_state {
  * - r_sock
  */
 typedef struct bus_state {
-    // Shared state between buses.
+    /* Shared state between buses. */
     pthread_mutex_t state_mutex;
     bool_t is_master;
     bool_t req_master;
@@ -93,6 +96,22 @@ typedef struct bus_state {
     char *l_sock;
     char *sock;
     char *r_sock;
+
+    /* Signal that pr bus is initialized and ready. */
+    pthread_mutex_t pr_ready_mutex;
+    pthread_cond_t cond_pr_ready;
+
+    /* Signal that data bus is initialized and ready. */
+    pthread_mutex_t data_ready_mutex;
+    pthread_cond_t cond_data_ready;
+
+    /* Signal that we have bus master. */
+    pthread_mutex_t pr_master_mutex;
+    pthread_cond_t cond_pr_master;
+
+    /* Signal that we are no longer bus master. */
+    pthread_mutex_t pr_rel_master_mutex;
+    pthread_cond_t cond_pr_rel_master;
 
     /*
      * Data bus operations.
@@ -123,6 +142,9 @@ typedef struct bus_state {
     pthread_mutex_t perma_slave_mutex;
     pthread_cond_t cond_perma_slave;
 
+    /* Function pointer to determine if the requested address
+     * on the data bus applies to the current device.
+     */
     bool_t (*addr_internal_to_device)(uint32_t);
 } bus_state_t;
 
