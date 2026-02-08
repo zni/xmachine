@@ -2,17 +2,27 @@
 
 A PDP-11/40 emulator (eventually).
 
-## The goal
-
-To while away my waking hours.
-
 ## What?
 
-Oh, right. Building this "thing". You'll need `gcc` and `make`.
+Oh, right, you probably also want a GNU Assembler setup to assemble PDP-11 assembly to aout.
+
+So, grab `binutils` and do some of this too:
+
+```
+$ mkdir -p ~/opt/pdp11-cross
+$ ./configure --target=pdp11-aout --prefix=$HOME/opt/pdp11-cross
+$ make
+$ make install
+$ cd <repo root>
+$ mkdir local
+$ ~/opt/pdp11-cross/bin/pdp11-aout-as asm/as/<file>.s -o local/<file>.aout
+```
+
+Then to build this you'll need `gcc` and `make`.
 Armed with those tools, run the following:
 
 ```
-make all
+$ make all
 ```
 
 You'll end up with a newly created `bin/` directory containing some stuff.
@@ -21,18 +31,13 @@ You'll end up with a newly created `bin/` directory containing some stuff.
 
 With `bin/bus`, `bin/cpu`, and `bin/mem` built you can now do some stuff... eventually.
 
-Not now though.
-
-If you want you can watch the priority bus interactions between the bus arbitrator and the cpu.
-
 ```
-$ bin/mem &
 $ bin/bus &
+$ bin/mem -f local/<file>.aout &
 $ bin/cpu &
 ```
 
 Failure to start the devices in that order will probably break things right now.
-
 
 ## Why?
 
