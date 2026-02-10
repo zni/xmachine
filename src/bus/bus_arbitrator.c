@@ -10,7 +10,6 @@
 #include "../libunibus/signals.h"
 #include "../common/include/types.h"
 
-#define SOCK_DIR "/tmp/xmachine"
 
 
 arb_state_t *GLOBAL_STATE = NULL;
@@ -44,19 +43,8 @@ handler(int signo, siginfo_t *info, void *context)
 arb_state_t*
 init_arbitrator(char *n_sock)
 {
-    struct stat statbuf;
     int ret = 0;
     int err = 0;
-
-    ret = stat(SOCK_DIR, &statbuf);
-    if (ret != 0 && errno == ENOENT) {
-        /* TODO Allow tmp dir to be configurable. */
-        ret = mkdir(SOCK_DIR, 0755);
-        if (ret != 0) {
-            perror("Failed to create tmp dir.");
-            return NULL;
-        }
-    }
 
     arb_state_t *arb = malloc(sizeof(arb_state_t));
     if (arb == NULL) {
@@ -85,7 +73,7 @@ init_arbitrator(char *n_sock)
     return arb;
 }
 
-void
+int
 client_connect(arb_state_t *arb)
 {
     int ret;
@@ -103,17 +91,21 @@ client_connect(arb_state_t *arb)
     );
     if (ret == -1) {
         perror("client_connect: connect");
-        exit(EXIT_FAILURE);
+        return ret;
     }
+
+    return ret;
 }
 
-void
+int
 client_close(arb_state_t *arb)
 {
     if (close(arb->client_socket) == -1) {
         perror("client_close");
-        exit(EXIT_FAILURE);
+        return -1;
     }
+
+    return 0;
 }
 
 void
@@ -270,7 +262,7 @@ negate_np_grant(arb_state_t *arb)
     rv = sendto(arb->client_socket, &resp, sizeof(resp), 0,
                 (struct sockaddr *) &(arb->current_client), arb->client_addr_len);
     if (rv == -1) {
-        perror("negate_bus_grant");
+        perror("negate_np_grant");
         exit(EXIT_FAILURE);
     }
 

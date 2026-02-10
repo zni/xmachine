@@ -29,15 +29,12 @@ You'll end up with a newly created `bin/` directory containing some stuff.
 
 ## Alright... now what?
 
-With `bin/bus`, `bin/cpu`, and `bin/mem` built you can now do some stuff... eventually.
+With `bin/cpu` and `bin/mem` built you can now do some stuff... eventually.
 
 ```
-$ bin/bus &
 $ bin/mem -f local/<file>.aout &
 $ bin/cpu &
 ```
-
-Failure to start the devices in that order will probably break things right now.
 
 ## Why?
 

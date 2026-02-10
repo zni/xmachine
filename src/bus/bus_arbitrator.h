@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
-#define NAME "ba"
+#define NAME "cpu"
 
 typedef struct arb_state {
     int priority_socket;
@@ -22,6 +22,7 @@ typedef struct arb_state {
 
     uint8_t sack;
     uint8_t bbsy;
+
 } arb_state_t;
 
 #endif
