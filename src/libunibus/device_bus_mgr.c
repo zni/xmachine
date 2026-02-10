@@ -14,37 +14,16 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "bus_arb.h"
+#include "data_bus.h"
 #include "debug.h"
 #include "device_bus_mgr.h"
+#include "priority_bus.h"
+#include "util.h"
 
 
 pthread_t PR_BUS;
 pthread_t D_BUS;
-
-int
-setup_socket_dir()
-{
-    int ret, err;
-    struct stat dir_stat;
-    ret = stat(SOCKET_DIR, &dir_stat);
-    if (ret == 0) {
-        return 0;
-    }
-
-    err = errno;
-    if (err != ENOENT) {
-        perror("setup_socket_dir-stat");
-        return -1;
-    }
-
-    ret = mkdir(SOCKET_DIR, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
-    if (ret != 0) {
-        perror("setup_socket_dir-mkdir");
-        return -1;
-    }
-
-    return 0;
-}
 
 bus_state_t*
 init_bus(char *l_sock, char *sock, char *r_sock)
@@ -302,6 +281,24 @@ cleanup_bus(bus_state_t *bus)
 }
 
 int
+init_bus_arb(bus_state_t *bus)
+{
+    int ret;
+    ret = pthread_create(
+        &PR_BUS,
+        NULL,
+        &bus_arb_mgr,
+        bus
+    );
+    if (ret != 0) {
+        perror("init_bus_arb");
+        return -1;
+    }
+
+    return 0;
+}
+
+int
 init_pr_bus(bus_state_t *bus)
 {
     int ret;
@@ -338,7 +335,39 @@ init_d_bus(bus_state_t *bus)
 }
 
 int
-connect_bus(bus_state_t *bus)
+connect_cpu_bus(bus_state_t *bus)
+{
+    bus->is_master = TRUE;
+
+    int ret;
+    ret = init_bus_arb(bus);
+    if (ret != 0) {
+        return ret;
+    }
+    pthread_mutex_lock(&(bus->pr_ready_mutex));
+    pthread_cond_wait(
+        &(bus->cond_pr_ready),
+        &(bus->pr_ready_mutex)
+    );
+    pthread_mutex_unlock(&(bus->pr_ready_mutex));
+
+    dbg_bus(bus, "connect_cpu_bus: after bus_arb");
+    ret = init_d_bus(bus);
+    if (ret != 0) {
+        return ret;
+    }
+    pthread_mutex_lock(&(bus->data_ready_mutex));
+    pthread_cond_wait(
+        &(bus->cond_data_ready),
+        &(bus->data_ready_mutex)
+    );
+    pthread_mutex_unlock(&(bus->data_ready_mutex));
+
+    return 0;
+}
+
+int
+connect_device_bus(bus_state_t *bus)
 {
     int ret;
     ret = init_pr_bus(bus);
@@ -378,7 +407,7 @@ data_bus_check(bus_state_t *bus, data_op_t *d_op)
 }
 
 void
-data_bus_cont(bus_state_t *bus, data_op_t *d_op)
+data_bus_reply(bus_state_t *bus, data_op_t *d_op)
 {
     // Update slave request.
     pthread_mutex_lock(&(bus->slave_op_mutex));

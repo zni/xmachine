@@ -83,21 +83,6 @@ dump_cpu(cpu_t *cpu)
 }
 
 void
-process_message(/*enum BusMessage t,*/ cpu_t *cpu,  uint32_t addr, uint16_t data)
-{
-//    // printf("CPU::%s(%d, %07o, %07o)\n",
-//    //     __FUNCTION__,
-//    //     static_cast<std::underlying_type<BusMessage>::type>(t),
-//    //     addr,
-//    //     data
-//    // );
-//
-    //m_recv_addr = addr;
-    //m_recv_data = data;
-    //m_processed = TRUE;
-}
-
-void
 inc_register(cpu_t *cpu, uint16_t reg, uint8_t is_byte_addr)
 {
     uint16_t *r = NULL;
@@ -225,13 +210,8 @@ fetch_data(cpu_t *cpu, uint32_t addr)
 
     addr = translate_bus_addr(addr);
 
-    // Request bus master, if necessary.
-    req_bus_master(BUS_STATE);
-
     // Block for read.
     data = read_data_in(BUS_STATE, addr);
-
-    release_bus_master(BUS_STATE);
 
     return data;
 }
@@ -253,18 +233,8 @@ store_data(cpu_t *cpu, uint32_t addr, uint16_t data)
 
     addr = translate_bus_addr(addr);
 
-    // Request bus master, if necessary.
-    req_bus_master(BUS_STATE);
-
     // Block for write.
     write_data_out(BUS_STATE, addr, data);
-
-    release_bus_master(BUS_STATE);
-
-// XXX REMOVE
-//    send(BusMessage::MSYN, 0, 0);
-//    send(BusMessage::DATO, addr, data);
-//    send(BusMessage::CLEAR, 0, 0);
 }
 
 void
@@ -283,21 +253,19 @@ store_data_b(cpu_t *cpu, uint32_t addr, uint8_t data)
 //    send(BusMessage::CLEAR, 0, 0);
 }
 
-void store_data_register(cpu_t *cpu, uint32_t addr, uint16_t data)
+void
+store_data_register(cpu_t *cpu, uint32_t addr, uint16_t data)
 {
     uint16_t *reg = bus_addr_to_register(cpu, addr);
     *reg = data;
 }
 
-void exec_instruction(cpu_t *cpu)
+void
+exec_instruction(cpu_t *cpu)
 {
     dump_cpu(cpu);
-    if (cpu->ir == 0) {
-        HALT(cpu);
-        return;
-    }
-
-    switch (cpu->ir & 0177400) {
+    uint16_t ir = cpu->ir;
+    switch (ir & 0177400) {
     // Branch OPS
     case BR_op:
         BR(cpu);
@@ -333,189 +301,189 @@ void exec_instruction(cpu_t *cpu)
         BLOS(cpu);
         break;
     case BVC_op:
-        BVC(cpu);
+        //BVC(cpu);
         break;
     case BVS_op:
         BVS(cpu);
         break;
     case BCC_op:
-        BCC(cpu);
+        //BCC(cpu);
         break;
     case BCS_op:
-        BCS(cpu);
+        //BCS(cpu);
         break;
 
-//    default:
-//        // Double OP Register Source and JSR
-//        switch (m_IR & 0177000) {
-//        case MUL_op:
-//            MUL();
-//            break;
-//        case DIV_op:
-//            DIV();
-//            break;
-//        case ASH_op:
-//            ASH();
-//            break;
-//        case ASHC_op:
-//            ASHC();
-//            break;
-//        case XOR_op:
-//            XOR();
-//            break;
-//        case JSR_op:
-//            JSR();
-//            break;
-//        default:
-//            switch (m_IR & 0170000) {
-//            // Double OPs
-//            case MOV_op:
-//                MOV();
-//                break;
-//            case MOVB_op:
-//                MOVB();
-//                break;
-//            case CMP_op:
-//                CMP();
-//                break;
-//            case CMPB_op:
-//                CMPB();
-//                break;
-//            case BIT_op:
-//                BIT();
-//                break;
-//            case BITB_op:
-//                BITB();
-//                break;
-//            case BIC_op:
-//                BIC();
-//                break;
-//            case BICB_op:
-//                BICB();
-//                break;
-//            case BIS_op:
-//                BIS();
-//                break;
-//            case BISB_op:
-//                BISB();
-//                break;
-//            case ADD_op:
-//                ADD();
-//                break;
-//            case SUB_op:
-//                SUB();
-//                break;
-//            default:
-//                // Single OPs
-//                switch (m_IR & 0177700) {
-//                case JMP_op:
-//                    JMP();
-//                    break;
-//                case SWAB_op:
-//                    SWAB();
-//                    break;
-//                case CLR_op:
-//                    CLR();
-//                    break;
-//                case CLRB_op:
-//                    CLRB();
-//                    break;
-//                case COM_op:
-//                    COM();
-//                    break;
-//                case COMB_op:
-//                    COMB();
-//                    break;
-//                case INC_op:
-//                    INC();
-//                    break;
-//                case INCB_op:
-//                    INCB();
-//                    break;
-//                case DEC_op:
-//                    DEC();
-//                    break;
-//                case DECB_op:
-//                    DECB();
-//                    break;
-//                case NEG_op:
-//                    NEG();
-//                    break;
-//                case NEGB_op:
-//                    NEGB();
-//                    break;
-//                case ADC_op:
-//                    ADC();
-//                    break;
-//                case ADCB_op:
-//                    ADCB();
-//                    break;
-//                case SBC_op:
-//                    SBC();
-//                    break;
-//                case SBCB_op:
-//                    SBCB();
-//                    break;
-//                case TST_op:
-//                    TST();
-//                    break;
-//                case TSTB_op:
-//                    TSTB();
-//                    break;
-//                case ROR_op:
-//                    ROR();
-//                    break;
-//                case RORB_op:
-//                    RORB();
-//                    break;
-//                case ROL_op:
-//                    ROL();
-//                    break;
-//                case ROLB_op:
-//                    ROLB();
-//                    break;
-//                case ASR_op:
-//                    ASR();
-//                    break;
-//                case ASRB_op:
-//                    ASRB();
-//                    break;
-//                case ASL_op:
-//                    ASL();
-//                    break;
-//                case ASLB_op:
-//                    ASLB();
-//                    break;
-//                case MTPS_op:
-//                    MTPS();
-//                    break;
-//                case MFPI_op:
-//                    MFPI();
-//                    break;
-//                case MFPD_op:
-//                    MFPD();
-//                    break;
-//                case MTPI_op:
-//                    MTPI();
-//                    break;
-//                case MTPD_op:
-//                    MTPD();
-//                    break;
-//                case SXT_op:
-//                    SXT();
-//                    break;
-//                case MFPS_op:
-//                    MFPS();
-//                    break;
-//                case RTS_op:
-//                    RTS();
-//                    break;
-//                default:
-//                    HALT();
-//                    break;
-//                }
-//            }
-//        }
+    default:
+        // Double OP Register Source and JSR
+        switch (ir & 0177000) {
+        case MUL_op:
+            MUL(cpu);
+            break;
+        case DIV_op:
+            DIV(cpu);
+            break;
+        case ASH_op:
+            ASH(cpu);
+            break;
+        case ASHC_op:
+            ASHC(cpu);
+            break;
+        case XOR_op:
+            XOR(cpu);
+            break;
+        case JSR_op:
+            JSR(cpu);
+            break;
+        default:
+            switch (ir & 0170000) {
+            // Double OPs
+            case MOV_op:
+                MOV(cpu);
+                break;
+            case MOVB_op:
+                MOVB(cpu);
+                break;
+            case CMP_op:
+                CMP(cpu);
+                break;
+            case CMPB_op:
+                CMPB(cpu);
+                break;
+            case BIT_op:
+                BIT(cpu);
+                break;
+            case BITB_op:
+                BITB(cpu);
+                break;
+            case BIC_op:
+                BIC(cpu);
+                break;
+            case BICB_op:
+                BICB(cpu);
+                break;
+            case BIS_op:
+                BIS(cpu);
+                break;
+            case BISB_op:
+                BISB(cpu);
+                break;
+            case ADD_op:
+                ADD(cpu);
+                break;
+            case SUB_op:
+                SUB(cpu);
+                break;
+            default:
+                // Single OPs
+                switch (ir & 0177700) {
+                case JMP_op:
+                    JMP(cpu);
+                    break;
+                case SWAB_op:
+                    SWAB(cpu);
+                    break;
+                case CLR_op:
+                    CLR(cpu);
+                    break;
+                case CLRB_op:
+                    CLRB(cpu);
+                    break;
+                case COM_op:
+                    COM(cpu);
+                    break;
+                case COMB_op:
+                    COMB(cpu);
+                    break;
+                case INC_op:
+                    INC(cpu);
+                    break;
+                case INCB_op:
+                    INCB(cpu);
+                    break;
+                case DEC_op:
+                    DEC(cpu);
+                    break;
+                case DECB_op:
+                    DECB(cpu);
+                    break;
+                case NEG_op:
+                    NEG(cpu);
+                    break;
+                case NEGB_op:
+                    NEGB(cpu);
+                    break;
+                case ADC_op:
+                    ADC(cpu);
+                    break;
+                case ADCB_op:
+                    ADCB(cpu);
+                    break;
+                case SBC_op:
+                    SBC(cpu);
+                    break;
+                case SBCB_op:
+                    SBCB(cpu);
+                    break;
+                case TST_op:
+                    TST(cpu);
+                    break;
+                case TSTB_op:
+                    TSTB(cpu);
+                    break;
+                case ROR_op:
+                    ROR(cpu);
+                    break;
+                case RORB_op:
+                    RORB(cpu);
+                    break;
+                case ROL_op:
+                    ROL(cpu);
+                    break;
+                case ROLB_op:
+                    ROLB(cpu);
+                    break;
+                case ASR_op:
+                    ASR(cpu);
+                    break;
+                case ASRB_op:
+                    ASRB(cpu);
+                    break;
+                case ASL_op:
+                    ASL(cpu);
+                    break;
+                case ASLB_op:
+                    ASLB(cpu);
+                    break;
+                case MTPS_op:
+                    MTPS(cpu);
+                    break;
+                case MFPI_op:
+                    MFPI(cpu);
+                    break;
+                case MFPD_op:
+                    MFPD(cpu);
+                    break;
+                case MTPI_op:
+                    MTPI(cpu);
+                    break;
+                case MTPD_op:
+                    MTPD(cpu);
+                    break;
+                case SXT_op:
+                    SXT(cpu);
+                    break;
+                case MFPS_op:
+                    MFPS(cpu);
+                    break;
+                case RTS_op:
+                    RTS(cpu);
+                    break;
+                default:
+                    HALT(cpu);
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -988,7 +956,8 @@ BLOS(cpu_t *cpu)
         cpu->pc = cpu->pc + (2 * offset);
 }
 
-void BVC(cpu_t *cpu)
+void
+BVC(cpu_t *cpu)
 {
     int8_t offset = get_branch_offset(cpu);
     cpu->alu = cpu->psw & OVERFLOWFLAG;
@@ -996,7 +965,8 @@ void BVC(cpu_t *cpu)
         cpu->pc = cpu->pc + (2 * offset);
 }
 
-void BVS(cpu_t *cpu)
+void
+BVS(cpu_t *cpu)
 {
     int8_t offset = get_branch_offset(cpu);
     cpu->alu = cpu->psw & OVERFLOWFLAG;
@@ -1004,7 +974,8 @@ void BVS(cpu_t *cpu)
         cpu->pc = cpu->pc + (2 * offset);
 }
 
-void BCC(cpu_t *cpu)
+void
+BCC(cpu_t *cpu)
 {
     int8_t offset = get_branch_offset(cpu);
     cpu->alu = cpu->psw & CARRYFLAG;
@@ -1012,7 +983,8 @@ void BCC(cpu_t *cpu)
         cpu->pc = cpu->pc + (2 * offset);
 }
 
-void BCS(cpu_t *cpu)
+void
+BCS(cpu_t *cpu)
 {
     int8_t offset = get_branch_offset(cpu);
     cpu->alu = cpu->psw & CARRYFLAG;
@@ -1690,7 +1662,7 @@ int main(int argc, char **argv)
 
     /* Attempt to connect to bus. */
     fprintf(stderr, "cpu connecting to bus...\n");
-    ret = connect_bus(bus);
+    ret = connect_cpu_bus(bus);
     if (ret != 0) {
         free(cpu);
         free(bus);

@@ -166,9 +166,7 @@ execute()
             printf("mem: execute: base case, err\n");
             continue;
         }
-        printf("mem: execute: calling data_bus_cont\n");
-        data_bus_cont(BUS_STATE, &slave_req);
-        printf("mem: execute: done calling data_bus_cont\n");
+        data_bus_reply(BUS_STATE, &slave_req);
     }
 }
 
@@ -251,7 +249,7 @@ main(int argc, char **argv)
     bus->addr_internal_to_device = &is_local_addr;
 
     BUS_STATE = bus;
-    ret = connect_bus(BUS_STATE);
+    ret = connect_device_bus(BUS_STATE);
     if (ret != 0) {
         fprintf(stderr, "Failed to connect to bus.\n");
         exit(EXIT_FAILURE);

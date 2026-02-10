@@ -1,10 +1,12 @@
 .PHONY: tags bin clean_libunibus clean_libload
 
+CC_OPTS=-g -Wall
+
 cpu: libunibus cpu.o bin
 	gcc -o bin/cpu src/cpu/cpu.o -Llib/ -lunibus -lpthread
 
 cpu.o: src/cpu/cpu.c src/cpu/cpu.h
-	gcc -o src/cpu/cpu.o -c src/cpu/cpu.c
+	gcc ${CC_OPTS} -o src/cpu/cpu.o -c src/cpu/cpu.c
 
 mem: libunibus libload mem.o bin
 	gcc -o bin/mem src/mem/mem.o -Llib/ -lunibus -lload -lpthread
@@ -24,12 +26,6 @@ tty: tty.o bin
 tty.o: src/tty/tty.c src/tty/tty.h
 	gcc -c src/tty/tty.c -o src/tty/tty.o
 
-bus: bus.o bin
-	gcc -o bin/bus src/bus/bus.o
-
-bus.o: src/bus/bus_arbitrator.c src/bus/bus_arbitrator.h
-	gcc -c src/bus/bus_arbitrator.c -o src/bus/bus.o
-
 libload: lib src/libload/load.c src/libload/load.h
 	gcc -c src/libload/load.c -o src/libload/load.o
 	ar rcs lib/libload.a src/libload/load.o
@@ -39,14 +35,14 @@ clean_libload:
 	rm -f src/libload/load.o
 
 libunibus: lib src/libunibus/priority_bus.c src/libunibus/priority_bus.h src/libunibus/data_bus.c src/libunibus/data_bus.h src/libunibus/device_bus_mgr.c src/libunibus/device_bus_mgr.h
-	(cd src/libunibus && \
-	gcc -c debug.c device_bus_mgr.c priority_bus.c data_bus.c && \
-	ar rcs ../../lib/libunibus.a debug.o device_bus_mgr.o data_bus.o priority_bus.o)
+	for s in src/libunibus/*.c; do gcc ${CC_OPTS} -c "$$s" -o "$${s%.c}.o"; done
+	ar rcs lib/libunibus.a src/libunibus/*.o
 
 clean_libunibus:
 	rm -f src/libunibus/device_bus_mgr.o
 	rm -f src/libunibus/priority_bus.o
 	rm -f src/libunibus/data_bus.o
+	rm -f src/libunibus/bus_arb.o
 	rm -f lib/libunibus.a
 
 loader: libload src/utilities/loader.c bin
@@ -67,8 +63,7 @@ clean: clean_libload clean_libunibus
 	rm -f src/disk/disk.o
 	rm -f src/mem/mem.o
 	rm -f src/tty/tty.o
-	rm -f src/bus/bus.o
 
-all: cpu bus mem
+all: cpu mem
 
 

@@ -267,8 +267,6 @@ data_bus_mgr(void *bus)
             process_op(d);
         }
         check_bus(d, is_master);
-
-        dbg_bus(STATE, "sleeping");
         nanosleep(&wait, NULL);
     } while (!shutdown);
 

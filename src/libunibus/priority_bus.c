@@ -175,6 +175,7 @@ priority_bus_mgr(void *bus)
     pthread_cond_signal(&(STATE->cond_pr_ready));
     pthread_mutex_unlock(&(STATE->pr_ready_mutex));
 
+    /* TODO Break this out into a function. */
     do {
         pthread_mutex_lock(&(STATE->state_mutex));
         is_master = STATE->is_master;
