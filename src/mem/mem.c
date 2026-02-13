@@ -195,9 +195,6 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    pid_t pid = getpid();
-    fprintf(stderr, "mem is starting [%d]\n", pid);
-
     mem_t *mem = init_mem();
     if (mem == NULL) {
         fprintf(stderr, "Failed to initialize memory.\n");
@@ -240,6 +237,9 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
     load_aout(aout_buffer, aout_header, load_offset);
+
+    pid_t pid = getpid();
+    fprintf(stderr, "mem is starting [%d]\n", pid);
 
     bus_state_t *bus = init_bus(sock_l, sock_name, NULL);
     if (bus == NULL) {

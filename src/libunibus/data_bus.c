@@ -48,14 +48,11 @@ get_fd(data_state_t *d, direction_t dir)
 {
     switch (dir) {
     case D_LEFT:
-        dbg_bus(STATE, "get_fd: LEFT");
         return d->d_bus_out_l;
     case D_RIGHT:
-        dbg_bus(STATE, "get_fd: RIGHT");
         return d->d_bus_out_r;
     case D_NONE:
     default:
-        dbg_bus(STATE, "get_fd: NONE");
         return -1;
     }
 }
@@ -78,7 +75,6 @@ get_fd_direction(data_state_t *d, data_bus_req_t *req, bool_t reply)
             return D_NONE;
         }
     } else {
-        dbg_bus(STATE, "get_fd_direction: flip a coin");
         if (strncmp(req->from, d->d_out_addr_l.sun_path, SOCK_NAME_LEN) == 0) {
             return reply ? D_LEFT : D_RIGHT;
         } else {
@@ -114,7 +110,6 @@ init_data_state(char *l_sock, char *sock, char *r_sock)
 
     memset(&(d->d_out_addr_l), 0, sizeof(struct sockaddr_un));
     if (l_sock != NULL) {
-        dbg_bus(STATE, "init_data_state: setting up l_sock");
         fprintf(stderr, "sock: %s -> l_sock: %s\n", sock, l_sock);
         d->d_out_addr_l.sun_family = AF_UNIX;
         sprintf(d->d_out_addr_l.sun_path, "/tmp/xmachine/%s_d.socket", l_sock);
@@ -122,7 +117,6 @@ init_data_state(char *l_sock, char *sock, char *r_sock)
 
     memset(&(d->d_out_addr_r), 0, sizeof(struct sockaddr_un));
     if (r_sock != NULL) {
-        dbg_bus(STATE, "init_data_state: setting up r_sock");
         fprintf(stderr, "sock: %s -> r_sock: %s\n", sock, r_sock);
         d->d_out_addr_r.sun_family = AF_UNIX;
         sprintf(d->d_out_addr_r.sun_path, "/tmp/xmachine/%s_d.socket", r_sock);
@@ -280,7 +274,6 @@ in_word(data_state_t *d)
 {
     dbg_bus(STATE, "in_word");
     int ret;
-    data_bus_req_t resp;
     data_bus_req_t req;
     req.msg_type = DBM_REQ;
     req.c = D_DATI;
@@ -288,45 +281,12 @@ in_word(data_state_t *d)
 
     update_from_addr(d, &req);
     ret = send_msg(d, &req);
-    dbg_bus(STATE, "in_word: after send_msg");
     if (ret != 0) {
-        /* I made this realization in reverse. Read below. */
+        /* Goodbye forever. */
         fprintf(stderr, "DATI: failed to send data bus message\n");
         fprintf(stderr, "DATI: this means the main thread will block forever\n");
         fprintf(stderr, "DATI: goodbye\n");
     }
-//    dbg_bus(STATE, "in_word: before wait_reply");
-//    ret = wait_reply(d, &resp);
-//    dbg_bus(STATE, "in_word: after wait_reply");
-//    if (ret != 0) {
-//        /*
-//         * This is the worst case Ontario.
-//         * What happens now?
-//         * - If we return, the main thread blocks forever.
-//         * - If we signal the main thread, we've fed it lies.
-//         *
-//         * I should probably return for now and figure out a better solution.
-//         */
-//        fprintf(stderr, "DATI: failed to get reply from data bus\n");
-//        fprintf(stderr, "DATI: this means the main thread will block forever\n");
-//        fprintf(stderr, "DATI: goodbye\n");
-//        return;
-//    }
-//
-//    /* Put the response in the master data buffer. */
-//    dbg_bus(STATE, "in_word: waiting for lock to update data buffer");
-//    pthread_mutex_lock(&(STATE->master_op_mutex));
-//    STATE->master.value = resp.data;
-//    STATE->master.op = R_DONE;
-//    pthread_mutex_unlock(&(STATE->master_op_mutex));
-//    dbg_bus(STATE, "in_word: updated data buffer");
-//
-//    /* Assuming we miraculously got this far, signal the main thread. */
-//    dbg_bus(STATE, "in_word: waiting for lock to signal main thread");
-//    pthread_mutex_lock(&(STATE->master_data_mutex));
-//    pthread_cond_signal(&(STATE->cond_master_data));
-//    pthread_mutex_unlock(&(STATE->master_data_mutex));
-//    dbg_bus(STATE, "in_word: signaled main thread, all done");
 }
 
 void
@@ -484,7 +444,6 @@ handle_resp(data_state_t *d, data_bus_req_t *event)
         return;
     }
 
-    dbg_bus(STATE, "handle_resp: about to unblock main thread");
     pthread_mutex_lock(&(STATE->master_data_mutex));
     pthread_cond_signal(&(STATE->cond_master_data));
     pthread_mutex_unlock(&(STATE->master_data_mutex));
@@ -508,15 +467,14 @@ handle_req(data_state_t *d, data_bus_req_t *event)
     switch (event->c) {
     case D_DATI:
         return handle_dati(d, event);
-        break;
     case D_DATIP:
-        break;
+        return;
     case D_DATO:
         return handle_dato(d, event);
-        break;
     case D_DATOB:
         return handle_datob(d, event);
-        break;
+    case D_EMPTY:
+        return;
     }
 }
 
@@ -532,8 +490,6 @@ handle_dati(data_state_t *d, data_bus_req_t *event)
     dbg_bus(STATE, "handle_dati");
 
     int ret;
-    int out_fd;
-    direction_t dir;
     data_bus_req_t resp;
     resp.msg_type = DBM_RESP;
     resp.c = D_DATI;
@@ -544,9 +500,7 @@ handle_dati(data_state_t *d, data_bus_req_t *event)
     STATE->slave.value = 0;
     pthread_mutex_unlock(&(STATE->slave_op_mutex));
 
-    dbg_bus(STATE, "handle_dati: slave_wait start");
     slave_wait();
-    dbg_bus(STATE, "handle_dati: slave_wait end");
 
     pthread_mutex_lock(&(STATE->slave_op_mutex));
     if (STATE->slave.op == R_DONE) {
@@ -566,25 +520,6 @@ handle_dati(data_state_t *d, data_bus_req_t *event)
     if (ret != 0) {
         dbg_bus(STATE, "handle_dati: failed to send message");
     }
-    //dir = get_fd_direction(d, event, TRUE);
-    //if (dir == D_NONE) {
-    //    dbg_bus(STATE, "handle_dati: direction NONE");
-    //    return;
-    //}
-
-    //out_fd = get_fd(d, dir);
-    //if (out_fd <= 2) {
-    //    dbg_bus(STATE, "handle_dati: not sending");
-    //    return;
-    //}
-    //update_from_addr(d, &resp);
-    //d_connect(d, dir);
-    //ret = write(out_fd, &resp, sizeof(resp));
-    //if (ret == -1) {
-    //    perror("handle_dati");
-    //    return;
-    //}
-    //d_close(d, dir);
 }
 
 void
@@ -713,6 +648,8 @@ d_connect(data_state_t *d, direction_t dir)
     case D_NONE:
         return -1;
     }
+
+    return -1;
 }
 
 int
@@ -783,6 +720,8 @@ d_close(data_state_t *d, direction_t dir)
     case D_NONE:
         return -1;
     }
+
+    return -1;
 }
 
 int

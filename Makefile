@@ -1,6 +1,6 @@
 .PHONY: tags bin clean_libunibus clean_libload
 
-CC_OPTS=-g -Wall
+CC_OPTS=-g -Wall -Wextra
 
 cpu: libunibus cpu.o bin
 	gcc -o bin/cpu src/cpu/cpu.o -Llib/ -lunibus -lpthread

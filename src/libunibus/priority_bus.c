@@ -196,6 +196,8 @@ priority_bus_mgr(void *bus)
     } while (!shutdown);
 
     pr_cleanup(pr);
+
+    return NULL;
 }
 
 void
@@ -420,6 +422,8 @@ get_fd(pr_state_t *pr, direction_t dir)
     case D_NONE:
         return -1;
     }
+
+    return -1;
 }
 
 direction_t
@@ -729,6 +733,8 @@ pr_connect(pr_state_t *pr, direction_t dir)
     case D_NONE:
         return -1;
     }
+
+    return -1;
 }
 
 int
@@ -799,6 +805,8 @@ pr_close(pr_state_t *pr, direction_t dir)
     case D_NONE:
         return -1;
     }
+
+    return -1;
 }
 
 int
