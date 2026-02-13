@@ -209,16 +209,12 @@ read_data_in(bus_state_t *bus, uint32_t addr)
     bus->master.addr = addr;
     pthread_mutex_unlock(&(bus->master_op_mutex));
 
-    dbg_bus(bus, "read_data_in: R_IN set, waiting");
-
     pthread_mutex_lock(&(bus->master_data_mutex));
     pthread_cond_wait(
         &(bus->cond_master_data),
         &(bus->master_data_mutex)
     );
     pthread_mutex_unlock(&(bus->master_data_mutex));
-
-    dbg_bus(bus, "read_data_in: got signal");
 
     pthread_mutex_lock(&(bus->master_op_mutex));
     data = bus->master.value;
@@ -351,7 +347,6 @@ connect_cpu_bus(bus_state_t *bus)
     );
     pthread_mutex_unlock(&(bus->pr_ready_mutex));
 
-    dbg_bus(bus, "connect_cpu_bus: after bus_arb");
     ret = init_d_bus(bus);
     if (ret != 0) {
         return ret;

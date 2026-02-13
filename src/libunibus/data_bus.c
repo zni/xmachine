@@ -110,14 +110,12 @@ init_data_state(char *l_sock, char *sock, char *r_sock)
 
     memset(&(d->d_out_addr_l), 0, sizeof(struct sockaddr_un));
     if (l_sock != NULL) {
-        fprintf(stderr, "sock: %s -> l_sock: %s\n", sock, l_sock);
         d->d_out_addr_l.sun_family = AF_UNIX;
         sprintf(d->d_out_addr_l.sun_path, "/tmp/xmachine/%s_d.socket", l_sock);
     }
 
     memset(&(d->d_out_addr_r), 0, sizeof(struct sockaddr_un));
     if (r_sock != NULL) {
-        fprintf(stderr, "sock: %s -> r_sock: %s\n", sock, r_sock);
         d->d_out_addr_r.sun_family = AF_UNIX;
         sprintf(d->d_out_addr_r.sun_path, "/tmp/xmachine/%s_d.socket", r_sock);
     }

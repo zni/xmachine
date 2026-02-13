@@ -301,16 +301,16 @@ exec_instruction(cpu_t *cpu)
         BLOS(cpu);
         break;
     case BVC_op:
-        //BVC(cpu);
+        BVC(cpu);
         break;
     case BVS_op:
         BVS(cpu);
         break;
     case BCC_op:
-        //BCC(cpu);
+        BCC(cpu);
         break;
     case BCS_op:
-        //BCS(cpu);
+        BCS(cpu);
         break;
 
     default:
