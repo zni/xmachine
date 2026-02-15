@@ -1,5 +1,5 @@
 CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_XOPEN_SOURCE=700L
-CFLAGS   = -std=c99 -pedantic -Wall -Wno-deprecated-declarations ${CPPFLAGS}
+CFLAGS   = -std=c99 -pedantic -Wall -Wno-deprecated-declarations
 CC = cc
 
 DEVICE_LDFLAGS = -lpthread
@@ -7,7 +7,6 @@ UNIBUS_LDFLAGS = -Lsrc/libunibus/ -lunibus
 LOAD_LDFLAGS = -Lsrc/libload/ -lload
 
 CPU_C = $(wildcard src/cpu/*.c)
-CPU_H = $(wildcard src/cpu/*.h)
 CPU_OBJ = ${CPU_C:.c=.o}
 
 MEM_C = $(wildcard src/mem/*.c)
@@ -24,15 +23,15 @@ LIBUNIBUS_OBJ = ${LIBUNIBUS_C:.c=.o}
 
 all: cpu mem
 
-${CPU_OBJ}: ${CPU_C} ${CPU_H}
+${CPU_OBJ}: ${CPU_C}
 
 cpu: libunibus ${CPU_OBJ}
-	${CC} -o $@ ${CPU_OBJ} ${UNIBUS_LDFLAGS} ${DEVICE_LDFLAGS}
+	${CC} -o src/cpu/$@ ${CPU_OBJ} ${UNIBUS_LDFLAGS} ${DEVICE_LDFLAGS}
 
 ${MEM_OBJ}: ${MEM_C} ${MEM_H}
 
 mem: libunibus libload ${MEM_OBJ}
-	${CC} -o $@ ${MEM_OBJ} ${DEVICE_LDFLAGS} ${UNIBUS_LDFLAGS} ${LOAD_LDFLAGS}
+	${CC} -o src/mem/$@ ${MEM_OBJ} ${DEVICE_LDFLAGS} ${UNIBUS_LDFLAGS} ${LOAD_LDFLAGS}
 
 ${LIBLOAD_OBJ}: ${LIBLOAD_C} ${LIBLOAD_H}
 
@@ -57,7 +56,9 @@ loader: libload src/utilities/loader.c
 
 clean: clean_libload clean_libunibus
 	rm -rf bin
+	rm -f src/cpu/cpu
 	rm -f src/cpu/cpu.o
+	rm -f src/mem/mem
 	rm -f src/mem/mem.o
 
 

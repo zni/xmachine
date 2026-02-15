@@ -1,5 +1,3 @@
-#include "cpu.h"
-
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
@@ -8,17 +6,218 @@
 
 #include "../libunibus/device_bus_mgr.h"
 
-cpu_t *CPU_STATE = NULL;
+enum ProcessorStatusFlags {
+    CARRYFLAG    = 0000001,
+    OVERFLOWFLAG = 0000002,
+    ZEROFLAG     = 0000004,
+    NEGATIVEFLAG = 0000010,
+    TRAPFLAG     = 0000020,
+    IPLBITS      = 0000340,
+    PREVMODE     = 0030000,
+    CURRMODE     = 0140000
+};
+
+enum OPCode {
+    // Branch OPs
+    BR_op   = 0000400,
+    BNE_op  = 0001000,
+    BEQ_op  = 0001400,
+    BGE_op  = 0002000,
+    BLT_op  = 0002400,
+    BGT_op  = 0003000,
+    BLE_op  = 0003400,
+    BPL_op  = 0100000,
+    BMI_op  = 0100400,
+    BHI_op  = 0101000,
+    BLOS_op = 0101400,
+    BVC_op  = 0102000,
+    BVS_op  = 0102400,
+    BCC_op  = 0103000,
+    BCS_op  = 0103400,
+
+    // Double OP Register Source
+    MUL_op  = 0070000,
+    DIV_op  = 0071000,
+    ASH_op  = 0072000,
+    ASHC_op = 0073000,
+    XOR_op  = 0074000,
+
+    // Subroutine
+    JSR_op  = 0004000,
+    RTS_op  = 0000200,
+
+    // Double OPs
+    MOV_op  = 0010000,
+    MOVB_op = 0110000,
+    CMP_op  = 0020000,
+    CMPB_op = 0120000,
+    BIT_op  = 0030000,
+    BITB_op = 0130000,
+    BIC_op  = 0040000,
+    BICB_op = 0140000,
+    BIS_op  = 0050000,
+    BISB_op = 0150000,
+    ADD_op  = 0060000,
+    SUB_op  = 0160000,
+
+    // Single OPs
+    JMP_op  = 0000100,
+    SWAB_op = 0000300,
+    CLR_op  = 0005000,
+    CLRB_op = 0105000,
+    COM_op  = 0005100,
+    COMB_op = 0105100,
+    INC_op  = 0005200,
+    INCB_op = 0105200,
+    DEC_op  = 0005300,
+    DECB_op = 0105300,
+    NEG_op  = 0005400,
+    NEGB_op = 0105400,
+    ADC_op  = 0005500,
+    ADCB_op = 0105500,
+    SBC_op  = 0005600,
+    SBCB_op = 0105600,
+    TST_op  = 0005700,
+    TSTB_op = 0105700,
+    ROR_op  = 0006000,
+    RORB_op = 0106000,
+    ROL_op  = 0006100,
+    ROLB_op = 0106100,
+    ASR_op  = 0006200,
+    ASRB_op = 0106200,
+    ASL_op  = 0006300,
+    ASLB_op = 0106300,
+    MTPS_op = 0106400,
+    MFPI_op = 0006500,
+    MFPD_op = 0106500,
+    MTPI_op = 0006600,
+    MTPD_op = 0106600,
+    SXT_op  = 0006700,
+    MFPS_op = 0106700
+};
+
+typedef struct _cpu {
+    uint16_t r0;
+    uint16_t r1;
+    uint16_t r2;
+    uint16_t r3;
+    uint16_t r4;
+    uint16_t r5;
+    uint16_t sp;
+    uint16_t pc;
+    uint16_t psw;
+    uint16_t alu;
+    uint16_t ir;
+
+    uint32_t src_address;
+    uint32_t dest_address;
+
+    bool_t halted;
+} cpu;
+
+static void usage();
+static cpu* init_cpu();
+static void execute();
+static void dump_cpu();
+static void inc_register(uint16_t, uint8_t);
+static void dec_register(uint16_t, uint8_t);
+static uint16_t fetch_register_contents(uint16_t);
+static uint32_t translate_bus_addr(uint32_t);
+static uint16_t fetch_data(uint32_t);
+static uint16_t fetch_data_register(uint32_t);
+static void store_data(uint32_t, uint16_t);
+static void store_data_b(uint32_t, uint8_t);
+static void store_data_register(uint32_t, uint16_t);
+static void exec_instruction();
+static int8_t get_branch_offset();
+static uint8_t is_internal_bus_addr(uint32_t);
+static uint32_t register_to_bus_addr(uint16_t);
+static uint16_t* bus_addr_to_register(uint32_t);
+static void setup_pc_addressing(uint32_t*, uint16_t, uint16_t);
+static void setup_sp_addressing(uint32_t*, uint16_t, uint16_t);
+static void setup_general_addressing(uint32_t*, uint16_t, uint16_t);
+static void setup_general_byte_addressing(uint32_t*, uint16_t, uint16_t);
+static void setup_dest_addressing(uint8_t);
+static void setup_src_addressing(uint8_t);
+static void set_zero_flag(uint16_t);
+static void set_negative_flag_b(uint8_t);
+static void set_negative_flag_w(uint16_t);
+
+static void ADCB();
+static void ADC();
+static void ADD();
+static void ASHC();
+static void ASH();
+static void ASLB();
+static void ASL();
+static void ASRB();
+static void ASR();
+static void BCC();
+static void BCS();
+static void BEQ();
+static void BGE();
+static void BGT();
+static void BHI();
+static void BICB();
+static void BIC();
+static void BISB();
+static void BIS();
+static void BITB();
+static void BIT();
+static void BLE();
+static void BLOS();
+static void BLT();
+static void BMI();
+static void BNE();
+static void BPL();
+static void BR();
+static void BVC();
+static void BVS();
+static void CLRB();
+static void CLR();
+static void CMPB();
+static void CMP();
+static void COMB();
+static void COM();
+static void DECB();
+static void DEC();
+static void DIV();
+static void HALT();
+static void INCB();
+static void INC();
+static void JMP();
+static void JSR();
+static void MFPD();
+static void MFPI();
+static void MFPS();
+static void MOVB();
+static void MOV();
+static void MTPD();
+static void MTPI();
+static void MTPS();
+static void MUL();
+static void NEGB();
+static void NEG();
+static void NOP();
+static void ROLB();
+static void ROL();
+static void RORB();
+static void ROR();
+static void RTS();
+static void SBCB();
+static void SBC();
+static void SUB();
+static void SWAB();
+static void SXT();
+static void TSTB();
+static void TST();
+static void XOR();
+
+static void cleanup();
+
+cpu *CPU_STATE = NULL;
 bus_state_t *BUS_STATE = NULL;
 
-bool_t is_internal_bus_addr(uint32_t);
-uint32_t translate_bus_addr(uint32_t);
-uint16_t* bus_addr_to_register(cpu_t*, uint32_t);
-uint16_t fetch_data(cpu_t*, uint32_t);
-uint16_t fetch_data_register(cpu_t*, uint32_t);
-void store_data_register(cpu_t*, uint32_t, uint16_t);
-void store_data(cpu_t*, uint32_t, uint16_t);
-void store_data_b(cpu_t*, uint32_t, uint8_t);
 
 void
 usage()
@@ -26,12 +225,12 @@ usage()
     fprintf(stderr, "cpu -p <offset>\n");
 }
 
-cpu_t*
+cpu*
 init_cpu()
 {
-    cpu_t *cpu = malloc(sizeof(cpu_t));
+    cpu *cpu = malloc(sizeof(cpu));
     if (cpu == NULL) {
-        perror("cpu");
+        perror("init_cpu");
         return NULL;
     }
 
@@ -56,63 +255,63 @@ init_cpu()
 }
 
 void
-execute(cpu_t *cpu)
+execute()
 {
-    while (!cpu->halted) {
-        cpu->ir = fetch_data(cpu, cpu->pc);
-        cpu->pc += 2; // advance by word.
-        exec_instruction(cpu);
+    while (!CPU_STATE->halted) {
+        CPU_STATE->ir = fetch_data(CPU_STATE->pc);
+        CPU_STATE->pc += 2; // advance by word.
+        exec_instruction();
     }
 }
 
 void
-dump_cpu(cpu_t *cpu)
+dump_cpu()
 {
-    printf("ALU: %07o\n", cpu->alu);
-    printf("PSW: %07o\n", cpu->psw);
-    printf("IR : %07o\n", cpu->ir);
-    printf("SP : %07o\n", cpu->sp);
-    printf("PC : %07o\n", cpu->pc);
-    printf("R0 : %07o\n", cpu->r0);
-    printf("R1 : %07o\n", cpu->r1);
-    printf("R2 : %07o\n", cpu->r2);
-    printf("R3 : %07o\n", cpu->r3);
-    printf("R4 : %07o\n", cpu->r4);
-    printf("R5 : %07o\n", cpu->r5);
+    printf("ALU: %07o\n", CPU_STATE->alu);
+    printf("PSW: %07o\n", CPU_STATE->psw);
+    printf("IR : %07o\n", CPU_STATE->ir);
+    printf("SP : %07o\n", CPU_STATE->sp);
+    printf("PC : %07o\n", CPU_STATE->pc);
+    printf("R0 : %07o\n", CPU_STATE->r0);
+    printf("R1 : %07o\n", CPU_STATE->r1);
+    printf("R2 : %07o\n", CPU_STATE->r2);
+    printf("R3 : %07o\n", CPU_STATE->r3);
+    printf("R4 : %07o\n", CPU_STATE->r4);
+    printf("R5 : %07o\n", CPU_STATE->r5);
     printf("\n");
 }
 
 void
-inc_register(cpu_t *cpu, uint16_t reg, uint8_t is_byte_addr)
+inc_register(uint16_t reg, uint8_t is_byte_addr)
 {
     uint16_t *r = NULL;
     switch (reg) {
         case 0:
-            r = &(cpu->r0);
+            r = &(CPU_STATE->r0);
             break;
         case 1:
-            r = &(cpu->r1);
+            r = &(CPU_STATE->r1);
             break;
         case 2:
-            r = &(cpu->r2);
+            r = &(CPU_STATE->r2);
             break;
         case 3:
-            r = &(cpu->r3);
+            r = &(CPU_STATE->r3);
             break;
         case 4:
-            r = &(cpu->r4);
+            r = &(CPU_STATE->r4);
             break;
         case 5:
-            r = &(cpu->r5);
+            r = &(CPU_STATE->r5);
             break;
         case 6:
-            r = &(cpu->sp);
+            r = &(CPU_STATE->sp);
             break;
         case 7:
-            r = &(cpu->pc);
+            r = &(CPU_STATE->pc);
             break;
         case 8:
-            r = &(cpu->psw);
+            r = &(CPU_STATE->psw);
             break;
 
         default:
@@ -127,36 +326,36 @@ inc_register(cpu_t *cpu, uint16_t reg, uint8_t is_byte_addr)
 }
 
 void
-dec_register(cpu_t *cpu, uint16_t reg, uint8_t is_byte_addr)
+dec_register(uint16_t reg, uint8_t is_byte_addr)
 {
     uint16_t *r = NULL;
     switch (reg) {
         case 0:
-            r = &(cpu->r0);
+            r = &(CPU_STATE->r0);
             break;
         case 1:
-            r = &(cpu->r1);
+            r = &(CPU_STATE->r1);
             break;
         case 2:
-            r = &(cpu->r2);
+            r = &(CPU_STATE->r2);
             break;
         case 3:
-            r = &(cpu->r3);
+            r = &(CPU_STATE->r3);
             break;
         case 4:
-            r = &(cpu->r4);
+            r = &(CPU_STATE->r4);
             break;
         case 5:
-            r = &(cpu->r5);
+            r = &(CPU_STATE->r5);
             break;
         case 6:
-            r = &(cpu->sp);
+            r = &(CPU_STATE->sp);
             break;
         case 7:
-            r = &(cpu->pc);
+            r = &(CPU_STATE->pc);
             break;
         case 8:
-            r = &(cpu->psw);
+            r = &(CPU_STATE->psw);
             break;
 
         default:
@@ -171,18 +370,18 @@ dec_register(cpu_t *cpu, uint16_t reg, uint8_t is_byte_addr)
 }
 
 uint16_t
-fetch_register_contents(cpu_t *cpu, uint16_t reg)
+fetch_register_contents(uint16_t reg)
 {
     switch (reg) {
-        case 0: return cpu->r0;
-        case 1: return cpu->r1;
-        case 2: return cpu->r2;
-        case 3: return cpu->r3;
-        case 4: return cpu->r4;
-        case 5: return cpu->r5;
-        case 6: return cpu->sp;
-        case 7: return cpu->pc;
-        case 8: return cpu->psw;
+        case 0: return CPU_STATE->r0;
+        case 1: return CPU_STATE->r1;
+        case 2: return CPU_STATE->r2;
+        case 3: return CPU_STATE->r3;
+        case 4: return CPU_STATE->r4;
+        case 5: return CPU_STATE->r5;
+        case 6: return CPU_STATE->sp;
+        case 7: return CPU_STATE->pc;
+        case 8: return CPU_STATE->psw;
 
         default: return 0xffff;
     }
@@ -200,11 +399,11 @@ translate_bus_addr(uint32_t addr)
 }
 
 uint16_t
-fetch_data(cpu_t *cpu, uint32_t addr)
+fetch_data(uint32_t addr)
 {
     uint16_t data;
     if (is_internal_bus_addr(addr)) {
-        data = fetch_data_register(cpu, addr);
+        data = fetch_data_register(addr);
         return data;
     }
 
@@ -217,17 +416,17 @@ fetch_data(cpu_t *cpu, uint32_t addr)
 }
 
 uint16_t
-fetch_data_register(cpu_t *cpu, uint32_t addr)
+fetch_data_register(uint32_t addr)
 {
-    uint16_t *reg = bus_addr_to_register(cpu, addr);
+    uint16_t *reg = bus_addr_to_register(addr);
     return *reg;
 }
 
 void
-store_data(cpu_t *cpu, uint32_t addr, uint16_t data)
+store_data(uint32_t addr, uint16_t data)
 {
     if (is_internal_bus_addr(addr)) {
-        store_data_register(cpu, addr, data);
+        store_data_register(addr, data);
         return;
     }
 
@@ -238,10 +437,10 @@ store_data(cpu_t *cpu, uint32_t addr, uint16_t data)
 }
 
 void
-store_data_b(cpu_t *cpu, uint32_t addr, uint8_t data)
+store_data_b(uint32_t addr, uint8_t data)
 {
     if (is_internal_bus_addr(addr)) {
-        store_data_register(cpu, addr, data);
+        store_data_register(addr, data);
         return;
     }
 
@@ -254,232 +453,233 @@ store_data_b(cpu_t *cpu, uint32_t addr, uint8_t data)
 }
 
 void
-store_data_register(cpu_t *cpu, uint32_t addr, uint16_t data)
+store_data_register(uint32_t addr, uint16_t data)
 {
-    uint16_t *reg = bus_addr_to_register(cpu, addr);
+    uint16_t *reg = bus_addr_to_register(addr);
     *reg = data;
 }
 
 void
-exec_instruction(cpu_t *cpu)
+exec_instruction()
 {
-    dump_cpu(cpu);
-    uint16_t ir = cpu->ir;
+    dump_cpu();
+
+    uint16_t ir = CPU_STATE->ir;
     switch (ir & 0177400) {
     // Branch OPS
     case BR_op:
-        BR(cpu);
+        BR();
         break;
     case BNE_op:
-        BNE(cpu);
+        BNE();
         break;
     case BEQ_op:
-        BEQ(cpu);
+        BEQ();
         break;
     case BGE_op:
-        BGE(cpu);
+        BGE();
         break;
     case BLT_op:
-        BLT(cpu);
+        BLT();
         break;
     case BGT_op:
-        BGT(cpu);
+        BGT();
         break;
     case BLE_op:
-        BLE(cpu);
+        BLE();
         break;
     case BPL_op:
-        BPL(cpu);
+        BPL();
         break;
     case BMI_op:
-        BMI(cpu);
+        BMI();
         break;
     case BHI_op:
-        BHI(cpu);
+        BHI();
         break;
     case BLOS_op:
-        BLOS(cpu);
+        BLOS();
         break;
     case BVC_op:
-        BVC(cpu);
+        BVC();
         break;
     case BVS_op:
-        BVS(cpu);
+        BVS();
         break;
     case BCC_op:
-        BCC(cpu);
+        BCC();
         break;
     case BCS_op:
-        BCS(cpu);
+        BCS();
         break;
 
     default:
         // Double OP Register Source and JSR
         switch (ir & 0177000) {
         case MUL_op:
-            MUL(cpu);
+            MUL();
             break;
         case DIV_op:
-            DIV(cpu);
+            DIV();
             break;
         case ASH_op:
-            ASH(cpu);
+            ASH();
             break;
         case ASHC_op:
-            ASHC(cpu);
+            ASHC();
             break;
         case XOR_op:
-            XOR(cpu);
+            XOR();
             break;
         case JSR_op:
-            JSR(cpu);
+            JSR();
             break;
         default:
             switch (ir & 0170000) {
             // Double OPs
             case MOV_op:
-                MOV(cpu);
+                MOV();
                 break;
             case MOVB_op:
-                MOVB(cpu);
+                MOVB();
                 break;
             case CMP_op:
-                CMP(cpu);
+                CMP();
                 break;
             case CMPB_op:
-                CMPB(cpu);
+                CMPB();
                 break;
             case BIT_op:
-                BIT(cpu);
+                BIT();
                 break;
             case BITB_op:
-                BITB(cpu);
+                BITB();
                 break;
             case BIC_op:
-                BIC(cpu);
+                BIC();
                 break;
             case BICB_op:
-                BICB(cpu);
+                BICB();
                 break;
             case BIS_op:
-                BIS(cpu);
+                BIS();
                 break;
             case BISB_op:
-                BISB(cpu);
+                BISB();
                 break;
             case ADD_op:
-                ADD(cpu);
+                ADD();
                 break;
             case SUB_op:
-                SUB(cpu);
+                SUB();
                 break;
             default:
                 // Single OPs
                 switch (ir & 0177700) {
                 case JMP_op:
-                    JMP(cpu);
+                    JMP();
                     break;
                 case SWAB_op:
-                    SWAB(cpu);
+                    SWAB();
                     break;
                 case CLR_op:
-                    CLR(cpu);
+                    CLR();
                     break;
                 case CLRB_op:
-                    CLRB(cpu);
+                    CLRB();
                     break;
                 case COM_op:
-                    COM(cpu);
+                    COM();
                     break;
                 case COMB_op:
-                    COMB(cpu);
+                    COMB();
                     break;
                 case INC_op:
-                    INC(cpu);
+                    INC();
                     break;
                 case INCB_op:
-                    INCB(cpu);
+                    INCB();
                     break;
                 case DEC_op:
-                    DEC(cpu);
+                    DEC();
                     break;
                 case DECB_op:
-                    DECB(cpu);
+                    DECB();
                     break;
                 case NEG_op:
-                    NEG(cpu);
+                    NEG();
                     break;
                 case NEGB_op:
-                    NEGB(cpu);
+                    NEGB();
                     break;
                 case ADC_op:
-                    ADC(cpu);
+                    ADC();
                     break;
                 case ADCB_op:
-                    ADCB(cpu);
+                    ADCB();
                     break;
                 case SBC_op:
-                    SBC(cpu);
+                    SBC();
                     break;
                 case SBCB_op:
-                    SBCB(cpu);
+                    SBCB();
                     break;
                 case TST_op:
-                    TST(cpu);
+                    TST();
                     break;
                 case TSTB_op:
-                    TSTB(cpu);
+                    TSTB();
                     break;
                 case ROR_op:
-                    ROR(cpu);
+                    ROR();
                     break;
                 case RORB_op:
-                    RORB(cpu);
+                    RORB();
                     break;
                 case ROL_op:
-                    ROL(cpu);
+                    ROL();
                     break;
                 case ROLB_op:
-                    ROLB(cpu);
+                    ROLB();
                     break;
                 case ASR_op:
-                    ASR(cpu);
+                    ASR();
                     break;
                 case ASRB_op:
-                    ASRB(cpu);
+                    ASRB();
                     break;
                 case ASL_op:
-                    ASL(cpu);
+                    ASL();
                     break;
                 case ASLB_op:
-                    ASLB(cpu);
+                    ASLB();
                     break;
                 case MTPS_op:
-                    MTPS(cpu);
+                    MTPS();
                     break;
                 case MFPI_op:
-                    MFPI(cpu);
+                    MFPI();
                     break;
                 case MFPD_op:
-                    MFPD(cpu);
+                    MFPD();
                     break;
                 case MTPI_op:
-                    MTPI(cpu);
+                    MTPI();
                     break;
                 case MTPD_op:
-                    MTPD(cpu);
+                    MTPD();
                     break;
                 case SXT_op:
-                    SXT(cpu);
+                    SXT();
                     break;
                 case MFPS_op:
-                    MFPS(cpu);
+                    MFPS();
                     break;
                 case RTS_op:
-                    RTS(cpu);
+                    RTS();
                     break;
                 default:
-                    HALT(cpu);
+                    HALT();
                     break;
                 }
             }
@@ -488,9 +688,9 @@ exec_instruction(cpu_t *cpu)
 }
 
 int8_t
-get_branch_offset(cpu_t *cpu)
+get_branch_offset()
 {
-    return (int8_t) (cpu->ir & 0377);
+    return (int8_t) (CPU_STATE->ir & 0377);
 }
 
 /*******************************
@@ -534,25 +734,25 @@ register_to_bus_addr(uint16_t reg)
 }
 
 uint16_t*
-bus_addr_to_register(cpu_t *cpu, uint32_t addr)
+bus_addr_to_register(uint32_t addr)
 {
     switch (addr) {
-        case 0777700: return &cpu->r0;
-        case 0777701: return &cpu->r1;
-        case 0777702: return &cpu->r2;
-        case 0777703: return &cpu->r3;
-        case 0777704: return &cpu->r4;
-        case 0777705: return &cpu->r5;
-        case 0777706: return &cpu->sp;
-        case 0777707: return &cpu->pc;
-        case 0777776: return &cpu->psw;
+        case 0777700: return &CPU_STATE->r0;
+        case 0777701: return &CPU_STATE->r1;
+        case 0777702: return &CPU_STATE->r2;
+        case 0777703: return &CPU_STATE->r3;
+        case 0777704: return &CPU_STATE->r4;
+        case 0777705: return &CPU_STATE->r5;
+        case 0777706: return &CPU_STATE->sp;
+        case 0777707: return &CPU_STATE->pc;
+        case 0777776: return &CPU_STATE->psw;
 
         default: return NULL;
     }
 }
 
 void
-setup_pc_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
+setup_pc_addressing(uint32_t *loc, uint16_t mode, uint16_t reg)
 {
     uint32_t relative = 0;
     switch (mode) {
@@ -563,27 +763,27 @@ setup_pc_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
 
         // From immediate.
         case 2:
-            *loc = cpu->pc;
-            cpu->pc += 2;
+            *loc = CPU_STATE->pc;
+            CPU_STATE->pc += 2;
             break;
 
         // From absolute.
         case 3:
-            *loc = fetch_data(cpu, cpu->pc);
-            cpu->pc += 2;
+            *loc = fetch_data(CPU_STATE->pc);
+            CPU_STATE->pc += 2;
             break;
 
         // Relative
         case 6:
-            relative = fetch_data(cpu, cpu->pc);
-            cpu->pc += 2;
-            *loc = cpu->pc + relative;
+            relative = fetch_data(CPU_STATE->pc);
+            CPU_STATE->pc += 2;
+            *loc = CPU_STATE->pc + relative;
             break;
     }
 }
 
 void
-setup_sp_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
+setup_sp_addressing(uint32_t *loc, uint16_t mode, uint16_t reg)
 {
     uint32_t index = 0;
     uint32_t addr = 0;
@@ -596,46 +796,46 @@ setup_sp_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
 
         // Deferred: (SP), top of the stack
         case 1:
-            *loc = cpu->sp;
+            *loc = CPU_STATE->sp;
             break;
 
         // Autoincrement: (Rn)+, get top of stack and then pop it
         case 2:
-            *loc = cpu->sp;
-            cpu->sp += 2;
+            *loc = CPU_STATE->sp;
+            CPU_STATE->sp += 2;
             break;
 
         // Deferred autoincrement: @(SP)+, top of stack is a pointer to a value,
         // then pop it.
         case 3:
-            *loc = fetch_data(cpu, cpu->sp);
-            cpu->sp += 2;
+            *loc = fetch_data(CPU_STATE->sp);
+            CPU_STATE->sp += 2;
             break;
 
         // Autodecrement: -(SP), push value onto stack.
         case 4:
-            cpu->sp -= 2;
-            *loc = cpu->sp;
+            CPU_STATE->sp -= 2;
+            *loc = CPU_STATE->sp;
             break;
 
         // Indexed: X(SP), access item X on the stack
         case 6:
-            index = fetch_data(cpu, cpu->pc);
-            cpu->pc += 2;
-            *loc = cpu->sp + index;
+            index = fetch_data(CPU_STATE->pc);
+            CPU_STATE->pc += 2;
+            *loc = CPU_STATE->sp + index;
             break;
 
         // Deferred index: @X(SP), access item pointed to by item X on the stack
         case 7:
-            index = fetch_data(cpu, cpu->pc);
-            cpu->pc += 2;
-            *loc = fetch_data(cpu, index + cpu->sp);
+            index = fetch_data(CPU_STATE->pc);
+            CPU_STATE->pc += 2;
+            *loc = fetch_data(index + CPU_STATE->sp);
             break;
     }
 }
 
 void
-setup_general_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
+setup_general_addressing(uint32_t *loc, uint16_t mode, uint16_t reg)
 {
     uint16_t index = 0;
     uint32_t deferred = 0;
@@ -647,7 +847,7 @@ setup_general_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
 
         // Deferred: (Rn)
         case 1:
-            *loc = fetch_register_contents(cpu, reg);
+            *loc = fetch_register_contents(reg);
             break;
 
         // Autoincrement: (Rn)+
@@ -655,16 +855,16 @@ setup_general_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
         // NOTE: (incremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 2:
-            *loc = fetch_register_contents(cpu, reg);
-            inc_register(cpu, reg, FALSE);
+            *loc = fetch_register_contents(reg);
+            inc_register(reg, FALSE);
             break;
 
         // Deferred autoincrement: @(Rn)+
         case 3:
-            deferred = fetch_register_contents(cpu, reg);
-            index = fetch_data(cpu, deferred);
-            inc_register(cpu, reg, FALSE);
-            *loc = fetch_data(cpu, index);
+            deferred = fetch_register_contents(reg);
+            index = fetch_data(deferred);
+            inc_register(reg, FALSE);
+            *loc = fetch_data(index);
             break;
 
         // Autodecrement: -(Rn)
@@ -672,40 +872,40 @@ setup_general_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
         // NOTE: (decremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 4:
-            *loc = fetch_register_contents(cpu, reg);
-            dec_register(cpu, reg, FALSE);
+            *loc = fetch_register_contents(reg);
+            dec_register(reg, FALSE);
             break;
 
         // Deferred autodecrement: @-(Rn)
         case 5:
-            deferred = fetch_register_contents(cpu, reg);
-            index = fetch_data(cpu, deferred);
-            *loc = fetch_data(cpu, index);
+            deferred = fetch_register_contents(reg);
+            index = fetch_data(deferred);
+            *loc = fetch_data(index);
             index -= 2;
-            store_data(cpu, deferred, index);
+            store_data(deferred, index);
             break;
 
         // Indexed: X(Rn)
         case 6:
-            index = fetch_data(cpu, cpu->pc);
-            cpu->pc += 2;
-            deferred = fetch_register_contents(cpu, reg);
-            *loc = fetch_data(cpu, index + deferred);
+            index = fetch_data(CPU_STATE->pc);
+            CPU_STATE->pc += 2;
+            deferred = fetch_register_contents(reg);
+            *loc = fetch_data(index + deferred);
             break;
 
         // Deferred indexed: @X(Rn)
         case 7:
-            index = fetch_data(cpu, cpu->pc);
-            cpu->pc += 2;
-            deferred = fetch_register_contents(cpu, reg);
-            deferred = fetch_data(cpu, deferred);
-            *loc = fetch_data(cpu, deferred + index);
+            index = fetch_data(CPU_STATE->pc);
+            CPU_STATE->pc += 2;
+            deferred = fetch_register_contents(reg);
+            deferred = fetch_data(deferred);
+            *loc = fetch_data(deferred + index);
             break;
     }
 }
 
 void
-setup_general_byte_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t reg)
+setup_general_byte_addressing(uint32_t *loc, uint16_t mode, uint16_t reg)
 {
     uint16_t index = 0;
     uint32_t deferred = 0;
@@ -717,7 +917,7 @@ setup_general_byte_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t
 
         // Deferred: (Rn)
         case 1:
-            *loc = fetch_register_contents(cpu, reg);
+            *loc = fetch_register_contents(reg);
             break;
 
         // Autoincrement: (Rn)+
@@ -725,16 +925,16 @@ setup_general_byte_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t
         // NOTE: (incremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 2:
-            *loc = fetch_register_contents(cpu, reg);
-            inc_register(cpu, reg, TRUE);
+            *loc = fetch_register_contents(reg);
+            inc_register(reg, TRUE);
             break;
 
         // Deferred autoincrement: @(Rn)+
         case 3:
-            deferred = fetch_register_contents(cpu, reg);
-            index = fetch_data(cpu, deferred);
-            inc_register(cpu, reg, TRUE);
-            *loc = fetch_data(cpu, index);
+            deferred = fetch_register_contents(reg);
+            index = fetch_data(deferred);
+            inc_register(reg, TRUE);
+            *loc = fetch_data(index);
             break;
 
         // Autodecrement: -(Rn)
@@ -742,110 +942,689 @@ setup_general_byte_addressing(cpu_t *cpu, uint32_t *loc, uint16_t mode, uint16_t
         // NOTE: (decremented by one or two) to address the next word or
         // byte depending upon whether the instruction **operates on byte or word data**
         case 4:
-            *loc = fetch_register_contents(cpu, reg);
-            dec_register(cpu, reg, TRUE);
+            *loc = fetch_register_contents(reg);
+            dec_register(reg, TRUE);
             break;
 
         // Deferred autodecrement: @-(Rn)
         case 5:
-            deferred = fetch_register_contents(cpu, reg);
-            index = fetch_data(cpu, deferred);
-            *loc = fetch_data(cpu, index);
+            deferred = fetch_register_contents(reg);
+            index = fetch_data(deferred);
+            *loc = fetch_data(index);
             index -= 1;
-            store_data(cpu, deferred, index);
+            store_data(deferred, index);
             break;
 
         // Indexed: X(Rn)
         case 6:
-            index = fetch_data(cpu, cpu->pc);
-            cpu->pc += 2;
-            deferred = fetch_register_contents(cpu, reg);
-            *loc = fetch_data(cpu, index + deferred);
+            index = fetch_data(CPU_STATE->pc);
+            CPU_STATE->pc += 2;
+            deferred = fetch_register_contents(reg);
+            *loc = fetch_data(index + deferred);
             break;
 
         // Deferred indexed: @X(Rn)
         case 7:
-            index = fetch_data(cpu, cpu->pc);
-            cpu->pc += 2;
-            deferred = fetch_register_contents(cpu, reg);
-            deferred = fetch_data(cpu, deferred);
-            *loc = fetch_data(cpu, deferred + index);
+            index = fetch_data(CPU_STATE->pc);
+            CPU_STATE->pc += 2;
+            deferred = fetch_register_contents(reg);
+            deferred = fetch_data(deferred);
+            *loc = fetch_data(deferred + index);
             break;
     }
 }
 
 void
-setup_dest_addressing(cpu_t *cpu, uint8_t use_byte_addr)
+setup_dest_addressing(uint8_t use_byte_addr)
 {
-    uint16_t reg = (cpu->ir & 00007);
-    uint16_t mode = (cpu->ir & 00070) >> 3;
+    uint16_t reg = (CPU_STATE->ir & 00007);
+    uint16_t mode = (CPU_STATE->ir & 00070) >> 3;
     switch (reg) {
         case 7:
-            setup_pc_addressing(cpu, &(cpu->dest_address), mode, reg);
+            setup_pc_addressing(&(CPU_STATE->dest_address), mode, reg);
             break;
         case 6:
-            setup_sp_addressing(cpu, &(cpu->dest_address), mode, reg);
+            setup_sp_addressing(&(CPU_STATE->dest_address), mode, reg);
             break;
         default:
             if (use_byte_addr) {
-                setup_general_byte_addressing(cpu, &(cpu->dest_address), mode, reg);
+                setup_general_byte_addressing(&(CPU_STATE->dest_address), mode, reg);
             } else {
-                setup_general_addressing(cpu, &(cpu->dest_address), mode, reg);
+                setup_general_addressing(&(CPU_STATE->dest_address), mode, reg);
             }
     }
 }
 
 void
-setup_src_addressing(cpu_t *cpu, uint8_t use_byte_addr)
+setup_src_addressing(uint8_t use_byte_addr)
 {
-    uint16_t reg = (cpu->ir & 00700) >> 6;
-    uint16_t mode = (cpu->ir & 07000) >> 9;
+    uint16_t reg = (CPU_STATE->ir & 00700) >> 6;
+    uint16_t mode = (CPU_STATE->ir & 07000) >> 9;
     switch (reg) {
         case 7:
-            setup_pc_addressing(cpu, &(cpu->src_address), mode, reg);
+            setup_pc_addressing(&(CPU_STATE->src_address), mode, reg);
             break;
         case 6:
-            setup_sp_addressing(cpu, &(cpu->src_address), mode, reg);
+            setup_sp_addressing(&(CPU_STATE->src_address), mode, reg);
             break;
         default:
             if (use_byte_addr) {
-                setup_general_byte_addressing(cpu, &(cpu->src_address), mode, reg);
+                setup_general_byte_addressing(&(CPU_STATE->src_address), mode, reg);
             } else {
-                setup_general_addressing(cpu, &(cpu->src_address), mode, reg);
+                setup_general_addressing(&(CPU_STATE->src_address), mode, reg);
             }
     }
 }
 
 void
-set_zero_flag(cpu_t *cpu, uint16_t value)
+set_zero_flag(uint16_t value)
 {
     if (value == 0) {
-        cpu->psw |= ZEROFLAG;
+        CPU_STATE->psw |= ZEROFLAG;
     } else {
-        cpu->psw = (cpu->psw & ZEROFLAG) ? (cpu->psw ^ ZEROFLAG) : cpu->psw;
+        CPU_STATE->psw = (CPU_STATE->psw & ZEROFLAG) ? (CPU_STATE->psw ^ ZEROFLAG) : CPU_STATE->psw;
     }
 }
 
 void
-set_negative_flag_b(cpu_t *cpu, uint8_t value)
+set_negative_flag_b(uint8_t value)
 {
     uint8_t mask = 0200;
     if (value & mask) {
-        cpu->psw |= NEGATIVEFLAG;
+        CPU_STATE->psw |= NEGATIVEFLAG;
     } else {
-        cpu->psw = (cpu->psw & NEGATIVEFLAG) ? (cpu->psw ^ NEGATIVEFLAG) : cpu->psw;
+        CPU_STATE->psw = (CPU_STATE->psw & NEGATIVEFLAG) ? (CPU_STATE->psw ^ NEGATIVEFLAG) : CPU_STATE->psw;
     }
 }
 
 void
-set_negative_flag_w(cpu_t *cpu, uint16_t value)
+set_negative_flag_w(uint16_t value)
 {
     uint16_t mask = 0100000;
     if (value & mask) {
-        cpu->psw |= NEGATIVEFLAG;
+        CPU_STATE->psw |= NEGATIVEFLAG;
     } else {
-        cpu->psw = (cpu->psw & NEGATIVEFLAG) ? (cpu->psw ^ NEGATIVEFLAG) : cpu->psw;
+        CPU_STATE->psw = (CPU_STATE->psw & NEGATIVEFLAG) ? (CPU_STATE->psw ^ NEGATIVEFLAG) : CPU_STATE->psw;
     }
+}
+
+void
+ADCB()
+{
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu += CPU_STATE->psw & CARRYFLAG;
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
+}
+
+void
+ADC()
+{
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu += CPU_STATE->psw & CARRYFLAG;
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
+}
+
+void
+ADD()
+{
+    setup_src_addressing(FALSE);
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->src_address);
+    CPU_STATE->alu += fetch_data(CPU_STATE->dest_address);
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_negative_flag_w(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
+}
+
+void
+ASHC()
+{
+    NOP();
+}
+
+void
+ASH()
+{
+    NOP();
+}
+
+void
+ASLB()
+{
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu <<= 1;
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
+}
+
+void
+ASL()
+{
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu <<= 1;
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
+}
+
+void
+ASRB()
+{
+    setup_dest_addressing(TRUE);
+
+    /* FIXME? fetch_data_b? */
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu >>= 1;
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
+}
+
+void
+ASR()
+{
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu >>= 1;
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
+}
+
+void
+BCC()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = CPU_STATE->psw & CARRYFLAG;
+    if (CPU_STATE->alu == 0)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BCS()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = CPU_STATE->psw & CARRYFLAG;
+    if (CPU_STATE->alu)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BEQ()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = CPU_STATE->psw & ZEROFLAG;
+    if (CPU_STATE->alu == ZEROFLAG)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BGE()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = (CPU_STATE->psw & NEGATIVEFLAG) >> 3;
+    CPU_STATE->alu ^= (CPU_STATE->psw & OVERFLOWFLAG) >> 1;
+    if (CPU_STATE->alu == 0)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BGT()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = (CPU_STATE->psw & ZEROFLAG) >> 2;
+    CPU_STATE->alu |= ((CPU_STATE->psw & NEGATIVEFLAG) >> 3) ^ ((CPU_STATE->psw & OVERFLOWFLAG) >> 1);
+    if (CPU_STATE->alu == 0)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BHI()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = CPU_STATE->psw & CARRYFLAG;
+    CPU_STATE->alu |= (CPU_STATE->psw & ZEROFLAG) >> 2;
+    if (CPU_STATE->alu == 0)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BICB()
+{
+    setup_src_addressing(TRUE);
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu &= ~(fetch_data(CPU_STATE->src_address) & 0377);
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_negative_flag_b(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
+}
+
+void
+BIC()
+{
+    setup_src_addressing(FALSE);
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu &= ~(fetch_data(CPU_STATE->src_address));
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_negative_flag_w(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
+}
+
+void
+BISB()
+{
+    setup_src_addressing(TRUE);
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu |= fetch_data(CPU_STATE->src_address) & 0377;
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_negative_flag_b(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
+}
+
+void
+BIS()
+{
+    setup_src_addressing(FALSE);
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu |= fetch_data(CPU_STATE->src_address);
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_negative_flag_w(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
+}
+
+void
+BITB()
+{
+    setup_src_addressing(TRUE);
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->src_address) & 0377;
+    CPU_STATE->alu &= fetch_data(CPU_STATE->dest_address) & 0377;
+
+    set_negative_flag_b(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
+}
+
+void
+BIT()
+{
+    setup_src_addressing(FALSE);
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->src_address);
+    CPU_STATE->alu &= fetch_data(CPU_STATE->dest_address);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
+}
+
+void
+BLE()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = (CPU_STATE->psw & ZEROFLAG) >> 2;
+    CPU_STATE->alu |= ((CPU_STATE->psw & NEGATIVEFLAG) >> 3) ^ ((CPU_STATE->psw & OVERFLOWFLAG) >> 1);
+    if (CPU_STATE->alu)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BLOS()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = CPU_STATE->psw & CARRYFLAG;
+    CPU_STATE->alu |= (CPU_STATE->psw & ZEROFLAG) >> 2;
+    if (CPU_STATE->alu)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BLT()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = (CPU_STATE->psw & NEGATIVEFLAG) >> 3;
+    CPU_STATE->alu ^= (CPU_STATE->psw & OVERFLOWFLAG) >> 1;
+    if (CPU_STATE->alu)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BMI()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = CPU_STATE->psw & NEGATIVEFLAG;
+    if (CPU_STATE->alu)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BNE()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = CPU_STATE->psw & ZEROFLAG;
+    if (CPU_STATE->alu == 0)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BPL()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = CPU_STATE->psw & NEGATIVEFLAG;
+    if (CPU_STATE->alu == 0)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BR()
+{
+    CPU_STATE->pc = CPU_STATE->pc + (2 * get_branch_offset());
+}
+
+void
+BVC()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = CPU_STATE->psw & OVERFLOWFLAG;
+    if (CPU_STATE->alu == 0)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+BVS()
+{
+    int8_t offset = get_branch_offset();
+    CPU_STATE->alu = CPU_STATE->psw & OVERFLOWFLAG;
+    if (CPU_STATE->alu)
+        CPU_STATE->pc = CPU_STATE->pc + (2 * offset);
+}
+
+void
+CLRB()
+{
+    setup_dest_addressing(TRUE);
+    CPU_STATE->alu = 0;
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_negative_flag_b(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
+}
+
+void
+CLR()
+{
+    setup_dest_addressing(FALSE);
+    CPU_STATE->alu = 0;
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_negative_flag_w(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
+}
+
+void
+CMPB()
+{
+    setup_src_addressing(TRUE);
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu -= fetch_data(CPU_STATE->src_address) & 0377;
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
+}
+
+void
+CMP()
+{
+    setup_src_addressing(FALSE);
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu -= fetch_data(CPU_STATE->src_address);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
+}
+
+void
+COMB()
+{
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = ~(fetch_data(CPU_STATE->dest_address) & 0377);
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_negative_flag_b(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
+}
+
+void
+COM()
+{
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = ~fetch_data(CPU_STATE->dest_address);
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_negative_flag_w(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
+}
+
+void
+DECB()
+{
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu--;
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
+}
+
+void
+DEC()
+{
+    setup_dest_addressing(FALSE);
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu--;
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
+}
+
+void
+DIV()
+{
+    NOP();
+}
+
+void
+HALT()
+{
+    CPU_STATE->halted = TRUE;
+}
+
+void
+INCB()
+{
+    setup_dest_addressing(TRUE);
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu++;
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
+}
+
+void
+INC()
+{
+    setup_dest_addressing(FALSE);
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu++;
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
+}
+
+void
+JMP()
+{
+    setup_dest_addressing(FALSE);
+    CPU_STATE->pc = fetch_data(CPU_STATE->dest_address);
+}
+
+void
+JSR()
+{
+    uint32_t reg = (CPU_STATE->ir & 0700) >> 6;
+     setup_dest_addressing(FALSE);
+
+    uint16_t tmp = CPU_STATE->dest_address;
+    uint16_t reg_contents = fetch_register_contents(reg);
+
+    store_data(CPU_STATE->sp, reg_contents);
+    dec_register(CPU_STATE->sp, FALSE);
+
+    store_data_register(register_to_bus_addr(reg), CPU_STATE->pc);
+    CPU_STATE->pc = tmp;
+}
+
+void
+MFPD()
+{
+    NOP();
+}
+
+void
+MFPI()
+{
+    NOP();
+}
+
+void
+MFPS()
+{
+    setup_dest_addressing(FALSE);
+    CPU_STATE->alu = CPU_STATE->psw;
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+}
+
+void
+MOVB()
+{
+    setup_src_addressing(TRUE);
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->src_address) & 0377;
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
+}
+
+void
+MOV()
+{
+    setup_src_addressing(FALSE);
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->src_address);
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
+}
+
+void
+MTPD()
+{
+    NOP();
+}
+
+void
+MTPI()
+{
+    NOP();
+}
+
+void
+MTPS()
+{
+    setup_dest_addressing(FALSE);
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->psw = CPU_STATE->alu;
+}
+
+void
+MUL()
+{
+    NOP();
+}
+
+void
+NEGB()
+{
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu = (~CPU_STATE->alu + 1) & 0377;
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
+}
+
+void
+NEG()
+{
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu = ~CPU_STATE->alu + 1;
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
 }
 
 void
@@ -855,766 +1634,188 @@ NOP()
 }
 
 void
-BR(cpu_t *cpu)
+ROLB()
 {
-    cpu->pc = cpu->pc + (2 * get_branch_offset(cpu));
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu = (CPU_STATE->alu << 7) | (CPU_STATE->alu >> 1);
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
 }
 
 void
-BNE(cpu_t *cpu)
+ROL()
 {
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = cpu->psw & ZEROFLAG;
-    if (cpu->alu == 0)
-        cpu->pc = cpu->pc + (2 * offset);
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu = (CPU_STATE->alu << 15) | (CPU_STATE->alu >> 1);
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
 }
 
 void
-BEQ(cpu_t *cpu)
+RORB()
 {
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = cpu->psw & ZEROFLAG;
-    if (cpu->alu == ZEROFLAG)
-        cpu->pc = cpu->pc + (2 * offset);
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu = (CPU_STATE->alu << 1) | (CPU_STATE->alu >> 7);
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
 }
 
 void
-BGE(cpu_t *cpu)
+ROR()
 {
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = (cpu->psw & NEGATIVEFLAG) >> 3;
-    cpu->alu ^= (cpu->psw & OVERFLOWFLAG) >> 1;
-    if (cpu->alu == 0)
-        cpu->pc = cpu->pc + (2 * offset);
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu = (CPU_STATE->alu << 1) | (CPU_STATE->alu >> 15);
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
 }
 
 void
-BLT(cpu_t *cpu)
+RTS()
 {
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = (cpu->psw & NEGATIVEFLAG) >> 3;
-    cpu->alu ^= (cpu->psw & OVERFLOWFLAG) >> 1;
-    if (cpu->alu)
-        cpu->pc = cpu->pc + (2 * offset);
+    uint32_t reg = CPU_STATE->ir & 07;
+    uint16_t reg_contents = fetch_register_contents(reg);
+    CPU_STATE->pc = reg_contents;
+
+    inc_register(CPU_STATE->sp, FALSE);
+    uint16_t top_stack = fetch_data(CPU_STATE->sp);
+    store_data_register(register_to_bus_addr(reg), top_stack);
 }
 
 void
-BGT(cpu_t *cpu)
+SBCB()
 {
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = (cpu->psw & ZEROFLAG) >> 2;
-    cpu->alu |= ((cpu->psw & NEGATIVEFLAG) >> 3) ^ ((cpu->psw & OVERFLOWFLAG) >> 1);
-    if (cpu->alu == 0)
-        cpu->pc = cpu->pc + (2 * offset);
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+    CPU_STATE->alu -= (CPU_STATE->psw & CARRYFLAG);
+    store_data_b(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
 }
 
 void
-BLE(cpu_t *cpu)
+SBC()
 {
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = (cpu->psw & ZEROFLAG) >> 2;
-    cpu->alu |= ((cpu->psw & NEGATIVEFLAG) >> 3) ^ ((cpu->psw & OVERFLOWFLAG) >> 1);
-    if (cpu->alu)
-        cpu->pc = cpu->pc + (2 * offset);
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu -= (CPU_STATE->psw & CARRYFLAG);
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
 }
 
 void
-BPL(cpu_t *cpu)
+SUB()
 {
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = cpu->psw & NEGATIVEFLAG;
-    if (cpu->alu == 0)
-        cpu->pc = cpu->pc + (2 * offset);
+    setup_src_addressing(FALSE);
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->src_address);
+    CPU_STATE->alu -= fetch_data(CPU_STATE->dest_address);
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_negative_flag_w(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
 }
 
 void
-BMI(cpu_t *cpu)
+SWAB()
 {
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = cpu->psw & NEGATIVEFLAG;
-    if (cpu->alu)
-        cpu->pc = cpu->pc + (2 * offset);
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+    CPU_STATE->alu = ((CPU_STATE->alu & 0177400) >> 8) | ((CPU_STATE->alu & 000377) << 8);
+    store_data(CPU_STATE->dest_address, CPU_STATE->alu);
+
+    set_negative_flag_w(CPU_STATE->alu);
+    set_zero_flag(CPU_STATE->alu);
 }
 
 void
-BHI(cpu_t *cpu)
-{
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = cpu->psw & CARRYFLAG;
-    cpu->alu |= (cpu->psw & ZEROFLAG) >> 2;
-    if (cpu->alu == 0)
-        cpu->pc = cpu->pc + (2 * offset);
-}
-
-void
-BLOS(cpu_t *cpu)
-{
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = cpu->psw & CARRYFLAG;
-    cpu->alu |= (cpu->psw & ZEROFLAG) >> 2;
-    if (cpu->alu)
-        cpu->pc = cpu->pc + (2 * offset);
-}
-
-void
-BVC(cpu_t *cpu)
-{
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = cpu->psw & OVERFLOWFLAG;
-    if (cpu->alu == 0)
-        cpu->pc = cpu->pc + (2 * offset);
-}
-
-void
-BVS(cpu_t *cpu)
-{
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = cpu->psw & OVERFLOWFLAG;
-    if (cpu->alu)
-        cpu->pc = cpu->pc + (2 * offset);
-}
-
-void
-BCC(cpu_t *cpu)
-{
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = cpu->psw & CARRYFLAG;
-    if (cpu->alu == 0)
-        cpu->pc = cpu->pc + (2 * offset);
-}
-
-void
-BCS(cpu_t *cpu)
-{
-    int8_t offset = get_branch_offset(cpu);
-    cpu->alu = cpu->psw & CARRYFLAG;
-    if (cpu->alu)
-        cpu->pc = cpu->pc + (2 * offset);
-}
-
-void
-MOV(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, FALSE);
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->src_address);
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-MOVB(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, TRUE);
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->src_address) & 0377;
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-CMP(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, FALSE);
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu -= fetch_data(cpu, cpu->src_address);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-CMPB(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, TRUE);
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu -= fetch_data(cpu, cpu->src_address) & 0377;
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-BIT(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, FALSE);
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->src_address);
-    cpu->alu &= fetch_data(cpu, cpu->dest_address);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-BITB(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, TRUE);
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->src_address) & 0377;
-    cpu->alu &= fetch_data(cpu, cpu->dest_address) & 0377;
-
-    set_negative_flag_b(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-BIC(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, FALSE);
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu &= ~(fetch_data(cpu, cpu->src_address));
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_negative_flag_w(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-BICB(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, TRUE);
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu &= ~(fetch_data(cpu, cpu->src_address) & 0377);
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_negative_flag_b(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-BIS(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, FALSE);
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu |= fetch_data(cpu, cpu->src_address);
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_negative_flag_w(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-BISB(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, TRUE);
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu |= fetch_data(cpu, cpu->src_address) & 0377;
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_negative_flag_b(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-ADD(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, FALSE);
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->src_address);
-    cpu->alu += fetch_data(cpu, cpu->dest_address);
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_negative_flag_w(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-SUB(cpu_t *cpu)
-{
-    setup_src_addressing(cpu, FALSE);
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->src_address);
-    cpu->alu -= fetch_data(cpu, cpu->dest_address);
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_negative_flag_w(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-JMP(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-    cpu->pc = fetch_data(cpu, cpu->dest_address);
-}
-
-void
-SWAB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu = ((cpu->alu & 0177400) >> 8) | ((cpu->alu & 000377) << 8);
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_negative_flag_w(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-CLR(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-    cpu->alu = 0;
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_negative_flag_w(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-CLRB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, TRUE);
-    cpu->alu = 0;
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_negative_flag_b(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-COM(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = ~fetch_data(cpu, cpu->dest_address);
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_negative_flag_w(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-COMB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = ~(fetch_data(cpu, cpu->dest_address) & 0377);
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_negative_flag_b(cpu, cpu->alu);
-    set_zero_flag(cpu, cpu->alu);
-}
-
-void
-INC(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu++;
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-INCB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, TRUE);
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu++;
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-DEC(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu--;
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-DECB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu--;
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-NEG(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu = ~cpu->alu + 1;
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-NEGB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu = (~cpu->alu + 1) & 0377;
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-ADC(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu += cpu->psw & CARRYFLAG;
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-ADCB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu += cpu->psw & CARRYFLAG;
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-SBC(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu -= (cpu->psw & CARRYFLAG);
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-SBCB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu -= (cpu->psw & CARRYFLAG);
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-TST(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-TSTB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-ROR(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu = (cpu->alu << 1) | (cpu->alu >> 15);
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-RORB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu = (cpu->alu << 1) | (cpu->alu >> 7);
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-ROL(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu = (cpu->alu << 15) | (cpu->alu >> 1);
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-ROLB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu = (cpu->alu << 7) | (cpu->alu >> 1);
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-ASR(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu >>= 1;
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-ASRB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, TRUE);
-
-    // FIXME? fetch_data_b?
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu >>= 1;
-    store_data_b(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-ASL(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->alu <<= 1;
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_w(cpu, cpu->alu);
-}
-
-void
-ASLB(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, TRUE);
-
-    cpu->alu = fetch_data(cpu, cpu->dest_address) & 0377;
-    cpu->alu <<= 1;
-    store_data(cpu, cpu->dest_address, cpu->alu);
-
-    set_zero_flag(cpu, cpu->alu);
-    set_negative_flag_b(cpu, cpu->alu);
-}
-
-void
-MTPS(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-    cpu->alu = fetch_data(cpu, cpu->dest_address);
-    cpu->psw = cpu->alu;
-}
-
-void
-MFPI(cpu_t *cpu)
+SXT()
 {
     NOP();
 }
 
 void
-MFPD(cpu_t *cpu)
+TSTB()
+{
+    setup_dest_addressing(TRUE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address) & 0377;
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_b(CPU_STATE->alu);
+}
+
+void
+TST()
+{
+    setup_dest_addressing(FALSE);
+
+    CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+
+    set_zero_flag(CPU_STATE->alu);
+    set_negative_flag_w(CPU_STATE->alu);
+}
+
+void
+XOR()
 {
     NOP();
 }
 
 void
-MTPI(cpu_t *cpu)
+cleanup()
 {
-    NOP();
-}
-
-void
-MTPD(cpu_t *cpu)
-{
-    NOP();
-}
-
-void
-SXT(cpu_t *cpu)
-{
-    NOP();
-}
-
-void
-MFPS(cpu_t *cpu)
-{
-    setup_dest_addressing(cpu, FALSE);
-    cpu->alu = cpu->psw;
-    store_data(cpu, cpu->dest_address, cpu->alu);
-}
-
-void
-MUL(cpu_t *cpu)
-{
-    NOP();
-}
-
-void
-DIV(cpu_t *cpu)
-{
-    NOP();
-}
-
-void
-ASH(cpu_t *cpu)
-{
-    NOP();
-}
-
-void
-ASHC(cpu_t *cpu)
-{
-    NOP();
-}
-
-void
-XOR(cpu_t *cpu)
-{
-    NOP();
-}
-
-void
-JSR(cpu_t *cpu)
-{
-    uint32_t reg = (cpu->ir & 0700) >> 6;
-     setup_dest_addressing(cpu, FALSE);
-
-    uint16_t tmp = cpu->dest_address;
-    uint16_t reg_contents = fetch_register_contents(cpu, reg);
-
-    store_data(cpu, cpu->sp, reg_contents);
-    dec_register(cpu, cpu->sp, FALSE);
-
-    store_data_register(cpu, register_to_bus_addr(reg), cpu->pc);
-    cpu->pc = tmp;
-}
-
-void
-RTS(cpu_t *cpu)
-{
-    uint32_t reg = cpu->ir & 07;
-    uint16_t reg_contents = fetch_register_contents(cpu, reg);
-    cpu->pc = reg_contents;
-
-    inc_register(cpu, cpu->sp, FALSE);
-    uint16_t top_stack = fetch_data(cpu, cpu->sp);
-    store_data_register(cpu, register_to_bus_addr(reg), top_stack);
-}
-
-void
-HALT(cpu_t *cpu)
-{
-    cpu->halted = TRUE;
-}
-
-void
-cleanup(cpu_t *cpu, bus_state_t *bus)
-{
-    printf("FINAL STATE\n");
-    printf("-----------\n");
-    dump_cpu(cpu);
-
-    if (cpu != NULL) {
-        free(cpu);
+    if (CPU_STATE != NULL) {
+        printf("FINAL STATE\n");
+        printf("-----------\n");
+        dump_cpu(CPU_STATE);
+        free(CPU_STATE);
     }
 
     /* Signal and join bus threads. */
-    cleanup_bus(bus);
+    if (BUS_STATE != NULL) {
+        cleanup_bus(BUS_STATE);
+    }
 }
 
 void
 handler(int signo, siginfo_t *info, void *context)
 {
-    cleanup(CPU_STATE, BUS_STATE);
+    cleanup();
 }
 
 
 int main(int argc, char **argv)
 {
     bus_state_t *bus;
-    cpu_t *cpu;
+    cpu *cpu;
     int ret, opt;
-    struct sigaction act = { 0 };
-    char sock_l[] = "ba";
+    char *sock_l = NULL;
     char sock_name[] = "cpu";
     char sock_r[] = "mem";
+    struct sigaction act;
 
     /* Setup signal handler. */
     act.sa_flags = SA_SIGINFO;
@@ -1671,9 +1872,9 @@ int main(int argc, char **argv)
     }
 
     fprintf(stderr, "cpu connected\n");
-    execute(cpu);
+    execute();
 
-    cleanup(cpu, bus);
+    cleanup();
 
     return 0;
 }
