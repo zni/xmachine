@@ -30,7 +30,7 @@ With `src/cpu/cpu` and `src/mem/mem` built you can run a few of the examples in
 `asm/as`:
 
 ```
-$ bin/mem -f local/<file>.aout &
-$ bin/cpu &
+$ src/mem/mem -f local/<file>.aout &
+$ src/cpu/cpu &
 ```
 
