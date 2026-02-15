@@ -5,52 +5,56 @@
 #include <string.h>
 #include <time.h>
 
-#include "data_bus.h"
 #include "debug.h"
 #include "signals.h"
 
 static bus_state_t *STATE = NULL;
+static data_state_t *DATA_BUS_STATE = NULL;
 
-static direction_t get_fd_direction(data_state_t*, data_bus_req_t*, bool_t);
-static int get_fd(data_state_t*, direction_t);
-static void update_from_addr(data_state_t*, data_bus_req_t*);
+static int get_fd(direction_t);
+static direction_t get_fd_direction(data_bus_req_t*, bool_t);
+static void update_from_addr(data_bus_req_t*);
 
-void slave_wait();
-void process_op(data_state_t*);
+static data_state_t* init_data_state(char*, char*, char*);
 
-void check_bus(data_state_t*, bool_t);
-void handle_resp(data_state_t*, data_bus_req_t*);
-void handle_req(data_state_t*, data_bus_req_t*);
+static void cleanup();
 
-bool_t examine_address(data_state_t*, data_bus_req_t*);
+extern void* data_bus_mgr(void*);
 
-/* TODO Probably just junk this. */
-void bus_forward(data_state_t*, data_bus_req_t*);
+static void in_word();
+static void out_word();
+static void out_byte();
+static void process_op();
+static void check_bus(bool_t);
+static void handle_resp(data_bus_req_t*);
+static bool_t examine_address(data_bus_req_t*);
+static void handle_req(data_bus_req_t*);
 
-void handle_dati(data_state_t*, data_bus_req_t*);
-//void handle_datip(uint32_t addr);
-void handle_dato(data_state_t*, data_bus_req_t*);
-void handle_datob(data_state_t*, data_bus_req_t*);
+static void handle_dati(data_bus_req_t*);
+/* static void handle_datip(uint32_t);*/
+static void handle_dato(data_bus_req_t*);
+static void handle_datob(data_bus_req_t*);
+static void slave_wait();
 
-int d_connect(data_state_t*, direction_t);
-int d_connect_l(data_state_t*);
-int d_connect_r(data_state_t*);
+static int d_connect(direction_t);
+static int d_connect_l();
+static int d_connect_r();
 
-int d_close(data_state_t*, direction_t);
-int d_close_l(data_state_t*);
-int d_close_r(data_state_t*);
+static int d_close(direction_t);
+static int d_close_l();
+static int d_close_r();
 
-int send_msg(data_state_t*, data_bus_req_t*);
-int wait_reply(data_state_t*, data_bus_req_t*);
+static int send_msg(data_bus_req_t*);
+static int wait_reply(data_bus_req_t*);
 
 static int
-get_fd(data_state_t *d, direction_t dir)
+get_fd(direction_t dir)
 {
     switch (dir) {
     case D_LEFT:
-        return d->d_bus_out_l;
+        return DATA_BUS_STATE->d_bus_out_l;
     case D_RIGHT:
-        return d->d_bus_out_r;
+        return DATA_BUS_STATE->d_bus_out_r;
     case D_NONE:
     default:
         return -1;
@@ -58,24 +62,24 @@ get_fd(data_state_t *d, direction_t dir)
 }
 
 static direction_t
-get_fd_direction(data_state_t *d, data_bus_req_t *req, bool_t reply)
+get_fd_direction(data_bus_req_t *req, bool_t reply)
 {
-    if (d->d_bus_out_l == -1 && d->d_bus_out_r == -1) {
+    if (DATA_BUS_STATE->d_bus_out_l == -1 && DATA_BUS_STATE->d_bus_out_r == -1) {
         return D_NONE;
-    } else if (d->d_bus_out_l == -1) {
+    } else if (DATA_BUS_STATE->d_bus_out_l == -1) {
         if (reply) {
             return D_RIGHT;
         } else {
             return D_NONE;
         }
-    } else if (d->d_bus_out_r == -1) {
+    } else if (DATA_BUS_STATE->d_bus_out_r == -1) {
         if (reply) {
             return D_LEFT;
         } else {
             return D_NONE;
         }
     } else {
-        if (strncmp(req->from, d->d_out_addr_l.sun_path, SOCK_NAME_LEN) == 0) {
+        if (strncmp(req->from, DATA_BUS_STATE->d_out_addr_l.sun_path, SOCK_NAME_LEN) == 0) {
             return reply ? D_LEFT : D_RIGHT;
         } else {
             return reply ? D_RIGHT : D_LEFT;
@@ -84,10 +88,10 @@ get_fd_direction(data_state_t *d, data_bus_req_t *req, bool_t reply)
 }
 
 static void
-update_from_addr(data_state_t *d, data_bus_req_t *req)
+update_from_addr(data_bus_req_t *req)
 {
     memset(req->from, 0, sizeof(req->from));
-    strncpy(req->from, d->d_in_addr.sun_path, sizeof(req->from));
+    strncpy(req->from, DATA_BUS_STATE->d_in_addr.sun_path, sizeof(req->from));
 }
 
 data_state_t*
@@ -154,11 +158,13 @@ init_data_state(char *l_sock, char *sock, char *r_sock)
 }
 
 void
-d_cleanup(data_state_t *d)
+cleanup()
 {
-    close(d->d_bus_in);
-    unlink(d->d_in_addr.sun_path);
-    free(d);
+    if (DATA_BUS_STATE != NULL) {
+        close(DATA_BUS_STATE->d_bus_in);
+        unlink(DATA_BUS_STATE->d_in_addr.sun_path);
+        free(DATA_BUS_STATE);
+    }
 }
 
 void*
@@ -168,7 +174,6 @@ data_bus_mgr(void *bus)
     wait.tv_sec = 5;
     wait.tv_nsec = 0;
 
-    data_state_t *d;
     bool_t is_master;
     bool_t shutdown;
     d_req_t master_op;
@@ -211,12 +216,12 @@ data_bus_mgr(void *bus)
 
     pthread_mutex_unlock(&(STATE->state_mutex));
 
-    d = init_data_state(l_sock, sock, r_sock);
-    if (d == NULL) {
+    DATA_BUS_STATE = init_data_state(l_sock, sock, r_sock);
+    if (DATA_BUS_STATE == NULL) {
         return NULL;
     }
 
-    d->is_addr_internal = addr_ptr;
+    DATA_BUS_STATE->is_addr_internal = addr_ptr;
 
     pthread_mutex_lock(&(STATE->data_ready_mutex));
     pthread_cond_signal(&(STATE->cond_data_ready));
@@ -230,55 +235,65 @@ data_bus_mgr(void *bus)
         if (master_op != R_NONE && master_op != R_DONE) {
             switch (master_op) {
             case R_IN:
-                d->buffer.op = R_IN;
-                d->buffer.addr = STATE->master.addr;
+                DATA_BUS_STATE->buffer.op = R_IN;
+                DATA_BUS_STATE->buffer.addr = STATE->master.addr;
                 STATE->master.op = R_NONE;
                 break;
             case R_INB:
-                d->buffer.op = R_INB;
-                d->buffer.addr = STATE->master.addr;
+                DATA_BUS_STATE->buffer.op = R_INB;
+                DATA_BUS_STATE->buffer.addr = STATE->master.addr;
                 STATE->master.op = R_NONE;
                 break;
             case R_OUT:
-                d->buffer.op = R_OUT;
-                d->buffer.addr = STATE->master.addr;
-                d->buffer.value = STATE->master.value;
+                DATA_BUS_STATE->buffer.op = R_OUT;
+                DATA_BUS_STATE->buffer.addr = STATE->master.addr;
+                DATA_BUS_STATE->buffer.value = STATE->master.value;
                 STATE->master.op = R_NONE;
                 break;
             case R_OUTB:
-                d->buffer.op = R_OUTB;
-                d->buffer.addr = STATE->master.addr;
-                d->buffer.value = STATE->master.value;
+                DATA_BUS_STATE->buffer.op = R_OUTB;
+                DATA_BUS_STATE->buffer.addr = STATE->master.addr;
+                DATA_BUS_STATE->buffer.value = STATE->master.value;
                 STATE->master.op = R_NONE;
                 break;
+
+            /* Fallthrough cases that do not apply. */
+            case R_BLOCK_IN:
+            case R_BLOCK_INB:
+            case R_BLOCK_OUT:
+            case R_BLOCK_OUTB:
+            case R_DONE:
+            case R_NONE:
+                DATA_BUS_STATE->buffer.op = R_NONE;
+                STATE->master.op = R_NONE;
             }
         }
         pthread_mutex_unlock(&(STATE->state_mutex));
 
         if (is_master) {
-            process_op(d);
+            process_op();
         }
-        check_bus(d, is_master);
+        check_bus(is_master);
         nanosleep(&wait, NULL);
     } while (!shutdown);
 
-    d_cleanup(d);
+    cleanup();
 
     return NULL;
 }
 
 void
-in_word(data_state_t *d)
+in_word()
 {
     dbg_bus(STATE, "in_word");
     int ret;
     data_bus_req_t req;
     req.msg_type = DBM_REQ;
     req.c = D_DATI;
-    req.addr = d->buffer.addr;
+    req.addr = DATA_BUS_STATE->buffer.addr;
 
-    update_from_addr(d, &req);
-    ret = send_msg(d, &req);
+    update_from_addr(&req);
+    ret = send_msg(&req);
     if (ret != 0) {
         /* Goodbye forever. */
         fprintf(stderr, "DATI: failed to send data bus message\n");
@@ -288,7 +303,7 @@ in_word(data_state_t *d)
 }
 
 void
-out_word(data_state_t *d)
+out_word()
 {
     /*
      * FIXME See in_word for details on just returning below.
@@ -299,17 +314,17 @@ out_word(data_state_t *d)
     data_bus_req_t req;
     req.msg_type = DBM_REQ;
     req.c = D_DATO;
-    req.addr = d->buffer.addr;
-    req.data = d->buffer.value;
+    req.addr = DATA_BUS_STATE->buffer.addr;
+    req.data = DATA_BUS_STATE->buffer.value;
 
-    update_from_addr(d, &req);
-    ret = send_msg(d, &req);
+    update_from_addr(&req);
+    ret = send_msg(&req);
     if (ret != 0) {
         fprintf(stderr, "DATO: failed to send data bus message\n");
         fprintf(stderr, "DATO: blocking forever, goodbye.\n");
         return;
     }
-    ret = wait_reply(d, &resp);
+    ret = wait_reply(&resp);
     if (ret != 0) {
         fprintf(stderr, "DATO: failed to get reply from data bus\n");
         fprintf(stderr, "DATO: blocking forever, goodbye.\n");
@@ -330,7 +345,7 @@ out_word(data_state_t *d)
 }
 
 void
-out_byte(data_state_t *d)
+out_byte()
 {
     /*
      * FIXME See in_word for details on just returning below.
@@ -341,17 +356,17 @@ out_byte(data_state_t *d)
     data_bus_req_t req;
     req.msg_type = DBM_REQ;
     req.c = D_DATOB;
-    req.addr = d->buffer.addr;
-    req.data = d->buffer.value;
+    req.addr = DATA_BUS_STATE->buffer.addr;
+    req.data = DATA_BUS_STATE->buffer.value;
 
-    update_from_addr(d, &req);
-    ret = send_msg(d, &req);
+    update_from_addr(&req);
+    ret = send_msg(&req);
     if (ret != 0) {
         fprintf(stderr, "DATOB: failed to send data bus message\n");
         fprintf(stderr, "DATOB: blocking forever, goodbye.\n");
         return;
     }
-    ret = wait_reply(d, &resp);
+    ret = wait_reply(&resp);
     if (ret != 0) {
         fprintf(stderr, "DATOB: failed to get reply from data bus\n");
         fprintf(stderr, "DATOB: blocking forever, goodbye.\n");
@@ -372,34 +387,44 @@ out_byte(data_state_t *d)
 }
 
 void
-process_op(data_state_t *d)
+process_op()
 {
-        switch (d->buffer.op) {
+        switch (DATA_BUS_STATE->buffer.op) {
         case R_IN:
-            in_word(d);
-            d->req_issued = TRUE;
+            in_word();
+            DATA_BUS_STATE->req_issued = TRUE;
             break;
         case R_OUT:
-            out_word(d);
-            d->req_issued = TRUE;
+            out_word();
+            DATA_BUS_STATE->req_issued = TRUE;
             break;
         case R_OUTB:
-            out_byte(d);
-            d->req_issued = TRUE;
+            out_byte();
+            DATA_BUS_STATE->req_issued = TRUE;
             break;
+
+        /* Fallthrough cases that do not apply. */
+        case R_INB:
+        case R_BLOCK_IN:
+        case R_BLOCK_INB:
+        case R_BLOCK_OUT:
+        case R_BLOCK_OUTB:
+        case R_DONE:
+        case R_NONE:
+            DATA_BUS_STATE->req_issued = 0;
         }
-        d->buffer.op = R_NONE;
+        DATA_BUS_STATE->buffer.op = R_NONE;
 }
 
 void
-check_bus(data_state_t *d, bool_t is_master)
+check_bus(bool_t is_master)
 {
     int ret;
     int err;
     bool_t is_this_device = FALSE;
     data_bus_req_t event;
 
-    ret = recv(d->d_bus_in, &event, sizeof(data_bus_req_t), MSG_DONTWAIT);
+    ret = recv(DATA_BUS_STATE->d_bus_in, &event, sizeof(data_bus_req_t), MSG_DONTWAIT);
     if (ret == -1) {
         err = errno;
         if (err == EAGAIN || err ==  EWOULDBLOCK) {
@@ -410,25 +435,20 @@ check_bus(data_state_t *d, bool_t is_master)
         }
     }
 
-    is_this_device = examine_address(d, &event);
+    is_this_device = examine_address(&event);
     if (event.msg_type == DBM_REQ && is_this_device) {
-        handle_req(d, &event);
+        handle_req(&event);
     } else if (
         event.msg_type == DBM_RESP &&
         is_master &&
-        d->req_issued
+        DATA_BUS_STATE->req_issued
     ) {
-        handle_resp(d, &event);
+        handle_resp(&event);
     }
-    /*
-     else {
-        bus_forward(d, &event);
-    }
-    */
 }
 
 void
-handle_resp(data_state_t *d, data_bus_req_t *event)
+handle_resp(data_bus_req_t *event)
 {
     dbg_bus(STATE, "handle_resp");
     switch (event->c) {
@@ -446,44 +466,41 @@ handle_resp(data_state_t *d, data_bus_req_t *event)
     pthread_cond_signal(&(STATE->cond_master_data));
     pthread_mutex_unlock(&(STATE->master_data_mutex));
 
-    d->req_issued = FALSE;
+    DATA_BUS_STATE->req_issued = FALSE;
 }
 
 bool_t
-examine_address(data_state_t *d, data_bus_req_t *event)
+examine_address(data_bus_req_t *event)
 {
-    if (d->is_addr_internal == NULL) {
+    if (DATA_BUS_STATE->is_addr_internal == NULL) {
         return FALSE;
     }
 
-    return d->is_addr_internal(event->addr);
+    return DATA_BUS_STATE->is_addr_internal(event->addr);
 }
 
 void
-handle_req(data_state_t *d, data_bus_req_t *event)
+handle_req(data_bus_req_t *event)
 {
     switch (event->c) {
     case D_DATI:
-        return handle_dati(d, event);
+        handle_dati(event);
+        return;
     case D_DATIP:
         return;
     case D_DATO:
-        return handle_dato(d, event);
+        handle_dato(event);
+        return;
     case D_DATOB:
-        return handle_datob(d, event);
+        handle_datob(event);
+        return;
     case D_EMPTY:
         return;
     }
 }
 
 void
-bus_forward(data_state_t *d, data_bus_req_t *event)
-{
-    fprintf(stderr, "bus_forward has been left unimplemented. sorry.\n");
-}
-
-void
-handle_dati(data_state_t *d, data_bus_req_t *event)
+handle_dati(data_bus_req_t *event)
 {
     dbg_bus(STATE, "handle_dati");
 
@@ -514,14 +531,14 @@ handle_dati(data_state_t *d, data_bus_req_t *event)
     }
     pthread_mutex_unlock(&(STATE->slave_op_mutex));
 
-    ret = send_msg(d, &resp);
+    ret = send_msg(&resp);
     if (ret != 0) {
         dbg_bus(STATE, "handle_dati: failed to send message");
     }
 }
 
 void
-handle_dato(data_state_t *d, data_bus_req_t *event)
+handle_dato(data_bus_req_t *event)
 {
     dbg_bus(STATE, "handle_dato");
 
@@ -554,24 +571,24 @@ handle_dato(data_state_t *d, data_bus_req_t *event)
     }
     pthread_mutex_unlock(&(STATE->slave_op_mutex));
 
-    dir = get_fd_direction(d, event, TRUE);
+    dir = get_fd_direction(event, TRUE);
     if (dir == D_NONE) {
         return;
     }
 
-    out_fd = get_fd(d, dir);
-    update_from_addr(d, &resp);
-    d_connect(d, dir);
+    out_fd = get_fd(dir);
+    update_from_addr(&resp);
+    d_connect(dir);
     ret = write(out_fd, &resp, sizeof(resp));
     if (ret == -1) {
         perror("handle_dato");
         return;
     }
-    d_close(d, dir);
+    d_close(dir);
 }
 
 void
-handle_datob(data_state_t *d, data_bus_req_t *event)
+handle_datob(data_bus_req_t *event)
 {
     dbg_bus(STATE, "handle_datob");
 
@@ -604,20 +621,20 @@ handle_datob(data_state_t *d, data_bus_req_t *event)
     }
     pthread_mutex_unlock(&(STATE->slave_op_mutex));
 
-    dir = get_fd_direction(d, event, TRUE);
+    dir = get_fd_direction(event, TRUE);
     if (dir == D_NONE) {
         return;
     }
 
-    out_fd = get_fd(d, dir);
-    update_from_addr(d, &resp);
-    d_connect(d, dir);
+    out_fd = get_fd(dir);
+    update_from_addr(&resp);
+    d_connect(dir);
     ret = write(out_fd, &resp, sizeof(resp));
     if (ret == -1) {
         perror("handle_datob");
         return;
     }
-    d_close(d, dir);
+    d_close(dir);
 }
 
 void
@@ -636,13 +653,13 @@ slave_wait()
 }
 
 int
-d_connect(data_state_t *d, direction_t dir)
+d_connect(direction_t dir)
 {
     switch (dir) {
     case D_LEFT:
-        return d_connect_l(d);
+        return d_connect_l();
     case D_RIGHT:
-        return d_connect_r(d);
+        return d_connect_r();
     case D_NONE:
         return -1;
     }
@@ -651,10 +668,10 @@ d_connect(data_state_t *d, direction_t dir)
 }
 
 int
-d_connect_l(data_state_t *d)
+d_connect_l()
 {
     int ret;
-    if (d->d_out_addr_l.sun_path[0] == 0) {
+    if (DATA_BUS_STATE->d_out_addr_l.sun_path[0] == 0) {
         return -1;
     }
 
@@ -664,12 +681,12 @@ d_connect_l(data_state_t *d)
         return ret;
     }
 
-    d->d_bus_out_l = ret;
+    DATA_BUS_STATE->d_bus_out_l = ret;
 
     ret = connect(
-        d->d_bus_out_l,
-        (const struct sockaddr *) &(d->d_out_addr_l),
-        sizeof(d->d_out_addr_l)
+        DATA_BUS_STATE->d_bus_out_l,
+        (const struct sockaddr *) &(DATA_BUS_STATE->d_out_addr_l),
+        sizeof(DATA_BUS_STATE->d_out_addr_l)
     );
     if (ret == -1) {
         perror("d_connect_l-connect");
@@ -680,24 +697,24 @@ d_connect_l(data_state_t *d)
 }
 
 int
-d_connect_r(data_state_t *d)
+d_connect_r()
 {
     int ret;
-    if (d->d_out_addr_r.sun_path[0] == 0) {
+    if (DATA_BUS_STATE->d_out_addr_r.sun_path[0] == 0) {
         return -1;
     }
 
-    d->d_bus_out_r = socket(AF_UNIX, SOCK_DGRAM, 0);
-    if (d->d_bus_out_r == -1) {
+    DATA_BUS_STATE->d_bus_out_r = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (DATA_BUS_STATE->d_bus_out_r == -1) {
         perror("d_connect_r-socket");
         ret = -1;
         return ret;
     }
 
     ret = connect(
-        d->d_bus_out_r,
-        (const struct sockaddr *) &(d->d_out_addr_r),
-        sizeof(d->d_out_addr_r)
+        DATA_BUS_STATE->d_bus_out_r,
+        (const struct sockaddr *) &(DATA_BUS_STATE->d_out_addr_r),
+        sizeof(DATA_BUS_STATE->d_out_addr_r)
     );
     if (ret == -1) {
         perror("d_connect_r-connect");
@@ -708,13 +725,13 @@ d_connect_r(data_state_t *d)
 }
 
 int
-d_close(data_state_t *d, direction_t dir)
+d_close(direction_t dir)
 {
     switch (dir) {
     case D_LEFT:
-        return d_close_l(d);
+        return d_close_l();
     case D_RIGHT:
-        return d_close_r(d);
+        return d_close_r();
     case D_NONE:
         return -1;
     }
@@ -723,67 +740,67 @@ d_close(data_state_t *d, direction_t dir)
 }
 
 int
-d_close_l(data_state_t *d)
+d_close_l()
 {
     int ret;
-    ret = close(d->d_bus_out_l);
+    ret = close(DATA_BUS_STATE->d_bus_out_l);
     if (ret == -1) {
         perror("d_close_l-close");
     }
 
-    d->d_bus_out_l = -1;
+    DATA_BUS_STATE->d_bus_out_l = -1;
 
     return ret;
 }
 
 int
-d_close_r(data_state_t *d)
+d_close_r()
 {
     int ret;
-    ret = close(d->d_bus_out_r);
+    ret = close(DATA_BUS_STATE->d_bus_out_r);
     if (ret == -1) {
         perror("d_close_r-close");
     }
 
-    d->d_bus_out_r = -1;
+    DATA_BUS_STATE->d_bus_out_r = -1;
 
     return ret;
 }
 
 int
-send_msg(data_state_t *d, data_bus_req_t *req)
+send_msg(data_bus_req_t *req)
 {
     dbg_bus(STATE, "send_msg");
 
     int ret;
-    ret = d_connect_l(d);
+    ret = d_connect_l();
     if (ret != -1) {
-        ret = write(d->d_bus_out_l, req, sizeof(data_bus_req_t));
+        ret = write(DATA_BUS_STATE->d_bus_out_l, req, sizeof(data_bus_req_t));
         if (ret == -1) {
             perror("send_msg_l");
             return ret;
         }
-        d_close_l(d);
+        d_close_l();
     }
 
-    ret = d_connect_r(d);
+    ret = d_connect_r();
     if (ret != -1) {
-        ret = write(d->d_bus_out_r, req, sizeof(data_bus_req_t));
+        ret = write(DATA_BUS_STATE->d_bus_out_r, req, sizeof(data_bus_req_t));
         if (ret == -1) {
             perror("send_msg_r");
             return ret;
         }
-        d_close_r(d);
+        d_close_r();
     }
 
     return 0;
 }
 
 int
-wait_reply(data_state_t *d, data_bus_req_t *resp)
+wait_reply(data_bus_req_t *resp)
 {
     int ret;
-    ret = recv(d->d_bus_in, resp, sizeof(data_bus_req_t), MSG_DONTWAIT);
+    ret = recv(DATA_BUS_STATE->d_bus_in, resp, sizeof(data_bus_req_t), MSG_DONTWAIT);
     if (ret != -1) {
         perror("wait_reply");
         return ret;
