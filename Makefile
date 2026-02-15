@@ -1,69 +1,64 @@
-.PHONY: tags bin clean_libunibus clean_libload
-CC=clang-19
-CC_OPTS=-g -Wall -Wextra
+CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_XOPEN_SOURCE=700L
+CFLAGS   = -std=c99 -pedantic -Wall -Wno-deprecated-declarations ${CPPFLAGS}
+CC = cc
 
-cpu: libunibus cpu.o bin
-	${CC} -o bin/cpu src/cpu/cpu.o -Llib/ -lunibus -lpthread
+DEVICE_LDFLAGS = -lpthread
+UNIBUS_LDFLAGS = -Lsrc/libunibus/ -lunibus
+LOAD_LDFLAGS = -Lsrc/libload/ -lload
 
-cpu.o: src/cpu/cpu.c src/cpu/cpu.h
-	${CC} ${CC_OPTS} -o src/cpu/cpu.o -c src/cpu/cpu.c
+CPU_C = $(wildcard src/cpu/*.c)
+CPU_H = $(wildcard src/cpu/*.h)
+CPU_OBJ = ${CPU_C:.c=.o}
 
-mem: libunibus libload mem.o bin
-	${CC} -o bin/mem src/mem/mem.o -Llib/ -lunibus -lload -lpthread
+MEM_C = $(wildcard src/mem/*.c)
+MEM_H = $(wildcard src/mem/*.h)
+MEM_OBJ = ${MEM_C:.c=.o}
 
-mem.o: src/mem/mem.c src/mem/mem.h
-	${CC} -c src/mem/mem.c -o src/mem/mem.o
+LIBLOAD_C = $(wildcard src/libload/*.c)
+LIBLOAD_H = $(wildcard src/libload/*.h)
+LIBLOAD_OBJ = ${LIBLOAD_C:.c=.o}
 
-disk: disk.o bin
-	${CC} -o bin/disk src/disk/disk.o
+LIBUNIBUS_C = $(wildcard src/libunibus/*.c)
+LIBUNIBUS_H = $(wildcard src/libunibus/*.h)
+LIBUNIBUS_OBJ = ${LIBUNIBUS_C:.c=.o}
 
-disk.o: src/disk/disk.c src/disk/disk.h
-	${CC} -c src/disk/disk.c -o src/disk/disk.o
+all: cpu mem
 
-tty: tty.o bin
-	${CC} -o bin/tty src/tty/tty.o
+${CPU_OBJ}: ${CPU_C} ${CPU_H}
 
-tty.o: src/tty/tty.c src/tty/tty.h
-	${CC} -c src/tty/tty.c -o src/tty/tty.o
+cpu: libunibus ${CPU_OBJ}
+	${CC} -o $@ ${CPU_OBJ} ${UNIBUS_LDFLAGS} ${DEVICE_LDFLAGS}
 
-libload: lib src/libload/load.c src/libload/load.h
-	${CC} -c src/libload/load.c -o src/libload/load.o
-	ar rcs lib/libload.a src/libload/load.o
+${MEM_OBJ}: ${MEM_C} ${MEM_H}
+
+mem: libunibus libload ${MEM_OBJ}
+	${CC} -o $@ ${MEM_OBJ} ${DEVICE_LDFLAGS} ${UNIBUS_LDFLAGS} ${LOAD_LDFLAGS}
+
+${LIBLOAD_OBJ}: ${LIBLOAD_C} ${LIBLOAD_H}
+
+libload: ${LIBLOAD_OBJ}
+	ar rcs src/libload/libload.a ${LIBLOAD_OBJ}
 
 clean_libload:
-	rm -f lib/libload.a
-	rm -f src/libload/load.o
+	rm -f ${LIBLOAD_OBJ}
+	rm -f src/libload/libload.a
 
-libunibus: lib src/libunibus/priority_bus.c src/libunibus/priority_bus.h src/libunibus/data_bus.c src/libunibus/data_bus.h src/libunibus/device_bus_mgr.c src/libunibus/device_bus_mgr.h
-	for s in src/libunibus/*.c; do ${CC} ${CC_OPTS} -c "$$s" -o "$${s%.c}.o"; done
-	ar rcs lib/libunibus.a src/libunibus/*.o
+${LIBUNIBUS_OBJ}: ${LIBUNIBUS_C} ${LIBUNIBUS_H}
+
+libunibus: ${LIBUNIBUS_OBJ}
+	ar rcs src/libunibus/libunibus.a ${LIBUNIBUS_OBJ}
 
 clean_libunibus:
-	rm -f src/libunibus/device_bus_mgr.o
-	rm -f src/libunibus/priority_bus.o
-	rm -f src/libunibus/data_bus.o
-	rm -f src/libunibus/bus_arb.o
-	rm -f lib/libunibus.a
+	rm -f ${LIBUNIBUS_OBJ}
+	rm -f src/libunibus/libunibus.a
 
-loader: libload src/utilities/loader.c bin
-	${CC} src/utilities/loader.c -L./lib -lload -o bin/loader
-
-tags:
-	ctags -R src
-
-bin:
-	mkdir -p bin
-
-lib:
-	mkdir -p lib
+loader: libload src/utilities/loader.c
+	${CC} src/utilities/loader.c ${LOAD_LDFLAGS} -o $@
 
 clean: clean_libload clean_libunibus
 	rm -rf bin
 	rm -f src/cpu/cpu.o
-	rm -f src/disk/disk.o
 	rm -f src/mem/mem.o
-	rm -f src/tty/tty.o
-
-all: cpu mem
 
 
+.PHONY: clean_libunibus clean_libload
