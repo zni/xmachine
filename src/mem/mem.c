@@ -15,9 +15,9 @@
 #define MEMHIGH MEMBYTES
 
 typedef struct _mem {
-    uint16_t mar;
-    uint16_t mbr;
-    uint8_t store[MEMBYTES];
+	uint16_t mar;
+	uint16_t mbr;
+	uint8_t store[MEMBYTES];
 } mem_dev;
 
 mem_dev *MEM_STATE = NULL;
@@ -31,61 +31,61 @@ static void dump_mem();
 void
 usage()
 {
-    fprintf(stderr, "mem -f <a.out file> -o <load offset>\n");
+	fprintf(stderr, "mem -f <a.out file> -o <load offset>\n");
 }
 
 uint8_t
 is_local_addr(uint32_t addr)
 {
-    if (addr >= MEMLOW && addr <= MEMHIGH) {
-        return 1;
-    }
+	if (addr >= MEMLOW && addr <= MEMHIGH) {
+		return 1;
+	}
 
-    return 0;
+	return 0;
 }
 
 void
 handler(int signo, siginfo_t *info, void *context)
 {
-    if (MEM_STATE != NULL) {
-        dump_mem(MEM_STATE);
-        free(MEM_STATE);
-    }
+	if (MEM_STATE != NULL) {
+		dump_mem(MEM_STATE);
+		free(MEM_STATE);
+	}
 
-    /* Signal and join bus threads. */
-    cleanup_bus(BUS_STATE);
+	/* Signal and join bus threads. */
+	cleanup_bus(BUS_STATE);
 
-    exit(EXIT_SUCCESS);
+	exit(EXIT_SUCCESS);
 }
 
 void
 load_aout(uint8_t *buffer, exec_t *header, uint32_t offset)
 {
-    int n, m;
-    for (n = 0, m = offset; n < header->a_text; n++, m++) {
-        MEM_STATE->store[m] = buffer[n];
-    }
+	int n, m;
+	for (n = 0, m = offset; n < header->a_text; n++, m++) {
+		MEM_STATE->store[m] = buffer[n];
+	}
 }
 
 void
 init_mem()
 {
-    MEM_STATE = (mem_dev*) malloc(sizeof(mem_dev));
-    if (MEM_STATE == NULL) {
-        perror("mem malloc");
-    }
+	MEM_STATE = (mem_dev*) malloc(sizeof(mem_dev));
+	if (MEM_STATE == NULL) {
+		perror("mem malloc");
+	}
 }
 
 void
 perform_read(data_xfer_spec *d_op)
 {
-    d_op->value = read_word(d_op->addr);
+	d_op->value = read_word(d_op->addr);
 }
 
 void
 perform_write(data_xfer_spec *d_op)
 {
-    write_word(d_op->addr, d_op->value);
+	write_word(d_op->addr, d_op->value);
 }
 
 void
@@ -96,166 +96,166 @@ perform_writeb(data_xfer_spec *d_op)
 void
 write_word(uint32_t addr, uint16_t word)
 {
-    MEM_STATE->mar = addr;
-    MEM_STATE->mbr = word;
-    MEM_STATE->store[MEM_STATE->mar] = MEM_STATE->mbr & 0377;
-    MEM_STATE->store[MEM_STATE->mar + 1] = (MEM_STATE->mbr & 0177400) >> 8;
+	MEM_STATE->mar = addr;
+	MEM_STATE->mbr = word;
+	MEM_STATE->store[MEM_STATE->mar] = MEM_STATE->mbr & 0377;
+	MEM_STATE->store[MEM_STATE->mar + 1] = (MEM_STATE->mbr & 0177400) >> 8;
 }
 
 void
 write_byte(uint32_t addr, uint16_t word)
 {
-    MEM_STATE->mar = addr;
-    MEM_STATE->mbr = word;
-    MEM_STATE->store[MEM_STATE->mar] = MEM_STATE->mbr & 0377;
+	MEM_STATE->mar = addr;
+	MEM_STATE->mbr = word;
+	MEM_STATE->store[MEM_STATE->mar] = MEM_STATE->mbr & 0377;
 }
 
 uint16_t
 read_word(uint32_t addr)
 {
-    uint16_t word = 0;
-    word = MEM_STATE->store[addr];
-    word |= MEM_STATE->store[addr + 1] << 8;
-    return word;
+	uint16_t word = 0;
+	word = MEM_STATE->store[addr];
+	word |= MEM_STATE->store[addr + 1] << 8;
+	return word;
 }
 
 void
 dump_mem()
 {
-    uint16_t row[16];
-    uint8_t all_zero = 1;
-    for (int r = 0; r < MEMWORDS; r += 32) {
-        for (int c = 0, i = 0; c < 32; c += 2, i++) {
-            if (read_word(r + c) != 0) { all_zero = 0; }
-            row[i] = read_word(r + c);
-        }
-        if (all_zero && ((r + 16) < MEMWORDS) && (r != 0)) {
-            continue;
-        }
+	uint16_t row[16];
+	uint8_t all_zero = 1;
+	for (int r = 0; r < MEMWORDS; r += 32) {
+		for (int c = 0, i = 0; c < 32; c += 2, i++) {
+			if (read_word(r + c) != 0) { all_zero = 0; }
+			row[i] = read_word(r + c);
+		}
+		if (all_zero && ((r + 16) < MEMWORDS) && (r != 0)) {
+			continue;
+		}
 
-        printf("0o%05o: ", r);
-        for (int i = 0; i < 16; i++) {
-            printf("0o%07o ", row[i]);
-        }
-        putchar('\n');
-        all_zero = 1;
-    }
+		printf("0o%05o: ", r);
+		for (int i = 0; i < 16; i++) {
+			printf("0o%07o ", row[i]);
+		}
+		putchar('\n');
+		all_zero = 1;
+	}
 }
 
 void
 execute()
 {
-    data_xfer_spec slave_req;
-    while(1) {
-        pthread_mutex_lock(&(BUS_STATE->perma_slave_mutex));
-        pthread_cond_wait(&(BUS_STATE->cond_perma_slave), &(BUS_STATE->perma_slave_mutex));
-        pthread_mutex_unlock(&(BUS_STATE->perma_slave_mutex));
+	data_xfer_spec slave_req;
+	while(1) {
+		pthread_mutex_lock(&(BUS_STATE->perma_slave_mutex));
+		pthread_cond_wait(&(BUS_STATE->cond_perma_slave), &(BUS_STATE->perma_slave_mutex));
+		pthread_mutex_unlock(&(BUS_STATE->perma_slave_mutex));
 
-        // Check for bus requests.
-        data_bus_check(BUS_STATE, &slave_req);
-        switch (slave_req.op) {
-        case R_NONE:
-            continue;
-        case R_BLOCK_IN:
-            perform_read(&slave_req);
-            break;
-        case R_BLOCK_OUT:
-            perform_write(&slave_req);
-            break;
-        case R_BLOCK_OUTB:
-            perform_writeb(&slave_req);
-            break;
-        default:
-            continue;
-        }
-        data_bus_reply(BUS_STATE, &slave_req);
-    }
+		// Check for bus requests.
+		data_bus_check(BUS_STATE, &slave_req);
+		switch (slave_req.op) {
+		case R_NONE:
+			continue;
+		case R_BLOCK_IN:
+			perform_read(&slave_req);
+			break;
+		case R_BLOCK_OUT:
+			perform_write(&slave_req);
+			break;
+		case R_BLOCK_OUTB:
+			perform_writeb(&slave_req);
+			break;
+		default:
+			continue;
+		}
+		data_bus_reply(BUS_STATE, &slave_req);
+	}
 }
 
 int
 main(int argc, char **argv)
 {
-    int ret, opt;
-    uint32_t load_offset = 0;
-    char sock_l[] = "cpu";
-    char sock_name[] = "mem";
-    char *aout_file = NULL;
-    exec_t *aout_header = NULL;
-    uint8_t *aout_buffer = NULL;
+	int ret, opt;
+	uint32_t load_offset = 0;
+	char sock_l[] = "cpu";
+	char sock_name[] = "mem";
+	char *aout_file = NULL;
+	exec_t *aout_header = NULL;
+	uint8_t *aout_buffer = NULL;
 
-    /* Setup signal handler. */
-    struct sigaction act = { 0 };
-    act.sa_flags = SA_SIGINFO;
-    act.sa_sigaction = &handler;
-    if (sigaction(SIGHUP, &act, NULL) == -1) {
-        perror("sigaction");
-        exit(EXIT_FAILURE);
-    }
+	/* Setup signal handler. */
+	struct sigaction act = { 0 };
+	act.sa_flags = SA_SIGINFO;
+	act.sa_sigaction = &handler;
+	if (sigaction(SIGHUP, &act, NULL) == -1) {
+		perror("sigaction");
+		exit(EXIT_FAILURE);
+	}
 
-    if (sigaction(SIGINT, &act, NULL) == -1) {
-        perror("sigaction");
-        exit(EXIT_FAILURE);
-    }
+	if (sigaction(SIGINT, &act, NULL) == -1) {
+		perror("sigaction");
+		exit(EXIT_FAILURE);
+	}
 
-    init_mem();
-    if (MEM_STATE == NULL) {
-        fprintf(stderr, "Failed to initialize memory.\n");
-        exit(EXIT_FAILURE);
-    }
+	init_mem();
+	if (MEM_STATE == NULL) {
+		fprintf(stderr, "Failed to initialize memory.\n");
+		exit(EXIT_FAILURE);
+	}
 
-    while ((opt = getopt(argc, argv, "f:o:")) != -1) {
-        switch (opt) {
-        case 'f':
-            aout_file = optarg;
-            break;
-        case 'o':
-            load_offset = strtoul(optarg, NULL, 10);
-            break;
-        default:
-            usage();
-            exit(EXIT_FAILURE);
-        }
-    }
+	while ((opt = getopt(argc, argv, "f:o:")) != -1) {
+		switch (opt) {
+		case 'f':
+			aout_file = optarg;
+			break;
+		case 'o':
+			load_offset = strtoul(optarg, NULL, 10);
+			break;
+		default:
+			usage();
+			exit(EXIT_FAILURE);
+		}
+	}
 
-    if (aout_file == NULL) {
-        usage();
-        printf("must specify an a.out file\n");
-        free(MEM_STATE);
-        exit(EXIT_FAILURE);
-    }
+	if (aout_file == NULL) {
+		usage();
+		printf("must specify an a.out file\n");
+		free(MEM_STATE);
+		exit(EXIT_FAILURE);
+	}
 
-    aout_header = aout_header_read(aout_file);
-    if (aout_header == NULL) {
-        printf("failed to read a.out header\n");
-        free(MEM_STATE);
-        exit(EXIT_FAILURE);
-    }
+	aout_header = aout_header_read(aout_file);
+	if (aout_header == NULL) {
+		printf("failed to read a.out header\n");
+		free(MEM_STATE);
+		exit(EXIT_FAILURE);
+	}
 
-    aout_buffer = aout_text_read(aout_file, aout_header);
-    if (aout_buffer == NULL) {
-        printf("failed to load TEXT from a.out\n");
-        free(MEM_STATE);
-        exit(EXIT_FAILURE);
-    }
-    load_aout(aout_buffer, aout_header, load_offset);
+	aout_buffer = aout_text_read(aout_file, aout_header);
+	if (aout_buffer == NULL) {
+		printf("failed to load TEXT from a.out\n");
+		free(MEM_STATE);
+		exit(EXIT_FAILURE);
+	}
+	load_aout(aout_buffer, aout_header, load_offset);
 
-    pid_t pid = getpid();
-    fprintf(stderr, "mem is starting [%d]\n", pid);
+	pid_t pid = getpid();
+	fprintf(stderr, "mem is starting [%d]\n", pid);
 
-    BUS_STATE = init_bus(sock_l, sock_name, NULL);
-    if (BUS_STATE == NULL) {
-        fprintf(stderr, "Failed to initialize bus.\n");
-        exit(EXIT_FAILURE);
-    }
-    BUS_STATE->addr_internal_to_device = &is_local_addr;
+	BUS_STATE = init_bus(sock_l, sock_name, NULL);
+	if (BUS_STATE == NULL) {
+		fprintf(stderr, "Failed to initialize bus.\n");
+		exit(EXIT_FAILURE);
+	}
+	BUS_STATE->addr_internal_to_device = &is_local_addr;
 
-    ret = connect_device_bus(BUS_STATE);
-    if (ret != 0) {
-        fprintf(stderr, "Failed to connect to bus.\n");
-        exit(EXIT_FAILURE);
-    }
-    execute();
+	ret = connect_device_bus(BUS_STATE);
+	if (ret != 0) {
+		fprintf(stderr, "Failed to connect to bus.\n");
+		exit(EXIT_FAILURE);
+	}
+	execute();
 
-    return 0;
+	return 0;
 }
 
