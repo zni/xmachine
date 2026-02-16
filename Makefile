@@ -1,5 +1,5 @@
-CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_XOPEN_SOURCE=700L
-CFLAGS   = -std=c99 -pedantic -Wall -Wno-deprecated-declarations
+CPPFLAGS = -D_XOPEN_SOURCE=700L
+CFLAGS   = -g -std=c99 -pedantic -Wall -Wno-deprecated-declarations
 CC = cc
 
 DEVICE_LDFLAGS = -lpthread

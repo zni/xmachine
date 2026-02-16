@@ -1,5 +1,5 @@
-#ifndef LIBBUSD_BUS_STATE_H
-#define LIBBUSD_BUS_STATE_H
+#ifndef LIBUNIBUS_BUS_STATE_H
+#define LIBUNIBUS_BUS_STATE_H
 
 #include <pthread.h>
 #include <stdint.h>
@@ -8,72 +8,26 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include "../common/include/types.h"
-
 /* Type of data bus request to make. */
-typedef enum d_req {
-    R_IN,
-    R_INB,
-    R_OUT,
-    R_OUTB,
-    R_BLOCK_IN,
-    R_BLOCK_INB,
-    R_BLOCK_OUT,
-    R_BLOCK_OUTB,
-    R_DONE,
-    R_NONE
-} d_req_t;
-
-/* Direction to send a message on the bus. */
-/* XXX Why did I even add in directionality? */
-typedef enum direction {
-    D_LEFT,
-    D_RIGHT,
-    D_NONE
-} direction_t;
-
-#define DIRC(x) (x == D_LEFT ? "L" : (x == D_RIGHT ? "R" : "NONE"))
+typedef enum _data_op {
+	R_IN,
+	R_INB,
+	R_OUT,
+	R_OUTB,
+	R_BLOCK_IN,
+	R_BLOCK_INB,
+	R_BLOCK_OUT,
+	R_BLOCK_OUTB,
+	R_DONE,
+	R_NONE
+} data_op;
 
 /* (Unnecessary?) struct to hold info on data bus request to make. */
-typedef struct data_op {
-    d_req_t op;
-    uint32_t addr;
-    uint16_t value;
-} data_op_t;
-
-/* State for the data bus processor. */
-typedef struct data_state {
-    struct sockaddr_un d_out_addr_l;
-    struct sockaddr_un d_out_addr_r;
-    struct sockaddr_un d_in_addr;
-
-    int d_bus_in;
-    int d_bus_out_l;
-    int d_bus_out_r;
-
-    data_op_t buffer;
-
-    bool_t req_issued;
-    bool_t ack_received;
-
-    bool_t (*is_addr_internal)(uint32_t);
-} data_state_t;
-
-/* State for the priority bus processor. */
-typedef struct pr_state {
-    struct sockaddr_un pr_out_addr_l;
-    struct sockaddr_un pr_out_addr_r;
-    struct sockaddr_un pr_in_addr;
-
-    int pr_bus_in;
-    int pr_bus_out_l;
-    int pr_bus_out_r;
-
-    bool_t npr_issued;
-    bool_t br_issued;
-    bool_t sack_asserted;
-    bool_t bbsy_asserted;
-} pr_state_t;
+typedef struct _data_xfer_spec {
+	data_op op;
+	uint32_t addr;
+	uint16_t value;
+} data_xfer_spec;
 
 /*
  * Shared state between bus processors and main device.
@@ -86,66 +40,67 @@ typedef struct pr_state {
  * - sock
  * - r_sock
  */
-typedef struct bus_state {
-    /* Shared state between buses. */
-    pthread_mutex_t state_mutex;
-    bool_t is_master;
-    bool_t req_master;
-    bool_t rel_master;
-    bool_t shutdown;
-    char *l_sock;
-    char *sock;
-    char *r_sock;
+typedef struct _bus_state {
+	/* Shared state between buses. */
+	pthread_mutex_t state_mutex;
+	uint8_t is_master;
+	uint8_t req_master;
+	uint8_t rel_master;
+	uint8_t shutdown;
 
-    /* Signal that pr bus is initialized and ready. */
-    pthread_mutex_t pr_ready_mutex;
-    pthread_cond_t cond_pr_ready;
+	char *l_sock;
+	char *sock;
+	char *r_sock;
 
-    /* Signal that data bus is initialized and ready. */
-    pthread_mutex_t data_ready_mutex;
-    pthread_cond_t cond_data_ready;
+	/* Signal that pr bus is initialized and ready. */
+	pthread_mutex_t pr_ready_mutex;
+	pthread_cond_t cond_pr_ready;
 
-    /* Signal that we have bus master. */
-    pthread_mutex_t pr_master_mutex;
-    pthread_cond_t cond_pr_master;
+	/* Signal that data bus is initialized and ready. */
+	pthread_mutex_t data_ready_mutex;
+	pthread_cond_t cond_data_ready;
 
-    /* Signal that we are no longer bus master. */
-    pthread_mutex_t pr_rel_master_mutex;
-    pthread_cond_t cond_pr_rel_master;
+	/* Signal that we have bus master. */
+	pthread_mutex_t pr_master_mutex;
+	pthread_cond_t cond_pr_master;
 
-    /*
-     * Data bus operations.
-     * - master_op_mutex protects master.
-     * - slave_op_mutex protects slave.
-     */
-    pthread_mutex_t master_op_mutex;
-    data_op_t master;
+	/* Signal that we are no longer bus master. */
+	pthread_mutex_t pr_rel_master_mutex;
+	pthread_cond_t cond_pr_rel_master;
 
-    pthread_mutex_t slave_op_mutex;
-    data_op_t slave;
+	/*
+	 * Data bus operations.
+	 * - master_op_mutex protects master.
+	 * - slave_op_mutex protects slave.
+	 */
+	pthread_mutex_t master_xfer_mutex;
+	data_xfer_spec master;
 
-    /*
-     * Data bus conditions.
-     * - grab master_data_mutex
-     *   -> signal/wait cond_master_data
-     *
-     * - grab slave_data_mutex
-     *   -> signal/wait cond_slave_data
-     */
-    pthread_mutex_t master_data_mutex;
-    pthread_cond_t cond_master_data;
+	pthread_mutex_t slave_xfer_mutex;
+	data_xfer_spec slave;
 
-    pthread_mutex_t slave_data_mutex;
-    pthread_cond_t cond_slave_data;
+	/*
+	 * Data bus conditions.
+	 * - grab master_data_mutex
+	 *   -> signal/wait cond_master_data
+	 *
+	 * - grab slave_data_mutex
+	 *   -> signal/wait cond_slave_data
+	 */
+	pthread_mutex_t master_data_mutex;
+	pthread_cond_t cond_master_data;
 
-    /* Only really valid for the memory device. */
-    pthread_mutex_t perma_slave_mutex;
-    pthread_cond_t cond_perma_slave;
+	pthread_mutex_t slave_data_mutex;
+	pthread_cond_t cond_slave_data;
 
-    /* Function pointer to determine if the requested address
-     * on the data bus applies to the current device.
-     */
-    bool_t (*addr_internal_to_device)(uint32_t);
-} bus_state_t;
+	/* Only really valid for the memory device. */
+	pthread_mutex_t perma_slave_mutex;
+	pthread_cond_t cond_perma_slave;
+
+	/* Function pointer to determine if the requested address
+	 * on the data bus applies to the current device.
+	 */
+	uint8_t (*addr_internal_to_device)(uint32_t);
+} bus_state;
 
 #endif

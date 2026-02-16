@@ -1,19 +1,32 @@
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "mem.h"
-#include "../common/include/types.h"
+
 #include "../libload/load.h"
 #include "../libunibus/device_bus_mgr.h"
 
-mem_t *MEM_STATE = NULL;
-bus_state_t *BUS_STATE = NULL;
 
-uint16_t read_word(mem_t*, uint32_t);
-void write_word(mem_t*, uint32_t, uint16_t);
-void write_byte(mem_t*, uint32_t, uint16_t);
-void dump_mem(mem_t*);
+#define MEMBYTES 65535
+#define MEMWORDS 32767
+
+#define MEMLOW 0
+#define MEMHIGH MEMBYTES
+
+typedef struct _mem {
+    uint16_t mar;
+    uint16_t mbr;
+    uint8_t store[MEMBYTES];
+} mem_dev;
+
+mem_dev *MEM_STATE = NULL;
+bus_state *BUS_STATE = NULL;
+
+static uint16_t read_word(uint32_t);
+static void write_word(uint32_t, uint16_t);
+static void write_byte(uint32_t, uint16_t);
+static void dump_mem();
 
 void
 usage()
@@ -21,14 +34,14 @@ usage()
     fprintf(stderr, "mem -f <a.out file> -o <load offset>\n");
 }
 
-bool_t
+uint8_t
 is_local_addr(uint32_t addr)
 {
     if (addr >= MEMLOW && addr <= MEMHIGH) {
-        return TRUE;
+        return 1;
     }
 
-    return FALSE;
+    return 0;
 }
 
 void
@@ -54,70 +67,67 @@ load_aout(uint8_t *buffer, exec_t *header, uint32_t offset)
     }
 }
 
-mem_t*
+void
 init_mem()
 {
-    mem_t *mem = malloc(sizeof(mem_t));
-    if (mem == NULL) {
+    MEM_STATE = (mem_dev*) malloc(sizeof(mem_dev));
+    if (MEM_STATE == NULL) {
         perror("mem malloc");
-        return NULL;
     }
-
-    return mem;
 }
 
 void
-perform_read(data_op_t *d_op)
+perform_read(data_xfer_spec *d_op)
 {
-    d_op->value = read_word(MEM_STATE, d_op->addr);
+    d_op->value = read_word(d_op->addr);
 }
 
 void
-perform_write(data_op_t *d_op)
+perform_write(data_xfer_spec *d_op)
 {
-    write_word(MEM_STATE, d_op->addr, d_op->value);
+    write_word(d_op->addr, d_op->value);
 }
 
 void
-perform_writeb(data_op_t *d_op)
+perform_writeb(data_xfer_spec *d_op)
 {
 }
 
 void
-write_word(mem_t *mem, uint32_t addr, uint16_t word)
+write_word(uint32_t addr, uint16_t word)
 {
-    mem->mar = addr;
-    mem->mbr = word;
-    mem->store[mem->mar] = mem->mbr & 0377;
-    mem->store[mem->mar + 1] = (mem->mbr & 0177400) >> 8;
+    MEM_STATE->mar = addr;
+    MEM_STATE->mbr = word;
+    MEM_STATE->store[MEM_STATE->mar] = MEM_STATE->mbr & 0377;
+    MEM_STATE->store[MEM_STATE->mar + 1] = (MEM_STATE->mbr & 0177400) >> 8;
 }
 
 void
-write_byte(mem_t *mem, uint32_t addr, uint16_t word)
+write_byte(uint32_t addr, uint16_t word)
 {
-    mem->mar = addr;
-    mem->mbr = word;
-    mem->store[mem->mar] = mem->mbr & 0377;
+    MEM_STATE->mar = addr;
+    MEM_STATE->mbr = word;
+    MEM_STATE->store[MEM_STATE->mar] = MEM_STATE->mbr & 0377;
 }
 
 uint16_t
-read_word(mem_t *mem, uint32_t addr)
+read_word(uint32_t addr)
 {
     uint16_t word = 0;
-    word = mem->store[addr];
-    word |= mem->store[addr + 1] << 8;
+    word = MEM_STATE->store[addr];
+    word |= MEM_STATE->store[addr + 1] << 8;
     return word;
 }
 
 void
-dump_mem(mem_t *mem)
+dump_mem()
 {
     uint16_t row[16];
-    uint8_t all_zero = TRUE;
+    uint8_t all_zero = 1;
     for (int r = 0; r < MEMWORDS; r += 32) {
         for (int c = 0, i = 0; c < 32; c += 2, i++) {
-            if (read_word(mem, r + c) != 0) { all_zero = FALSE; }
-            row[i] = read_word(mem, r + c);
+            if (read_word(r + c) != 0) { all_zero = 0; }
+            row[i] = read_word(r + c);
         }
         if (all_zero && ((r + 16) < MEMWORDS) && (r != 0)) {
             continue;
@@ -128,15 +138,15 @@ dump_mem(mem_t *mem)
             printf("0o%07o ", row[i]);
         }
         putchar('\n');
-        all_zero = TRUE;
+        all_zero = 1;
     }
 }
 
 void
 execute()
 {
-    data_op_t slave_req;
-    while(TRUE) {
+    data_xfer_spec slave_req;
+    while(1) {
         pthread_mutex_lock(&(BUS_STATE->perma_slave_mutex));
         pthread_cond_wait(&(BUS_STATE->cond_perma_slave), &(BUS_STATE->perma_slave_mutex));
         pthread_mutex_unlock(&(BUS_STATE->perma_slave_mutex));
@@ -187,12 +197,11 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    mem_t *mem = init_mem();
-    if (mem == NULL) {
+    init_mem();
+    if (MEM_STATE == NULL) {
         fprintf(stderr, "Failed to initialize memory.\n");
         exit(EXIT_FAILURE);
     }
-    MEM_STATE = mem;
 
     while ((opt = getopt(argc, argv, "f:o:")) != -1) {
         switch (opt) {
@@ -211,21 +220,21 @@ main(int argc, char **argv)
     if (aout_file == NULL) {
         usage();
         printf("must specify an a.out file\n");
-        free(mem);
+        free(MEM_STATE);
         exit(EXIT_FAILURE);
     }
 
     aout_header = aout_header_read(aout_file);
     if (aout_header == NULL) {
         printf("failed to read a.out header\n");
-        free(mem);
+        free(MEM_STATE);
         exit(EXIT_FAILURE);
     }
 
     aout_buffer = aout_text_read(aout_file, aout_header);
     if (aout_buffer == NULL) {
         printf("failed to load TEXT from a.out\n");
-        free(mem);
+        free(MEM_STATE);
         exit(EXIT_FAILURE);
     }
     load_aout(aout_buffer, aout_header, load_offset);
@@ -233,14 +242,13 @@ main(int argc, char **argv)
     pid_t pid = getpid();
     fprintf(stderr, "mem is starting [%d]\n", pid);
 
-    bus_state_t *bus = init_bus(sock_l, sock_name, NULL);
-    if (bus == NULL) {
+    BUS_STATE = init_bus(sock_l, sock_name, NULL);
+    if (BUS_STATE == NULL) {
         fprintf(stderr, "Failed to initialize bus.\n");
         exit(EXIT_FAILURE);
     }
-    bus->addr_internal_to_device = &is_local_addr;
+    BUS_STATE->addr_internal_to_device = &is_local_addr;
 
-    BUS_STATE = bus;
     ret = connect_device_bus(BUS_STATE);
     if (ret != 0) {
         fprintf(stderr, "Failed to connect to bus.\n");

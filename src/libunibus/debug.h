@@ -3,6 +3,6 @@
 
 #include "bus_state.h"
 
-void dbg_bus(bus_state_t*, const char *);
+void dbg_bus(bus_state*, const char *);
 
 #endif

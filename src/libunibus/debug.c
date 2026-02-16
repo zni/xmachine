@@ -3,9 +3,10 @@
 
 #include "debug.h"
 
+
 void
-dbg_bus(bus_state_t *bus, const char *msg)
+dbg_bus(bus_state *bus, const char *msg)
 {
-    fprintf(stderr, "%s: %s\n", bus->sock, msg);
+	fprintf(stderr, "%s: %s\n", bus->sock, msg);
 }
 
