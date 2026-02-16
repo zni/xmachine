@@ -196,7 +196,7 @@ release_bus_master(bus_state *bus)
 uint16_t
 read_data_in(bus_state *bus, uint32_t addr)
 {
-	dbg_bus(bus, "read_data_in");
+	dbg_bus(bus, "mgr:read_data_in");
 	data_op status;
 	uint16_t data;
 

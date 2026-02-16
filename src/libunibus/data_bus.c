@@ -218,8 +218,8 @@ void*
 data_bus_mgr(void *bus)
 {
 	struct timespec wait;
-	wait.tv_sec = 5;
-	wait.tv_nsec = 0;
+	wait.tv_sec = 0;
+	wait.tv_nsec = 300000000; /* 300ms */
 
 	uint8_t is_master;
 	uint8_t shutdown;
@@ -311,7 +311,6 @@ data_bus_mgr(void *bus)
 			case R_BLOCK_OUTB:
 			case R_DONE:
 			case R_NONE:
-				DATA_BUS_STATE->buffer.op = R_NONE;
 				STATE->master.op = R_NONE;
 			}
 		}
@@ -332,7 +331,7 @@ data_bus_mgr(void *bus)
 void
 in_word()
 {
-	dbg_bus(STATE, "in_word");
+	dbg_bus(STATE, "data_bus:in_word");
 	int ret;
 	data_bus_req req;
 	req.msg_type = DBM_REQ;
@@ -458,7 +457,6 @@ process_op()
 		case R_BLOCK_OUTB:
 		case R_DONE:
 		case R_NONE:
-			DATA_BUS_STATE->req_issued = 0;
 		}
 		DATA_BUS_STATE->buffer.op = R_NONE;
 }

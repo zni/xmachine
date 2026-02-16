@@ -144,8 +144,8 @@ void*
 priority_bus_mgr(void *bus)
 {
 	struct timespec wait;
-	wait.tv_sec = 5;
-	wait.tv_nsec = 0;
+	wait.tv_sec = 0;
+	wait.tv_nsec = 300000000; /* 300ms */
 
 	uint8_t is_master;
 	uint8_t req_master;
