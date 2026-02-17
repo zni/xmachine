@@ -254,6 +254,34 @@ write_data_out(bus_state *bus, uint32_t addr, uint16_t data)
 }
 
 void
+write_data_out_b(bus_state *bus, uint32_t addr, uint8_t data)
+{
+	data_op status;
+
+	pthread_mutex_lock(&(bus->master_xfer_mutex));
+	bus->master.op = R_OUTB;
+	bus->master.addr = addr;
+	bus->master.value = data;
+	pthread_mutex_unlock(&(bus->master_xfer_mutex));
+
+	pthread_mutex_lock(&(bus->master_data_mutex));
+	pthread_cond_wait(
+		&(bus->cond_master_data),
+		&(bus->master_data_mutex)
+	);
+	pthread_mutex_unlock(&(bus->master_data_mutex));
+
+	pthread_mutex_lock(&(bus->master_xfer_mutex));
+	status = bus->master.op;
+	bus->master.op = R_NONE;
+	pthread_mutex_unlock(&(bus->master_xfer_mutex));
+
+	if (status != R_DONE) {
+		fprintf(stderr, "write failed\n");
+	}
+}
+
+void
 cleanup_bus(bus_state *bus)
 {
 	int ret;

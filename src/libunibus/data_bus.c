@@ -58,8 +58,6 @@ typedef struct _data_bus_req {
 static bus_state *STATE = NULL;
 static data_state *DATA_BUS_STATE = NULL;
 
-static int get_fd(direction);
-static direction get_fd_direction(data_bus_req*, uint8_t);
 static void update_from_addr(data_bus_req*);
 
 static data_state* init_data_state(char*, char*, char*);
@@ -83,56 +81,14 @@ static void handle_dato(data_bus_req*);
 static void handle_datob(data_bus_req*);
 static void slave_wait();
 
-static int d_connect(direction);
 static int d_connect_l();
 static int d_connect_r();
 
-static int d_close(direction);
 static int d_close_l();
 static int d_close_r();
 
 static int send_msg(data_bus_req*);
 static int wait_reply(data_bus_req*);
-
-static int
-get_fd(direction dir)
-{
-	switch (dir) {
-	case D_LEFT:
-		return DATA_BUS_STATE->d_bus_out_l;
-	case D_RIGHT:
-		return DATA_BUS_STATE->d_bus_out_r;
-	case D_NONE:
-	default:
-		return -1;
-	}
-}
-
-static direction
-get_fd_direction(data_bus_req *req, uint8_t reply)
-{
-	if (DATA_BUS_STATE->d_bus_out_l == -1 && DATA_BUS_STATE->d_bus_out_r == -1) {
-		return D_NONE;
-	} else if (DATA_BUS_STATE->d_bus_out_l == -1) {
-		if (reply) {
-			return D_RIGHT;
-		} else {
-			return D_NONE;
-		}
-	} else if (DATA_BUS_STATE->d_bus_out_r == -1) {
-		if (reply) {
-			return D_LEFT;
-		} else {
-			return D_NONE;
-		}
-	} else {
-		if (strncmp(req->from, DATA_BUS_STATE->d_out_addr_l.sun_path, SOCK_NAME_LEN) == 0) {
-			return reply ? D_LEFT : D_RIGHT;
-		} else {
-			return reply ? D_RIGHT : D_LEFT;
-		}
-	}
-}
 
 static void
 update_from_addr(data_bus_req *req)
@@ -396,9 +352,9 @@ out_byte()
 	/*
 	 * FIXME See in_word for details on just returning below.
 	 */
+	dbg_bus(STATE, "data_bus:out_byte");
 
 	int ret;
-	data_bus_req resp;
 	data_bus_req req;
 	req.msg_type = DBM_REQ;
 	req.c = D_DATOB;
@@ -412,24 +368,6 @@ out_byte()
 		fprintf(stderr, "DATOB: blocking forever, goodbye.\n");
 		return;
 	}
-	ret = wait_reply(&resp);
-	if (ret != 0) {
-		fprintf(stderr, "DATOB: failed to get reply from data bus\n");
-		fprintf(stderr, "DATOB: blocking forever, goodbye.\n");
-		return;
-	}
-
-	/* Put the response in the master data buffer. */
-	pthread_mutex_lock(&(STATE->master_xfer_mutex));
-	STATE->master.addr = 0;
-	STATE->master.value = 0;
-	STATE->master.op = R_DONE;
-	pthread_mutex_unlock(&(STATE->master_xfer_mutex));
-
-	/* Assuming we miraculously got this far, signal the main thread. */
-	pthread_mutex_lock(&(STATE->master_data_mutex));
-	pthread_cond_signal(&(STATE->cond_master_data));
-	pthread_mutex_unlock(&(STATE->master_data_mutex));
 }
 
 void
@@ -457,6 +395,8 @@ process_op()
 		case R_BLOCK_OUTB:
 		case R_DONE:
 		case R_NONE:
+		default:
+			break;
 		}
 		DATA_BUS_STATE->buffer.op = R_NONE;
 }
@@ -497,7 +437,9 @@ handle_resp(data_bus_req *event)
 {
 	dbg_bus(STATE, "handle_resp");
 	switch (event->c) {
-	case D_DATI:
+	case D_DATI: /* Fallthrough, all transactions are handled the same. */
+	case D_DATO:
+	case D_DATOB:
 		pthread_mutex_lock(&(STATE->master_xfer_mutex));
 		STATE->master.value = event->data;
 		STATE->master.op = R_DONE;
@@ -588,8 +530,6 @@ handle_dato(data_bus_req *event)
 	dbg_bus(STATE, "handle_dato");
 
 	int ret;
-	int out_fd;
-	direction dir;
 	data_bus_req resp;
 	resp.msg_type = DBM_RESP;
 	resp.c = D_DATO;
@@ -616,20 +556,10 @@ handle_dato(data_bus_req *event)
 	}
 	pthread_mutex_unlock(&(STATE->slave_xfer_mutex));
 
-	dir = get_fd_direction(event, 1);
-	if (dir == D_NONE) {
-		return;
+	ret = send_msg(&resp);
+	if (ret != 0) {
+		dbg_bus(STATE, "handle_dati: failed to send message");
 	}
-
-	out_fd = get_fd(dir);
-	update_from_addr(&resp);
-	d_connect(dir);
-	ret = write(out_fd, &resp, sizeof(resp));
-	if (ret == -1) {
-		perror("handle_dato");
-		return;
-	}
-	d_close(dir);
 }
 
 void
@@ -638,8 +568,6 @@ handle_datob(data_bus_req *event)
 	dbg_bus(STATE, "handle_datob");
 
 	int ret;
-	int out_fd;
-	direction dir;
 	data_bus_req resp;
 	resp.msg_type = DBM_RESP;
 	resp.c = D_DATOB;
@@ -654,6 +582,7 @@ handle_datob(data_bus_req *event)
 
 	pthread_mutex_lock(&(STATE->slave_xfer_mutex));
 	if (STATE->slave.op == R_DONE) {
+		resp.addr = 0;
 		resp.data = 0;
 		resp.ssyn = ASSERTED;
 
@@ -666,20 +595,10 @@ handle_datob(data_bus_req *event)
 	}
 	pthread_mutex_unlock(&(STATE->slave_xfer_mutex));
 
-	dir = get_fd_direction(event, 1);
-	if (dir == D_NONE) {
-		return;
+	ret = send_msg(&resp);
+	if (ret != 0) {
+		dbg_bus(STATE, "handle_dati: failed to send message");
 	}
-
-	out_fd = get_fd(dir);
-	update_from_addr(&resp);
-	d_connect(dir);
-	ret = write(out_fd, &resp, sizeof(resp));
-	if (ret == -1) {
-		perror("handle_datob");
-		return;
-	}
-	d_close(dir);
 }
 
 void
@@ -695,21 +614,6 @@ slave_wait()
 		&(STATE->slave_data_mutex)
 	);
 	pthread_mutex_unlock(&(STATE->slave_data_mutex));
-}
-
-int
-d_connect(direction dir)
-{
-	switch (dir) {
-	case D_LEFT:
-		return d_connect_l();
-	case D_RIGHT:
-		return d_connect_r();
-	case D_NONE:
-		return -1;
-	}
-
-	return -1;
 }
 
 int
@@ -767,21 +671,6 @@ d_connect_r()
 	}
 
 	return 0;
-}
-
-int
-d_close(direction dir)
-{
-	switch (dir) {
-	case D_LEFT:
-		return d_close_l();
-	case D_RIGHT:
-		return d_close_r();
-	case D_NONE:
-		return -1;
-	}
-
-	return -1;
 }
 
 int

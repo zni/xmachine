@@ -6,54 +6,49 @@
 
 void usage()
 {
-    printf("loader <file>\n");
-    exit(EXIT_FAILURE);
+	printf("loader <file>\n");
+	exit(EXIT_FAILURE);
 }
 
 int main(int argc, char **argv)
 {
-    if (argc < 2) {
-        usage();
-    }
+	if (argc < 2) {
+		usage();
+	}
 
-    char *exe = argv[1];
+	char *obj_file = argv[1];
 
-    exec_t *header = aout_header_read(exe);
-    if (header == NULL) {
-        printf("Failed to read header.\n");
-        exit(EXIT_FAILURE);
-    }
+	aout_object *aout = aout_read(obj_file);
+	if (aout == NULL) {
+		printf("Failed to object.\n");
+		exit(EXIT_FAILURE);
+	}
 
-    printf("midmag : %04o\n", header->a_midmag);
-    printf("text   : %d\n", header->a_text);
-    printf("data   : %d\n", header->a_data);
-    printf("bss    : %d\n", header->a_bss);
-    printf("syms   : %d\n", header->a_syms);
-    printf("entry  : %04o\n", header->a_entry);
-    printf("trsize : %d\n", header->a_trsize);
-    printf("drsize : %d\n", header->a_drsize);
+	printf(".header\n");
+	printf("midmag : %04o\n", aout->header.a_midmag);
+	printf("text   : %d\n", aout->header.a_text);
+	printf("data   : %d\n", aout->header.a_data);
+	printf("bss    : %d\n", aout->header.a_bss);
+	printf("syms   : %d\n", aout->header.a_syms);
+	printf("entry  : %04o\n", aout->header.a_entry);
+	printf("trsize : %d\n", aout->header.a_trsize);
+	printf("drsize : %d\n", aout->header.a_drsize);
 
-    uint8_t *text = aout_text_read(exe, header);
-    if (text == NULL) {
-        printf("Failed to read text.\n");
-        exit(EXIT_FAILURE);
-    }
+	printf("\n.text\n");
+	int i;
+	for (i = 0; i < (aout->header.a_text >> 1); i++) {
+		printf("0o%06o\n", aout->text[i]);
+	}
 
-    uint16_t dat = 0;
-    int i = 0;
-    for (i = 0; i < header->a_text; i++) {
-        if ((i % 2) == 0) {
-            dat = text[i];
-        } else {
-            dat |= (text[i] << 8) & 0xFF00;
-            printf("%06o\n", dat);
-            dat = 0;
-        }
-    }
+/*
+	printf("\n.symbol_table\n");
+	for (i = 0; i < (aout->header.a_syms >> 1); i++) {
+		printf("0o%06o\n", aout->table[i].value);
+	}
+*/
 
-    free(header);
-    free(text);
+	aout_free(&aout);
 
-    return 0;
+	return 0;
 }
 

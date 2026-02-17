@@ -18,6 +18,7 @@ void release_bus_master(bus_state*);
 // Master functions.
 uint16_t read_data_in(bus_state*, uint32_t);
 void write_data_out(bus_state*, uint32_t, uint16_t);
+void write_data_out_b(bus_state*, uint32_t, uint8_t);
 
 // Slave functions.
 void data_bus_check(bus_state*, data_xfer_spec*);

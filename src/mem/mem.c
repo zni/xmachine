@@ -27,6 +27,7 @@ static uint16_t read_word(uint32_t);
 static void write_word(uint32_t, uint16_t);
 static void write_byte(uint32_t, uint16_t);
 static void dump_mem();
+static void load_aout(aout_object*, uint32_t);
 
 void
 usage()
@@ -48,7 +49,7 @@ void
 handler(int signo, siginfo_t *info, void *context)
 {
 	if (MEM_STATE != NULL) {
-		dump_mem(MEM_STATE);
+		dump_mem();
 		free(MEM_STATE);
 	}
 
@@ -59,11 +60,14 @@ handler(int signo, siginfo_t *info, void *context)
 }
 
 void
-load_aout(uint8_t *buffer, exec_t *header, uint32_t offset)
+load_aout(aout_object *aout, uint32_t offset)
 {
 	int n, m;
-	for (n = 0, m = offset; n < header->a_text; n++, m++) {
-		MEM_STATE->store[m] = buffer[n];
+	for (n = 0, m = offset; n < (aout->header.a_text >> 1); n++) {
+		MEM_STATE->store[m] = (aout->text[n] & 0x00FF);
+		m++;
+		MEM_STATE->store[m] = (aout->text[n] & 0xFF00) >> 8;
+		m++;
 	}
 }
 
@@ -91,6 +95,7 @@ perform_write(data_xfer_spec *d_op)
 void
 perform_writeb(data_xfer_spec *d_op)
 {
+	write_byte(d_op->addr, d_op->value);
 }
 
 void
@@ -177,11 +182,10 @@ main(int argc, char **argv)
 {
 	int ret, opt;
 	uint32_t load_offset = 0;
-	char sock_l[] = "cpu";
-	char sock_name[] = "mem";
+	char *sock_l = "cpu";
+	char *sock_name = "mem";
 	char *aout_file = NULL;
-	exec_t *aout_header = NULL;
-	uint8_t *aout_buffer = NULL;
+	aout_object *aout = NULL;
 
 	/* Setup signal handler. */
 	struct sigaction act = { 0 };
@@ -224,20 +228,14 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	aout_header = aout_header_read(aout_file);
-	if (aout_header == NULL) {
+	aout = aout_read(aout_file);
+	if (aout == NULL) {
 		printf("failed to read a.out header\n");
 		free(MEM_STATE);
 		exit(EXIT_FAILURE);
 	}
 
-	aout_buffer = aout_text_read(aout_file, aout_header);
-	if (aout_buffer == NULL) {
-		printf("failed to load TEXT from a.out\n");
-		free(MEM_STATE);
-		exit(EXIT_FAILURE);
-	}
-	load_aout(aout_buffer, aout_header, load_offset);
+	load_aout(aout, load_offset);
 
 	pid_t pid = getpid();
 	fprintf(stderr, "mem is starting [%d]\n", pid);

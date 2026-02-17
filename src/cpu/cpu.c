@@ -444,10 +444,8 @@ store_data_b(uint32_t addr, uint8_t data)
 
 	addr = translate_bus_addr(addr);
 
-// FIXME
-//	send(BusMessage::MSYN, 0, 0);
-//	send(BusMessage::DATOB, addr, data);
-//	send(BusMessage::CLEAR, 0, 0);
+	// Block for write.
+	write_data_out_b(BUS_REF, addr, data);
 }
 
 void
@@ -776,6 +774,7 @@ setup_pc_addressing(uint32_t *loc, uint16_t mode, uint16_t reg)
 			relative = fetch_data(CPU_STATE->pc);
 			CPU_STATE->pc += 2;
 			*loc = CPU_STATE->pc + relative;
+			printf("loc: 0o%06o\n", *loc);
 			break;
 	}
 }
@@ -996,6 +995,7 @@ setup_src_addressing(uint8_t use_byte_addr)
 {
 	uint16_t reg = (CPU_STATE->ir & 00700) >> 6;
 	uint16_t mode = (CPU_STATE->ir & 07000) >> 9;
+	printf("reg: %u, mode: %u\n", reg, mode);
 	switch (reg) {
 		case 7:
 			setup_pc_addressing(&(CPU_STATE->src_address), mode, reg);
@@ -1788,11 +1788,13 @@ cleanup()
 		printf("-----------\n");
 		dump_cpu(CPU_STATE);
 		free(CPU_STATE);
+		CPU_STATE = NULL;
 	}
 
 	/* Signal and join bus threads. */
 	if (BUS_REF != NULL) {
 		cleanup_bus(BUS_REF);
+		BUS_REF = NULL;
 	}
 }
 
