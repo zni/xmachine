@@ -18,3 +18,4 @@ Then:
 ```
 $ pdp11-aout-as <asm> -o <output file>
 ```
+pdp11-aout-as -aln -m11/40

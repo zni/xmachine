@@ -1,3 +1,4 @@
+.text
 		MOV TTYKS, r0
 		MOV TTYKB, r1
 		MOV TTYPB, r2
@@ -13,9 +14,9 @@ R:		TSTB (r3)			# Wait for READY flag to raise.
 		MOVB (r1), (r2)		# Move key buffer contents to print buffer.
 		BR ECHO
 		HALT
-
 TTYKS:	.WORD 0777560
 TTYKB:	.WORD 0777562
 TTYPS:	.WORD 0777564
 TTYPB:	.WORD 0777566
 BUSY:	.WORD 04000
+.end
