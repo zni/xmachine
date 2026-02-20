@@ -88,7 +88,6 @@ static int d_close_l();
 static int d_close_r();
 
 static int send_msg(data_bus_req*);
-static int wait_reply(data_bus_req*);
 
 static void
 update_from_addr(data_bus_req *req)
@@ -312,7 +311,6 @@ out_word()
 	 */
 
 	int ret;
-	data_bus_req resp;
 	data_bus_req req;
 	req.msg_type = DBM_REQ;
 	req.c = D_DATO;
@@ -326,24 +324,6 @@ out_word()
 		fprintf(stderr, "DATO: blocking forever, goodbye.\n");
 		return;
 	}
-	ret = wait_reply(&resp);
-	if (ret != 0) {
-		fprintf(stderr, "DATO: failed to get reply from data bus\n");
-		fprintf(stderr, "DATO: blocking forever, goodbye.\n");
-		return;
-	}
-
-	/* Put the response in the master data buffer. */
-	pthread_mutex_lock(&(STATE->master_xfer_mutex));
-	STATE->master.addr = 0;
-	STATE->master.value = 0;
-	STATE->master.op = R_DONE;
-	pthread_mutex_unlock(&(STATE->master_xfer_mutex));
-
-	/* Assuming we miraculously got this far, signal the main thread. */
-	pthread_mutex_lock(&(STATE->master_data_mutex));
-	pthread_cond_signal(&(STATE->cond_master_data));
-	pthread_mutex_unlock(&(STATE->master_data_mutex));
 }
 
 void
@@ -730,15 +710,3 @@ send_msg(data_bus_req *req)
 	return 0;
 }
 
-int
-wait_reply(data_bus_req *resp)
-{
-	int ret;
-	ret = recv(DATA_BUS_STATE->d_bus_in, resp, sizeof(data_bus_req), MSG_DONTWAIT);
-	if (ret != -1) {
-		perror("wait_reply");
-		return ret;
-	}
-
-	return 0;
-}

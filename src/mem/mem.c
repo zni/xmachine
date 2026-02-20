@@ -23,11 +23,19 @@ typedef struct _mem {
 mem_dev *MEM_STATE = NULL;
 bus_state *BUS_STATE = NULL;
 
-static uint16_t read_word(uint32_t);
+static void usage();
+static uint8_t is_local_addr(uint32_t);
+static void handler(int, siginfo_t*, void*);
+static void load_aout(aout_object*, uint32_t);
+static void init_mem();
+static void perform_read(data_xfer_spec*);
+static void perform_write(data_xfer_spec*);
+static void perform_writeb(data_xfer_spec*);
 static void write_word(uint32_t, uint16_t);
 static void write_byte(uint32_t, uint16_t);
+static uint16_t read_word(uint32_t);
 static void dump_mem();
-static void load_aout(aout_object*, uint32_t);
+static void execute();
 
 void
 usage()

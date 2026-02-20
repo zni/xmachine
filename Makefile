@@ -52,7 +52,7 @@ clean_libunibus:
 	rm -f src/libunibus/libunibus.a
 
 loader: libload src/utilities/loader.c
-	${CC} src/utilities/loader.c ${LOAD_LDFLAGS} -o $@
+	${CC} src/utilities/loader.c ${LOAD_LDFLAGS} -o src/utilities/$@
 
 clean: clean_libload clean_libunibus
 	rm -rf bin
@@ -60,6 +60,7 @@ clean: clean_libload clean_libunibus
 	rm -f src/cpu/cpu.o
 	rm -f src/mem/mem
 	rm -f src/mem/mem.o
+	rm -f src/utilities/loader
 
 
 .PHONY: clean_libunibus clean_libload

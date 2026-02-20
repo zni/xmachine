@@ -1,12 +1,9 @@
-# What?
+# binutils pdp11-aout
 
-Alright, so this is PDP-11 in GNU assembler syntax.
-
-To assemble this stuff, just:
+## Building
 
 - Grab a binutils release (I'm using GNU binutils 2.45 as of 2025-10-05).
-- Build it like this:
-
+- Compile and install it:
 ```
 ./configure --target=pdp11-aout --prefix=$HOME/opt/pdp11-cross
 make
@@ -16,6 +13,5 @@ make install
 Then:
 
 ```
-$ pdp11-aout-as <asm> -o <output file>
+$ pdp11-aout-as -aln -m11/40 <asm> -o <output file>
 ```
-pdp11-aout-as -aln -m11/40
