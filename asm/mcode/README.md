@@ -1,17 +1,17 @@
-# What the hell is this?
+# PDP-11 Homebrew Machine Code Format
 
-Well, when it was early days (earlier days), I just wrote stuff in machine
-code and loaded it in.
+## Overview
+When I was just starting (and before I found the MACRO-11 implementation on
+github), I just wrote stuff in machine code and loaded it in.
 
-Despite not really being conducive to writing long (or understandable)
-programs, I still needed to test the machine somehow.
-
-Anyway, this is here just because it existed for a purpose at one point.
+Obviously, this was kind of a pain and not really optimal for anything beyond
+simple examples.
 
 ## File Format
+```
+<machine code>
+.end
+```
 
-    <machine code>
-    .end
-
-Machine code lines are in octal I think.
+Machine code lines are in octal.
 

@@ -1,17 +1,19 @@
-# binutils pdp11-aout
+# GNU Assembler
 
-## Building
+In here are the macro11 examples translated to GNU Assembler, targeting pdp11-aout.
 
-- Grab a binutils release (I'm using GNU binutils 2.45 as of 2025-10-05).
-- Compile and install it:
+To assemble these files you'll need to build binutils for the pdp11-aout target.
+
+I'm using GNU binutils 2.45 as of 2025-10-05.
+
+## Building binutils
 ```
-./configure --target=pdp11-aout --prefix=$HOME/opt/pdp11-cross
-make
-make install
+$ ./configure --target=pdp11-aout --prefix=$HOME/opt/pdp11-cross
+$ make
+$ make install
 ```
 
-Then:
-
+## Assembling the source
 ```
 $ pdp11-aout-as -aln -m11/40 <asm> -o <output file>
 ```
