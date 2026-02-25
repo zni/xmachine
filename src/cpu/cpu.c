@@ -6,6 +6,12 @@
 
 #include "../libunibus/device_bus_mgr.h"
 
+#ifdef CPUDBG
+#define CPU_P(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define CPU_P(...)
+#endif
+
 enum ProcessorStatusFlags {
 	CARRYFLAG    = 0000001,
 	OVERFLOWFLAG = 0000002,
@@ -1457,9 +1463,13 @@ DECB()
 void
 DEC()
 {
+	CPU_P("DEC\n");
+
 	setup_dest_addressing(0);
 	CPU_STATE->alu = fetch_data(CPU_STATE->dest_address);
+	CPU_P("\t0o%06o\n", CPU_STATE->alu);
 	CPU_STATE->alu--;
+	CPU_P("\t0o%06o\n", CPU_STATE->alu);
 	store_data(CPU_STATE->dest_address, CPU_STATE->alu);
 
 	set_zero_flag(CPU_STATE->alu);

@@ -7,6 +7,12 @@
 #include "../libload/load.h"
 #include "../libunibus/device_bus_mgr.h"
 
+#ifdef MEMDBG
+#define MEM_P(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define MEM_P(...)
+#endif
+
 
 #define MEMBYTES 65535
 #define MEMWORDS 32767
@@ -70,8 +76,12 @@ handler(int signo, siginfo_t *info, void *context)
 void
 load_aout(aout_object *aout, uint32_t offset)
 {
+	MEM_P("loading program\n");
+
 	int n, m;
 	for (n = 0, m = offset; n < (aout->header.a_text >> 1); n++) {
+		MEM_P("[0o%06o] = 0o%06o\n", m, aout->text[n]);
+
 		MEM_STATE->store[m] = (aout->text[n] & 0x00FF);
 		m++;
 		MEM_STATE->store[m] = (aout->text[n] & 0xFF00) >> 8;
@@ -109,6 +119,8 @@ perform_writeb(data_xfer_spec *d_op)
 void
 write_word(uint32_t addr, uint16_t word)
 {
+	MEM_P("W [0o%06o] = 0o%06o\n", addr, word);
+
 	MEM_STATE->mar = addr;
 	MEM_STATE->mbr = word;
 	MEM_STATE->store[MEM_STATE->mar] = MEM_STATE->mbr & 0377;

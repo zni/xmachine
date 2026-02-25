@@ -1,4 +1,4 @@
-CPPFLAGS = -D_XOPEN_SOURCE=700L
+CPPFLAGS = -D_XOPEN_SOURCE=700L -DMEMDBG -DCPUDBG
 CFLAGS   = -g -std=c99 -pedantic -Wall -Wno-deprecated-declarations
 CC = cc
 

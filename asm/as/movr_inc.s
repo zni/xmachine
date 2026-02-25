@@ -1,14 +1,11 @@
-# Not sure what the point of this program is.
-# It modifies the instructions to be executed until
-# it starts running them.
+# Test indirection with increment.
 .text
-.globl s000
 		MOV s000, r0
-		MOV s000, r1
+		MOV $s000, r1
 		INC r0
 		MOV r0, s000
-D:		DEC r0
-		MOV $0322, (r1)+
+D:		MOV $0322, (r1)+
+		DEC r0
 		BNE D
 		HALT
 s000:	.WORD 4
