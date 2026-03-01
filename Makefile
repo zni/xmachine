@@ -21,6 +21,11 @@ LIBUNIBUS_C = $(wildcard src/libunibus/*.c)
 LIBUNIBUS_H = $(wildcard src/libunibus/*.h)
 LIBUNIBUS_OBJ = ${LIBUNIBUS_C:.c=.o}
 
+ASFLAGS = -m11/40
+AS = $$HOME/opt/dev/pdp11-binutils/bin/pdp11-aout-as
+AS_BASIC_S = $(wildcard asm/as/basic/*.s)
+AS_BASIC_OBJ = ${AS_BASIC_S:.s=.aout}
+
 all: cpu mem
 
 ${CPU_OBJ}: ${CPU_C}
@@ -47,6 +52,11 @@ ${LIBUNIBUS_OBJ}: ${LIBUNIBUS_C} ${LIBUNIBUS_H}
 libunibus: ${LIBUNIBUS_OBJ}
 	ar rcs src/libunibus/libunibus.a ${LIBUNIBUS_OBJ}
 
+${AS_BASIC_OBJ}: ${AS_BASIC_S}
+	for n in ${AS_BASIC_S}; do ${AS} ${ASFLAGS} $$n -o $$n.aout; done
+
+basic: ${AS_BASIC_OBJ}
+
 clean_libunibus:
 	rm -f ${LIBUNIBUS_OBJ}
 	rm -f src/libunibus/libunibus.a
@@ -56,6 +66,7 @@ loader: libload src/utilities/loader.c
 
 clean: clean_libload clean_libunibus
 	rm -rf bin
+	rm -f asm/as/basic/*.aout
 	rm -f src/cpu/cpu
 	rm -f src/cpu/cpu.o
 	rm -f src/mem/mem
@@ -63,4 +74,4 @@ clean: clean_libload clean_libunibus
 	rm -f src/utilities/loader
 
 
-.PHONY: clean_libunibus clean_libload
+.PHONY: clean_libunibus clean_libload basic
