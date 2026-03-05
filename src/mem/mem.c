@@ -79,6 +79,7 @@ load_aout(aout_object *aout, uint32_t offset)
 	MEM_P("loading program\n");
 
 	int n, m;
+	/* Why the shift? a_text is the count of bytes and I want words. */
 	for (n = 0, m = offset; n < (aout->header.a_text >> 1); n++) {
 		MEM_P("[0o%06o] = 0o%06o\n", m, aout->text[n]);
 

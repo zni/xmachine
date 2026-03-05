@@ -36,6 +36,7 @@ int main(int argc, char **argv)
 
 	printf("\n.text\n");
 	int i;
+	/* Why the shift? a_text is the count of bytes and I want words. */
 	for (i = 0; i < (aout->header.a_text >> 1); i++) {
 		printf("0o%06o\n", aout->text[i]);
 	}
