@@ -49,7 +49,7 @@ typedef struct pr_bus_req {
 
 	pr_signal_t sig;
 	assert_t assertion;
-	uint32_t value;
+	uint32_t level;
 } pr_bus_req_t;
 
 #endif
