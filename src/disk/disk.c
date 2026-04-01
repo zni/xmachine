@@ -1,126 +1,152 @@
+#include <fcntl.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 #include "disk.h"
+#include "../libunibus/device_bus_mgr.h"
 
-void init_disk()
+static void init_disk();
+static void shutdown_disk();
+static void execute();
+static void fill_buffer();
+static void empty_buffer();
+static void read_sector();
+static void write_sector();
+static void clear_buffer_register();
+static void set_status_register(uint16_t);
+static void set_transfer_flag();
+static void clear_transfer_flag();
+static uint8_t is_transfer_flag_set();
+static void set_done_flag();
+/* static void clear_done_flag(); */
+/* static uint8_t is_done_flag_set(); */
+/* static void clear_writable_flags(); */
+static void clear_all_flags();
+static void usage();
+static void handler(int, siginfo_t*, void*);
+
+static disk_state DSK_STATE;
+static bus_state *BUS_STATE = NULL;
+
+void
+init_disk()
 {
-//    m_state = DiskControllerState::BEGIN;
-//    m_function = DiskControllerFunction::IDLE;
-//    m_track = 0;
-//    m_sector = 0;
-//    m_RXCS = 0;
-//    m_RXDB = 0;
-//    m_buffer_index = 0;
-//    m_disk_media = NULL;
-//    m_bus_connection = NULL;
+	DSK_STATE.op = DSK_OP_BEGIN;
+	DSK_STATE.func = DSK_FUNC_IDLE;
+	DSK_STATE.track = 0;
+	DSK_STATE.sector = 0;
+	DSK_STATE.rxcs = 0;
+	DSK_STATE.rxdb = 0;
+	DSK_STATE.buffer_idx = 0;
+	DSK_STATE.disk_media = -1;
 }
 
-void shutdown_disk()
+void
+shutdown_disk()
 {
-//    if (m_disk_media != NULL) {
-//        fclose(m_disk_media);
-//    }
+	if (DSK_STATE.disk_media == -1) {
+		return;
+	}
+
+	close(DSK_STATE.disk_media);
 }
 
-//void send(enum BusMessage t, uint32_t addr, uint16_t data)
-//{
-//    m_bus_connection->send_bus_message(this, t, addr, data);
-//}
-
-//void DiskController::recv(enum BusMessage t, uint32_t addr, uint16_t data)
-//{
-//    if (addr == RXCS || addr == RXDB) {
-//        process_bus_message(t, addr, data);
-//    }
-//}
-
-//uint16_t DiskController::bus_id()
-//{
-//    return 0000003;
-//}
-
-//void DiskController::set_bus(Bus *bus)
-//{
-//    m_bus_connection = bus;
-//}
-
-void insert_disk_media(char *disk)
+uint8_t
+is_local_addr(uint32_t addr)
 {
-//    m_disk_media = fopen(disk, "r+");
+	if (addr == RXCS_ADDR || addr == RXDB_ADDR) {
+		/* process_bus_message(t, addr, data); */
+		return 1;
+	}
+
+	return 0;
 }
 
-void execute()
+void
+insert_disk_media(char *disk)
 {
-//    uint16_t go_flag;
-//    while (!m_bus_connection->halted()) {
-//        go_flag = static_cast<uint16_t>(RXCSFlag::GO) & m_RXCS;
-//        if (go_flag && ((m_state == DiskControllerState::BEGIN) ||
-//                        (m_state == DiskControllerState::DONE))) {
-//
-//
-//            enum DiskControllerFunction function =
-//                static_cast<DiskControllerFunction>((static_cast<uint16_t>(RXCSFlag::FS) & m_RXCS) >> 1);
-//
-//            clear_all_flags();
-//
-//            switch (function) {
-//                case DiskControllerFunction::FILL_BUFFER:
-//                    m_state = DiskControllerState::FILL;
-//                    m_function = DiskControllerFunction::FILL_BUFFER;
-//                    set_transfer_flag();
-//                    break;
-//                case DiskControllerFunction::EMPTY_BUFFER:
-//                    m_state = DiskControllerState::EMPTY;
-//                    m_function = DiskControllerFunction::EMPTY_BUFFER;
-//                    break;
-//                case DiskControllerFunction::WRITE_SECTOR:
-//                    m_state = DiskControllerState::SECTOR;
-//                    m_function = DiskControllerFunction::WRITE_SECTOR;
-//                    set_transfer_flag();
-//                    break;
-//                case DiskControllerFunction::READ_SECTOR:
-//                    m_state = DiskControllerState::SECTOR;
-//                    m_function = DiskControllerFunction::READ_SECTOR;
-//                    set_transfer_flag();
-//                    break;
-//                case DiskControllerFunction::NOT_USED:
-//                    break;
-//                case DiskControllerFunction::READ_STATUS:
-//                    break;
-//                case DiskControllerFunction::WRITE_DEL:
-//                    break;
-//                case DiskControllerFunction::READ_ERR:
-//                    break;
-//                default:
-//                    break;
-//            }
-//
-//        } else if ((m_state == DiskControllerState::FILL) &&
-//                   (m_function == DiskControllerFunction::FILL_BUFFER)) {
-//
-//            fill_buffer();
-//
-//        } else if ((m_state == DiskControllerState::EMPTY) &&
-//                   (m_function == DiskControllerFunction::EMPTY_BUFFER)) {
-//
-//            empty_buffer();
-//
-//        } else if (m_function == DiskControllerFunction::READ_SECTOR) {
-//
-//            read_sector();
-//
-//        } else if (m_function == DiskControllerFunction::WRITE_SECTOR) {
-//
-//            write_sector();
-//
-//        } else if (m_state == DiskControllerState::DONE) {
-//            m_state = DiskControllerState::BEGIN;
-//
-//            set_done_flag();
-//        }
-//        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-//    }
+	int fd;
+	fd = open(disk, O_RDWR);
+	if (fd == -1) {
+		perror("insert_disk_media-open");
+		return;
+	}
+
+	DSK_STATE.disk_media = fd;
 }
 
-void dump()
+void
+execute()
+{
+	uint16_t go_flag;
+	uint8_t halt = 0;
+
+	pthread_mutex_lock(&(BUS_STATE)->state_mutex);
+	halt = BUS_STATE->shutdown;
+	pthread_mutex_unlock(&(BUS_STATE)->state_mutex);
+	while (!halt) {
+		go_flag = RXCS_FLAG_GO & DSK_STATE.rxcs;
+		if (go_flag && ((DSK_STATE.op == DSK_OP_BEGIN) ||
+		                (DSK_STATE.op == DSK_OP_DONE))) {
+			int function = (RXCS_FLAG_FS & DSK_STATE.rxcs) >> 1;
+			clear_all_flags();
+
+			switch (function) {
+				case DSK_FUNC_FILL_BUFFER:
+					DSK_STATE.op = DSK_OP_FILL;
+					DSK_STATE.func = DSK_FUNC_FILL_BUFFER;
+					set_transfer_flag();
+					break;
+				case DSK_FUNC_EMPTY_BUFFER:
+					DSK_STATE.op = DSK_OP_EMPTY;
+					DSK_STATE.func = DSK_FUNC_EMPTY_BUFFER;
+					break;
+				case DSK_FUNC_WRITE_SECTOR:
+					DSK_STATE.op = DSK_OP_SECTOR;
+					DSK_STATE.func = DSK_FUNC_WRITE_SECTOR;
+					set_transfer_flag();
+					break;
+				case DSK_FUNC_READ_SECTOR:
+					DSK_STATE.op = DSK_OP_SECTOR;
+					DSK_STATE.func = DSK_FUNC_READ_SECTOR;
+					set_transfer_flag();
+					break;
+				case DSK_FUNC_NOT_USED:
+					break;
+				case DSK_FUNC_READ_STATUS:
+					break;
+				case DSK_FUNC_WRITE_DEL:
+					break;
+				case DSK_FUNC_READ_ERR:
+					break;
+				default:
+					break;
+			}
+
+		} else if ((DSK_STATE.op == DSK_OP_FILL) &&
+		           (DSK_STATE.func == DSK_FUNC_FILL_BUFFER)) {
+			fill_buffer();
+		} else if ((DSK_STATE.op == DSK_OP_EMPTY) &&
+		           (DSK_STATE.func == DSK_FUNC_EMPTY_BUFFER)) {
+			empty_buffer();
+		} else if (DSK_STATE.func == DSK_FUNC_READ_SECTOR) {
+			read_sector();
+		} else if (DSK_STATE.func == DSK_FUNC_WRITE_SECTOR) {
+			write_sector();
+		} else if (DSK_STATE.op == DSK_OP_DONE) {
+			DSK_STATE.op = DSK_OP_BEGIN;
+			set_done_flag();
+		}
+		pthread_mutex_lock(&(BUS_STATE)->state_mutex);
+		halt = BUS_STATE->shutdown;
+		pthread_mutex_unlock(&(BUS_STATE)->state_mutex);
+	}
+}
+
+void
+dump()
 {
     //printw("RXCS: %07o\n", m_RXCS);
     //printw("RXDB: %07o\n", m_RXDB);
@@ -134,8 +160,9 @@ void dump()
     //refresh();
 }
 
-//void DiskController::process_bus_message(enum BusMessage t, uint32_t addr, uint16_t data)
-//{
+void
+handle_bus_op(/*enum BusMessage t, uint32_t addr, uint16_t data*/)
+{
 //    switch (t) {
 //        case BusMessage::DATI:
 //            if (addr == RXCS) {
@@ -179,174 +206,281 @@ void dump()
 //        }
 //        default: break;
 //    }
-//}
-
-void fill_buffer()
-{
-//    if (m_buffer_index == SECTOR_SIZE) {
-//        return;
-//    }
-//
-//
-//    if (!is_transfer_flag_set()) {
-//        clear_transfer_flag();
-//
-//        m_internal_buffer[m_buffer_index] = m_RXDB & 0377;
-//        clear_buffer_register();
-//        m_buffer_index++;
-//        if (m_buffer_index != SECTOR_SIZE) {
-//            set_transfer_flag();
-//        } else {
-//            clear_all_flags();
-//            set_done_flag();
-//            m_buffer_index = 0;
-//            m_state = DiskControllerState::DONE;
-//            m_function = DiskControllerFunction::IDLE;
-//        }
-//    } else {
-//
-//    }
 }
 
-void empty_buffer()
+void
+fill_buffer()
 {
-//    if (m_buffer_index == SECTOR_SIZE) {
-//        return;
-//    }
-//
-//    if (!is_transfer_flag_set()) {
-//        m_RXDB = m_internal_buffer[m_buffer_index];
-//        m_buffer_index++;
-//        if (m_buffer_index != SECTOR_SIZE) {
-//            set_transfer_flag();
-//        } else {
-//            clear_all_flags();
-//            set_done_flag();
-//            m_buffer_index = 0;
-//            m_state = DiskControllerState::DONE;
-//            m_function = DiskControllerFunction::IDLE;
-//        }
-//    }
+	if (DSK_STATE.buffer_idx == SECTOR_SIZE) {
+		return;
+	}
+
+	if (is_transfer_flag_set()) {
+		return;
+	}
+
+	clear_transfer_flag();
+
+	DSK_STATE.internal_buffer[DSK_STATE.buffer_idx] = (
+		DSK_STATE.rxdb & 0377
+	);
+	clear_buffer_register();
+	DSK_STATE.buffer_idx++;
+	if (DSK_STATE.buffer_idx != SECTOR_SIZE) {
+		 set_transfer_flag();
+	} else {
+		clear_all_flags();
+		set_done_flag();
+
+		DSK_STATE.buffer_idx = 0;
+		DSK_STATE.op = DSK_OP_DONE;
+		DSK_STATE.func = DSK_FUNC_IDLE;
+	}
 }
 
-void read_sector()
+void
+empty_buffer()
 {
-//    if (m_state == DiskControllerState::SECTOR && !is_transfer_flag_set()) {
-//        m_sector = m_RXDB;
-//        m_state = DiskControllerState::TRACK;
-//        set_transfer_flag();
-//    } else if (m_state == DiskControllerState::TRACK && !is_transfer_flag_set()) {
-//        m_track = m_RXDB;
-//        m_state = DiskControllerState::WRITE_SECTOR;
-//    } else if (m_state == DiskControllerState::WRITE_SECTOR) {
-//        if (m_disk_media != NULL) {
-//            // 3328 bytes per track.
-//            uint32_t track_offset = 3328 * m_track;
-//            uint32_t disk_offset = track_offset + (128 * m_sector);
-//            fseek(m_disk_media, disk_offset, SEEK_SET);
-//            fread(m_internal_buffer, sizeof(uint8_t), 128, m_disk_media);
-//        }
-//
-//        m_state = DiskControllerState::DONE;
-//        m_function = DiskControllerFunction::IDLE;
-//        m_sector = 0;
-//        m_track = 0;
-//    }
+	if (DSK_STATE.buffer_idx == SECTOR_SIZE) {
+		return;
+	}
+
+	if (is_transfer_flag_set()) {
+		return;
+	}
+
+	DSK_STATE.rxdb = (
+		DSK_STATE.internal_buffer[DSK_STATE.buffer_idx]
+	);
+	DSK_STATE.buffer_idx++;
+	if (DSK_STATE.buffer_idx != SECTOR_SIZE) {
+		set_transfer_flag();
+	} else {
+		clear_all_flags();
+		set_done_flag();
+
+		DSK_STATE.buffer_idx = 0;
+		DSK_STATE.op = DSK_OP_DONE;
+		DSK_STATE.func = DSK_FUNC_IDLE;
+	}
 }
 
-void write_sector()
+void
+read_sector()
 {
-//    if (m_state == DiskControllerState::SECTOR && !is_transfer_flag_set()) {
-//        m_sector = m_RXDB;
-//        m_state = DiskControllerState::TRACK;
-//        set_transfer_flag();
-//    } else if (m_state == DiskControllerState::TRACK && !is_transfer_flag_set()) {
-//        m_track = m_RXDB;
-//        m_state = DiskControllerState::WRITE_SECTOR;
-//    } else if (m_state == DiskControllerState::WRITE_SECTOR) {
-//        if (m_disk_media != NULL) {
-//            // 3328 bytes per track.
-//            uint32_t track_offset = 3328 * m_track;
-//            uint32_t disk_offset = track_offset + (128 * m_sector);
-//            fseek(m_disk_media, disk_offset, SEEK_SET);
-//            fwrite(m_internal_buffer, sizeof(uint8_t), 128, m_disk_media);
-//        }
-//
-//        m_state = DiskControllerState::DONE;
-//        m_function = DiskControllerFunction::IDLE;
-//        m_sector = 0;
-//        m_track = 0;
-//    }
+	if (DSK_STATE.op == DSK_OP_SECTOR && !is_transfer_flag_set()) {
+		DSK_STATE.sector = DSK_STATE.rxdb;
+		DSK_STATE.op = DSK_OP_TRACK;
+		set_transfer_flag();
+	} else if (DSK_STATE.op == DSK_OP_TRACK && !is_transfer_flag_set()) {
+		DSK_STATE.track = DSK_STATE.rxdb;
+		DSK_STATE.op = DSK_OP_WRITE_SECTOR;
+	} else if (DSK_STATE.op == DSK_OP_WRITE_SECTOR) {
+		if (DSK_STATE.disk_media != -1) {
+			uint32_t track_offset = TRACK_SIZE * DSK_STATE.track;
+			uint32_t disk_offset = track_offset + (SECTOR_SIZE * DSK_STATE.sector);
+			lseek(DSK_STATE.disk_media, disk_offset, SEEK_SET);
+			read(DSK_STATE.disk_media, DSK_STATE.internal_buffer, sizeof(uint8_t) * SECTOR_SIZE);
+		}
+
+		DSK_STATE.op = DSK_OP_DONE;
+		DSK_STATE.func = DSK_FUNC_IDLE;
+		DSK_STATE.sector = 0;
+		DSK_STATE.track = 0;
+	}
 }
 
-void clear_buffer_register()
+void
+write_sector()
 {
-//    m_RXDB = 0;
+	if (DSK_STATE.op == DSK_OP_SECTOR && !is_transfer_flag_set()) {
+		DSK_STATE.sector = DSK_STATE.rxdb;
+		DSK_STATE.op = DSK_OP_TRACK;
+		set_transfer_flag();
+	} else if (DSK_STATE.op == DSK_OP_TRACK && !is_transfer_flag_set()) {
+		DSK_STATE.track = DSK_STATE.rxdb;
+		DSK_STATE.op = DSK_OP_WRITE_SECTOR;
+	} else if (DSK_STATE.op == DSK_OP_WRITE_SECTOR) {
+		if (DSK_STATE.disk_media != -1) {
+			uint32_t track_offset = TRACK_SIZE * DSK_STATE.track;
+			uint32_t disk_offset = track_offset + (SECTOR_SIZE * DSK_STATE.sector);
+			lseek(DSK_STATE.disk_media, disk_offset, SEEK_SET);
+			/* XXX was internal_buffer previously uint8_t? */
+			write(DSK_STATE.disk_media, DSK_STATE.internal_buffer, sizeof(uint8_t) * 128);
+		}
+		DSK_STATE.op = DSK_OP_DONE;
+		DSK_STATE.func = DSK_FUNC_IDLE;
+		DSK_STATE.sector = 0;
+		DSK_STATE.track = 0;
+	}
 }
 
-void set_status_register(uint16_t data)
+void
+clear_buffer_register()
 {
-//    // Only allow writeable fields to be set.
-//    data &= RXCS_WRITE_MASK;
-//    m_RXCS |= data;
+	DSK_STATE.rxdb = 0;
 }
 
-void set_transfer_flag()
+void
+set_status_register(uint16_t data)
 {
-//    if ((m_RXCS & static_cast<uint16_t>(RXCSFlag::XFER)) == 0) {
-//        m_RXCS |= static_cast<uint16_t>(RXCSFlag::XFER);
-//    }
+	/* Only allow writeable fields to be set. */
+	data &= RXCS_WRITE_MASK;
+	DSK_STATE.rxcs |= data;
 }
 
-void clear_transfer_flag()
+void
+set_transfer_flag()
 {
-//    m_RXCS = m_RXCS & ~static_cast<uint16_t>(RXCSFlag::XFER);
+	if ((DSK_STATE.rxcs & RXCS_FLAG_XFER) == 0) {
+		DSK_STATE.rxcs |= RXCS_FLAG_XFER;
+	}
 }
 
-uint8_t is_transfer_flag_set()
+void
+clear_transfer_flag()
 {
-//    if (m_RXCS & static_cast<uint16_t>(RXCSFlag::XFER)) {
-//        return true;
-//    } else {
-//        return false;
-//    }
+	DSK_STATE.rxcs = DSK_STATE.rxcs & RXCS_FLAG_XFER;
 }
 
-void set_done_flag()
+uint8_t
+is_transfer_flag_set()
 {
-//    if ((m_RXCS & static_cast<uint16_t>(RXCSFlag::DONE)) == 0) {
-//        m_RXCS |= static_cast<uint16_t>(RXCSFlag::DONE);
-//    }
+	if (DSK_STATE.rxcs & RXCS_FLAG_XFER) {
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
-void clear_done_flag()
+void
+set_done_flag()
 {
-//    if (m_RXCS & static_cast<uint16_t>(RXCSFlag::DONE)) {
-//        m_RXCS ^= static_cast<uint16_t>(RXCSFlag::DONE);
-//    }
+	if ((DSK_STATE.rxcs & RXCS_FLAG_DONE) == 0) {
+		DSK_STATE.rxcs |= RXCS_FLAG_DONE;
+	}
 }
 
-uint8_t is_done_flag_set()
+/* XXX Unused?
+void
+clear_done_flag()
 {
-//    if (m_RXCS & static_cast<uint16_t>(RXCSFlag::DONE)) {
-//        return true;
-//    } else {
-//        return false;
-//    }
+	if (DSK_STATE.rxcs & RXCS_FLAG_DONE) {
+		DSK_STATE.rxcs ^= RXCS_FLAG_DONE;
+	}
+}
+*/
+
+/* XXX Unused?
+uint8_t
+is_done_flag_set()
+{
+	if (DSK_STATE.rxcs & RXCS_FLAG_DONE) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+*/
+
+/* XXX Unused?
+void
+clear_writable_flags()
+{
+	DSK_STATE.rxcs = DSK_STATE.rxcs & ~RXCS_WRITE_MASK;
+}
+*/
+
+void
+clear_all_flags()
+{
+	DSK_STATE.rxcs = 0;
 }
 
-void clear_writeable_flags()
+void
+usage()
 {
-//    m_RXCS = m_RXCS & ~RXCS_WRITE_MASK;
+	fprintf(stderr, "disk -f <disk image>\n");
 }
 
-void clear_all_flags()
+void
+handler(int signo, siginfo_t *info, void *context)
 {
-//    m_RXCS = 0;
+	/* Signal and join bus threads. */
+	if (BUS_STATE != NULL) {
+		cleanup_bus(BUS_STATE);
+	}
+
+	shutdown_disk();
+
+	exit(EXIT_SUCCESS);
 }
 
-int main(int argc, char **argv)
+
+int
+main(int argc, char **argv)
 {
-    return 0;
+	/* Setup signal handler. */
+	struct sigaction act = { 0 };
+	act.sa_flags = SA_SIGINFO;
+	act.sa_sigaction = &handler;
+	if (sigaction(SIGHUP, &act, NULL) == -1) {
+		perror("sigaction");
+		exit(EXIT_FAILURE);
+	}
+
+	if (sigaction(SIGINT, &act, NULL) == -1) {
+		perror("sigaction");
+		exit(EXIT_FAILURE);
+	}
+
+	/* Setup disk service. */
+	int ret, opt;
+	char *sock_l = "mem";
+	char *sock_name = "disk";
+	char *disk_image = NULL;
+
+	while ((opt = getopt(argc, argv, "i:")) != -1) {
+		switch (opt) {
+		case 'i':
+			disk_image = optarg;
+			break;
+		default:
+			usage();
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	if (disk_image == NULL) {
+		usage();
+		fprintf(stderr, "must specify a disk image\n");
+		exit(EXIT_FAILURE);
+	}
+
+	pid_t pid = getpid();
+	fprintf(stderr, "disk is starting [%d]\n", pid);
+
+	BUS_STATE = init_bus(sock_l, sock_name, NULL);
+	if (BUS_STATE == NULL) {
+		fprintf(stderr, "failed to initialize bus state.\n");
+		exit(EXIT_FAILURE);
+	}
+	BUS_STATE->addr_internal_to_device = &is_local_addr;
+
+	ret = connect_device_bus(BUS_STATE);
+	if (ret != 0) {
+		fprintf(stderr, "failed to connect to bus.\n");
+		exit(EXIT_FAILURE);
+	}
+	if (BUS_STATE == NULL) {
+		fprintf(stderr, "failed to initialize bus state.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	init_disk();
+	execute();
+	shutdown_disk();
+
+	return 0;
 }
 

@@ -13,6 +13,10 @@ MEM_C = $(wildcard src/mem/*.c)
 MEM_H = $(wildcard src/mem/*.h)
 MEM_OBJ = ${MEM_C:.c=.o}
 
+DISK_C = $(wildcard src/disk/*.c)
+DISK_H = $(wildcard src/disk/*.h)
+DISK_OBJ = ${DISK_C:.c=.o}
+
 LIBLOAD_C = $(wildcard src/libload/*.c)
 LIBLOAD_H = $(wildcard src/libload/*.h)
 LIBLOAD_OBJ = ${LIBLOAD_C:.c=.o}
@@ -26,7 +30,7 @@ AS = $$HOME/opt/dev/pdp11-binutils/bin/pdp11-aout-as
 AS_BASIC_S = $(wildcard asm/as/basic/*.s)
 AS_BASIC_OBJ = ${AS_BASIC_S:.s=.aout}
 
-all: cpu mem
+all: cpu mem disk
 
 ${CPU_OBJ}: ${CPU_C}
 
@@ -37,6 +41,11 @@ ${MEM_OBJ}: ${MEM_C} ${MEM_H}
 
 mem: libunibus libload ${MEM_OBJ}
 	${CC} -o src/mem/$@ ${MEM_OBJ} ${DEVICE_LDFLAGS} ${UNIBUS_LDFLAGS} ${LOAD_LDFLAGS}
+
+${DISK_OBJ}: ${DISK_C}
+
+disk: libunibus ${DISK_OBJ}
+	${CC} -o src/disk/$@ ${DISK_OBJ} ${UNIBUS_LDFLAGS} ${DEVICE_LDFLAGS}
 
 ${LIBLOAD_OBJ}: ${LIBLOAD_C} ${LIBLOAD_H}
 
@@ -71,6 +80,8 @@ clean: clean_libload clean_libunibus
 	rm -f src/cpu/cpu.o
 	rm -f src/mem/mem
 	rm -f src/mem/mem.o
+	rm -f src/disk/disk
+	rm -f src/disk/disk.o
 	rm -f src/utilities/loader
 
 
