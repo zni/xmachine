@@ -26,8 +26,8 @@ typedef struct _mem {
 	uint8_t store[MEMBYTES];
 } mem_dev;
 
-mem_dev *MEM_STATE = NULL;
-bus_state *BUS_STATE = NULL;
+static mem_dev *MEM_STATE = NULL;
+static bus_state *BUS_STATE = NULL;
 
 static void usage();
 static uint8_t is_local_addr(uint32_t);
@@ -263,14 +263,14 @@ main(int argc, char **argv)
 
 	BUS_STATE = init_bus(sock_l, sock_name, NULL);
 	if (BUS_STATE == NULL) {
-		fprintf(stderr, "Failed to initialize bus.\n");
+		fprintf(stderr, "failed to initialize bus.\n");
 		exit(EXIT_FAILURE);
 	}
 	BUS_STATE->addr_internal_to_device = &is_local_addr;
 
 	ret = connect_device_bus(BUS_STATE);
 	if (ret != 0) {
-		fprintf(stderr, "Failed to connect to bus.\n");
+		fprintf(stderr, "failed to connect to bus.\n");
 		exit(EXIT_FAILURE);
 	}
 	execute();
