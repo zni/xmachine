@@ -10,6 +10,8 @@
 static void init_disk();
 static void shutdown_disk();
 static void execute();
+static void dump_disk_state();
+static void pending_bus_requests();
 static void fill_buffer();
 static void empty_buffer();
 static void read_sector();
@@ -87,6 +89,8 @@ execute()
 	halt = BUS_STATE->shutdown;
 	pthread_mutex_unlock(&(BUS_STATE)->state_mutex);
 	while (!halt) {
+		pending_bus_requests();
+
 		go_flag = RXCS_FLAG_GO & DSK_STATE.rxcs;
 		if (go_flag && ((DSK_STATE.op == DSK_OP_BEGIN) ||
 		                (DSK_STATE.op == DSK_OP_DONE))) {
@@ -146,66 +150,56 @@ execute()
 }
 
 void
-dump()
+dump_disk_state()
 {
-    //printw("RXCS: %07o\n", m_RXCS);
-    //printw("RXDB: %07o\n", m_RXDB);
-    //for (int i = 0; i < BUFFER_SIZE; i++) {
-    //    printw("%03o ", m_internal_buffer[i]);
-    //    if ((i + 1) % 16 == 0 && i != 0) {
-    //        printw("\n");
-    //    }
-    //}
-    //printw("\n");
-    //refresh();
+	fprintf(stdout, "RXCS: %07o\n", DSK_STATE.rxcs);
+	fprintf(stdout, "RXDB: %07o\n", DSK_STATE.rxdb);
 }
 
 void
-handle_bus_op(/*enum BusMessage t, uint32_t addr, uint16_t data*/)
+pending_bus_requests()
 {
-//    switch (t) {
-//        case BusMessage::DATI:
-//            if (addr == RXCS) {
-//                send(BusMessage::SSYN, addr, m_RXCS);
-//            } else if (addr == RXDB) {
-//                send(BusMessage::SSYN, addr, m_RXDB);
-//                clear_transfer_flag();
-//                clear_buffer_register();
-//            }
-//            break;
-//
-//        case BusMessage::DATOB:
-//            if (addr == RXCS) {
-//                set_status_register(data);
-//                send(BusMessage::SSYN, addr, data);
-//            } else if (addr == RXDB) {
-//                m_RXDB = data;
-//                clear_transfer_flag();
-//                send(BusMessage::SSYN, addr, data);
-//            }
-//            break;
-//
-//        case BusMessage::DATO:
-//            if (addr == RXCS) {
-//                set_status_register(data);
-//                send(BusMessage::SSYN, addr, data);
-//            } else if (addr == RXDB) {
-//                m_RXDB = data;
-//                clear_transfer_flag();
-//                send(BusMessage::SSYN, addr, data);
-//            }
-//            break;
-//        case BusMessage::DATIP: {
-//            break;
-//        }
-//        case BusMessage::MSYN: {
-//            break;
-//        }
-//        case BusMessage::SSYN: {
-//            break;
-//        }
-//        default: break;
-//    }
+	data_xfer_spec slave_req;
+
+	pthread_mutex_lock(&(BUS_STATE->perma_slave_mutex));
+	pthread_cond_wait(&(BUS_STATE->cond_perma_slave), &(BUS_STATE->perma_slave_mutex));
+	pthread_mutex_unlock(&(BUS_STATE->perma_slave_mutex));
+
+	switch (slave_req.op) {
+	case R_BLOCK_IN:
+		if (slave_req.addr == RXCS_ADDR) {
+			slave_req.value = DSK_STATE.rxcs;
+			data_bus_reply(BUS_STATE, &slave_req);
+		} else if (slave_req.addr == RXDB_ADDR) {
+			slave_req.value = DSK_STATE.rxdb;
+			clear_transfer_flag();
+			clear_buffer_register();
+			data_bus_reply(BUS_STATE, &slave_req);
+		}
+		break;
+
+	case R_BLOCK_OUTB:
+		if (slave_req.addr == RXCS_ADDR) {
+			set_status_register(slave_req.value);
+			data_bus_reply(BUS_STATE, &slave_req);
+		} else if (slave_req.addr == RXDB_ADDR) {
+			DSK_STATE.rxdb = slave_req.value;
+			clear_transfer_flag();
+			data_bus_reply(BUS_STATE, &slave_req);
+		}
+		break;
+
+	case R_BLOCK_OUT:
+		if (slave_req.addr == RXCS_ADDR) {
+			set_status_register(slave_req.value);
+			data_bus_reply(BUS_STATE, &slave_req);
+		} else if (slave_req.addr == RXDB_ADDR) {
+			DSK_STATE.rxdb = slave_req.value;
+			clear_transfer_flag();
+			data_bus_reply(BUS_STATE, &slave_req);
+		}
+		break;
+	}
 }
 
 void
@@ -412,6 +406,8 @@ handler(int signo, siginfo_t *info, void *context)
 	}
 
 	shutdown_disk();
+
+	dump_disk_state();
 
 	exit(EXIT_SUCCESS);
 }
